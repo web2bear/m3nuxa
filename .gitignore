@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+**/.vs/
+*.user
+config.json
+backups/
+resources/
+dist/
+.build-temp/
+.editor-build/

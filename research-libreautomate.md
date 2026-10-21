@@ -1,0 +1,31 @@
+# LibreAutomate/Au для самостоятельного приложения
+
+Проверено 21 октября 2026 года по документации автора, исходному коду и NuGet. Это исследование применимости, не результат запуска на компьютере пользователя.
+
+## Краткий вывод
+
+**Au можно использовать как библиотеку в самостоятельном C# приложении без редактора LibreAutomate.** Автор прямо описывает использование через NuGet вне приложения и указывает необходимые файлы; отдельный пакет [LibreAutomate 1.16.6](https://www.nuget.org/packages/LibreAutomate/1.16.6) нацелен на Windows/.NET 9 и 10. В [репозитории](https://github.com/qgindi/LibreAutomate) и [описании библиотеки](https://www.libreautomate.com/articles/Library.html) нет зависимости от AutoHotkey; в составе NuGet-пакета она также не обнаружена. Это подтверждает отсутствие **заявленной зависимости**, но не заменяет проверку конкретного опубликованного приложения. [Library](https://www.libreautomate.com/articles/Library.html), [NuGet](https://www.nuget.org/packages/LibreAutomate/1.16.6).
+
+Au закрывает сразу несколько сценариев первой версии: отправку одного сочетания `keys.send`, регистрацию сочетания вызова меню через `ActionTriggers.Hotkey`, открытие папки через `run.it`. Для минимального MVP это реальный кандидат на общую библиотеку автоматизации; выбор закрепить после короткого прототипа и проверки размера/поведения развёртывания. [keys.send](https://www.libreautomate.com/api/Au.keys.send.html), [ActionTriggers](https://www.libreautomate.com/api/Au.Triggers.ActionTriggers.html), [run.it](https://www.libreautomate.com/api/Au.run.it.html).
+
+## Лицензия и развёртывание
+
+- Исходный репозиторий редактора и библиотеки содержит [MIT LICENSE](https://github.com/qgindi/LibreAutomate/blob/master/LICENSE.txt). У опубликованного [NuGet-пакета также указана MIT](https://www.nuget.org/packages/LibreAutomate/1.16.6). Отдельной лицензии редактора в проверенном корневом LICENSE не видно; при распространении сохранять уведомление об авторских правах и лицензию.
+- Документация перечисляет `Au.dll`, `AuCpp.dll`, `Au.DllHost.exe`; последние два являются native-файлами, используемыми `Au.dll`. В NuGet-режиме они находятся в `runtimes`. Если копировать библиотеку вручную, native-файлы надо включить в поставку. Автор рекомендует Windows-манифест с DPI-awareness и `disableWindowFiltering`. [Library](https://www.libreautomate.com/articles/Library.html).
+- Опубликованный пакет 1.16.6 содержит `Au.dll` для `net9.0-windows7.0` и `net10.0-windows7.0`, а также `AuCpp.dll` и `Au.DllHost.exe` для `win-x86`, `win-x64`, `win-arm64`. Список установлен прямой проверкой ZIP-содержимого [официального NuGet-пакета](https://www.nuget.org/packages/LibreAutomate/1.16.6); NuGet-страница показывает «No dependencies» для целевых .NET frameworks, что не означает отсутствие перечисленных native-файлов.
+- В независимом приложении редактор/его процесс не требуется по [инструкции автора](https://www.libreautomate.com/articles/Library.html). Понадобится подходящий .NET runtime либо самостоятельная поставка runtime по правилам публикации .NET; конкретную публикацию здесь не испытывали.
+
+## Возможности по задачам
+
+| Задача | Подтверждение | Оговорка |
+| --- | --- | --- |
+| Отправить одно сочетание в активное приложение | [`keys.send("Ctrl+A")` и другие примеры](https://www.libreautomate.com/api/Au.keys.send.html); документация говорит, что используется `SendInput`. | Автор отмечает, что стандартный процесс не отправит ввод процессу с правами администратора/uiAccess. Фокус и конкретное приложение проверять отдельно. |
+| Вызвать меню одним глобальным сочетанием | [`ActionTriggers.Hotkey["Ctrl+K"]` и `Triggers.Run()`](https://www.libreautomate.com/api/Au.Triggers.ActionTriggers.html). | В независимом tray-приложении проверить жизненный цикл триггера, поток и конфликты сочетаний. Не путать с `keys.send`: это разные операции. |
+| Активировать окно | [Пример `wnd.find(...).Activate()`](https://www.libreautomate.com/cookbook/Find%20window%2C%20controls%2C%20activate.html). | Ограничения фокуса Windows и повышенных окон проверить на целевых программах. |
+| Открыть папку | [`run.it` принимает каталог](https://www.libreautomate.com/api/Au.run.it.html). | Документация прямо говорит, что ShellExecuteEx **может не создать новый процесс/окно**. Требование «каждый раз новое окно Explorer» отдельно проверить и при необходимости решить специальным способом. |
+| Файловые операции | [`filesystem` содержит copy, move, delete, enumerate, load/save](https://www.libreautomate.com/api/Au.filesystem.html). | Копирование и перемещение выделенных файлов в папку назначения уже входят в первую версию. Нужно проверить поведение при совпадении имён, частичном сбое и переносе между дисками; сравнить удобство с системными файловыми операциями Windows. |
+| Выделение файлов Explorer | В [исходнике `ExplorerFolder`](https://github.com/qgindi/LibreAutomate/blob/master/Au/Files,%20data/ExplorerFolder.cs) имеются `Of(wnd)`, `All(...)`, `GetSelectedItems()`, также код для вкладок Explorer. | Публичную документированную гарантию работы во всех версиях Explorer не нашли. Проверить активную вкладку и многовыбор на Windows пользователя. Временно возможен [`clipboard.copy`](https://www.libreautomate.com/api/Au.clipboard.copy.html), но он отправляет `Ctrl+C` и восстанавливает буфер, поэтому это другой по поведению способ. |
+
+## Рекомендация для MVP
+
+Предлагаемый эксперимент: самостоятельное C# tray-приложение с NuGet `LibreAutomate`: сочетание вызова меню, открытие папки новым окном, запуск программы с параметрами, отправка сочетания и копирование/перемещение выделенных файлов Explorer. Проверить работу без установки редактора и AutoHotkey, поставку native-файлов, конфликт горячей клавиши, целевое приложение с обычными и повышенными правами, а также активную вкладку и многовыбор Explorer. Только после этой проверки решать, использовать Au как общую основу или ограничить его модулем действий. Это предложение проверки, а не согласованное начало реализации. [Library](https://www.libreautomate.com/articles/Library.html), [keys.send](https://www.libreautomate.com/api/Au.keys.send.html), [ActionTriggers](https://www.libreautomate.com/api/Au.Triggers.ActionTriggers.html), [run.it](https://www.libreautomate.com/api/Au.run.it.html).
