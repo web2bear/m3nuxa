@@ -13,6 +13,8 @@ dotnet publish src/ContexWin.App/ContexWin.App.csproj -c Release -r win-x64 --se
 dotnet publish src/ContexWin.Mcp/ContexWin.Mcp.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishReadyToRun=false -o dist/ContexWin
 ```
 
+Перед повторной публикацией завершите `ContexWin.App.exe` через пункт «Выход» в трее: работающий экземпляр удерживает файл в `dist/ContexWin`, и публикация завершается ошибкой `GenerateBundle: Access denied`.
+
 Перенесите папку `dist/ContexWin` целиком. Она должна быть доступна для записи. Автозапуск включается из служебного меню трея.
 
 ## Редактор
