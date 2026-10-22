@@ -146,11 +146,14 @@ internal sealed class TrayApplication : ApplicationContext
     {
         var invocation = InvocationContext.Capture(_foreground.LastWindow);
         DisposeMenu();
-        _menu = new ContextMenuStrip();
+        _menu = new ContextMenuStrip { AutoClose = true };
         LauncherMenu.Style(_menu);
         FillMenu(_menu.Items, nodes, invocation);
         if (_menu.Items.Count == 0) _menu.Items.Add("Меню пусто").Enabled = false;
         _menu.Show(Cursor.Position);
+        // A menu opened from a global hotkey has no active owner window. Give the
+        // visible drop-down foreground activation so outside clicks dismiss it.
+        NativeMethods.SetForegroundWindow(_menu.Handle);
     }
 
     private void FillMenu(ToolStripItemCollection target, IEnumerable<MenuNode> nodes, InvocationContext invocation)
@@ -162,7 +165,9 @@ internal sealed class TrayApplication : ApplicationContext
             {
                 Image = ItemIcon.Load(node),
                 ShortcutKeyDisplayString = node.Hotkey,
-                Padding = new Padding(4, 5, 8, 5)
+                Padding = new Padding(6, 6, 12, 6),
+                ImageAlign = ContentAlignment.MiddleLeft,
+                TextAlign = ContentAlignment.MiddleLeft
             };
             target.Add(item);
             if (node.Kind == MenuNodeKind.Group) { LauncherMenu.Style(item.DropDown); FillMenu(item.DropDownItems, node.Children, invocation); }

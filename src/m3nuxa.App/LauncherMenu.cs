@@ -16,7 +16,7 @@ internal static class LauncherMenu
         menu.BackColor = background;
         menu.ForeColor = foreground;
         menu.Font = new Font("Segoe UI", 10);
-        menu.Padding = new Padding(5);
+        menu.Padding = new Padding(8);
         menu.ImageScalingSize = new Size(20, 20);
         menu.DropShadowEnabled = true;
         menu.Renderer = new MenuRenderer(background, foreground, highContrast ? SystemColors.Highlight : dark ? Color.FromArgb(55, 55, 55) : Color.FromArgb(234, 234, 234));
@@ -45,7 +45,12 @@ internal static class LauncherMenu
             e.Graphics.FillPath(brush, path);
         }
         protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
-        { e.TextColor = !e.Item.Enabled ? SystemColors.GrayText : SystemInformation.HighContrast && e.Item.Selected ? SystemColors.HighlightText : foreground; base.OnRenderItemText(e); }
+        {
+            e.TextColor = !e.Item.Enabled ? SystemColors.GrayText : SystemInformation.HighContrast && e.Item.Selected ? SystemColors.HighlightText : foreground;
+            // Segoe UI glyphs sit optically above the center of the image slot.
+            e.TextRectangle = new Rectangle(e.TextRectangle.X, e.TextRectangle.Y + 2, e.TextRectangle.Width, e.TextRectangle.Height);
+            base.OnRenderItemText(e);
+        }
         protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e)
         { e.ArrowColor = foreground; base.OnRenderArrow(e); }
         protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
