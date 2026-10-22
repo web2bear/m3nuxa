@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "m3nuxa.Editor (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "m3nuxa.Editor (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

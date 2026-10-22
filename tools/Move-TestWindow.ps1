@@ -1,9 +1,9 @@
-param([string]$ProcessName = 'ContexWin.Editor')
+param([string]$ProcessName = 'm3nuxa.Editor')
 $ErrorActionPreference = 'Stop'
 Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
-public static class ContexWinTestDisplay {
+public static class m3nuxaTestDisplay {
     [StructLayout(LayoutKind.Sequential)] struct Rect { public int Left, Top, Right, Bottom; }
     [StructLayout(LayoutKind.Sequential)] struct MonitorInfo { public int Size; public Rect Bounds, Work; public uint Flags; }
     delegate bool MonitorCallback(IntPtr monitor, IntPtr dc, IntPtr rectangle, IntPtr data);
@@ -37,5 +37,5 @@ for ($attempt = 0; $attempt -lt 30 -and $window -eq [IntPtr]::Zero; $attempt++) 
     if ($process) { $window = $process.MainWindowHandle } else { Start-Sleep -Milliseconds 100 }
 }
 if ($window -eq [IntPtr]::Zero) { throw "No visible test window for $ProcessName" }
-if ([ContexWinTestDisplay]::Move($window)) { Write-Output 'Test window moved to the second monitor.' }
+if ([m3nuxaTestDisplay]::Move($window)) { Write-Output 'Test window moved to the second monitor.' }
 else { Write-Output 'Only one monitor is available; using the current monitor.' }

@@ -1,29 +1,29 @@
-﻿param(
+param(
     [ValidateSet('win-x64', 'win-x86', 'win-arm64')]
     [string]$RuntimeIdentifier = 'win-x64'
 )
 
 $ErrorActionPreference = 'Stop'
-$output = Join-Path $PSScriptRoot 'dist/ContexWin'
+$output = Join-Path $PSScriptRoot 'dist/m3nuxa'
 $platform = $RuntimeIdentifier.Substring(4)
 
-foreach ($process in @(Get-Process -Name 'ContexWin.App', 'ContexWin.Editor' -ErrorAction SilentlyContinue)) {
+foreach ($process in @(Get-Process -Name 'm3nuxa.App', 'm3nuxa.Editor' -ErrorAction SilentlyContinue)) {
     Write-Host "Останавливаю $($process.ProcessName) (PID $($process.Id)) перед публикацией."
     Stop-Process -Id $process.Id -Force
     Wait-Process -Id $process.Id -Timeout 10 -ErrorAction SilentlyContinue
 }
 
-dotnet publish (Join-Path $PSScriptRoot 'src/ContexWin.Editor/ContexWin.Editor.csproj') -c Release -p:Platform=$platform -r $RuntimeIdentifier --self-contained true -p:PublishTrimmed=false -p:PublishReadyToRun=false -o $output
+dotnet publish (Join-Path $PSScriptRoot 'src/m3nuxa.Editor/m3nuxa.Editor.csproj') -c Release -p:Platform=$platform -r $RuntimeIdentifier --self-contained true -p:PublishTrimmed=false -p:PublishReadyToRun=false -o $output
 if ($LASTEXITCODE -ne 0) { throw 'Не удалось опубликовать редактор.' }
 
-dotnet publish (Join-Path $PSScriptRoot 'src/ContexWin.App/ContexWin.App.csproj') -c Release -r $RuntimeIdentifier --self-contained true -p:PublishSingleFile=true -p:PublishReadyToRun=false -o $output
+dotnet publish (Join-Path $PSScriptRoot 'src/m3nuxa.App/m3nuxa.App.csproj') -c Release -r $RuntimeIdentifier --self-contained true -p:PublishSingleFile=true -p:PublishReadyToRun=false -o $output
 if ($LASTEXITCODE -ne 0) { throw 'Не удалось опубликовать приложение.' }
 
-foreach ($name in @('ContexWin.App.exe', 'ContexWin.Editor.exe', 'ContexWin.Editor.pri')) {
+foreach ($name in @('m3nuxa.App.exe', 'm3nuxa.Editor.exe', 'm3nuxa.Editor.pri')) {
     if (-not (Test-Path -LiteralPath (Join-Path $output $name))) { throw "В публикации отсутствует $name" }
 }
 
-foreach ($name in @('ContexWin.Mcp.exe', 'ContexWin.Mcp.pdb')) {
+foreach ($name in @('m3nuxa.Mcp.exe', 'm3nuxa.Mcp.pdb')) {
     $legacyPath = Join-Path $output $name
     if (Test-Path -LiteralPath $legacyPath) { Remove-Item -LiteralPath $legacyPath -Force }
 }
@@ -47,5 +47,5 @@ foreach ($directory in Get-ChildItem -LiteralPath $output -Directory) {
 }
 
 Write-Host "Portable-папка готова: $output"
-$app = Start-Process -FilePath (Join-Path $output 'ContexWin.App.exe') -WorkingDirectory $output -PassThru
-Write-Host "ContexWin.App запущен (PID $($app.Id))."
+$app = Start-Process -FilePath (Join-Path $output 'm3nuxa.App.exe') -WorkingDirectory $output -PassThru
+Write-Host "m3nuxa.App запущен (PID $($app.Id))."
