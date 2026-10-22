@@ -44,7 +44,8 @@ public partial class App : Application
             await page.CheckTreeIconConsistencyAsync();
             await page.CheckExplorerIconsAsync();
             await page.CheckTreeReorderAsync();
-            await File.WriteAllTextAsync(resultPath, "PASS: initial tree and property icons agree; Explorer icons, shortcut import, image preview; tree labels, models and properties after reparenting and refresh.");
+            page.CheckApplyAvailability();
+            await File.WriteAllTextAsync(resultPath, "PASS: initial tree and property icons agree; Explorer icons, shortcut import, image preview; tree labels, models and properties after reparenting and refresh; apply availability and tooltip track net changes.");
             Environment.Exit(0);
         }
         catch (Exception ex)

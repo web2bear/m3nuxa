@@ -59,6 +59,40 @@ public sealed partial class MainPage
         PropertiesPanel.Children.Remove(visual);
     }
 
+    internal void CheckApplyAvailability()
+    {
+        config = new AppConfig { Items = [new MenuNode { Name = "Исходный пункт", Kind = MenuNodeKind.Action }] };
+        baseSnapshot = Snapshot();
+        undo.Clear(); redo.Clear();
+        dirty = false;
+        RefreshTree(); UpdateApplyState();
+        Check(false, "initial state");
+
+        Remember();
+        config.Items[0].Name = "Изменённый пункт";
+        MarkDirty();
+        Check(true, "after edit");
+
+        UndoClicked(this, null!);
+        Check(false, "after undo to original");
+
+        RedoClicked(this, null!);
+        Check(true, "after redo");
+
+        config.Items[0].Name = "Исходный пункт";
+        MarkDirty();
+        Check(false, "after matching original without undo");
+
+        void Check(bool expected, string stage)
+        {
+            if (dirty != expected || ApplyButton.IsEnabled != expected || ApplyMenuItem.IsEnabled != expected)
+                throw new Exception($"Apply availability is wrong {stage}.");
+            var tooltip = ToolTipService.GetToolTip(ApplyButton) as string;
+            if (tooltip != (expected ? "Есть несохранённые изменения. Применить их." : "Нет изменений для применения"))
+                throw new Exception($"Apply tooltip is wrong {stage}: {tooltip}.");
+        }
+    }
+
     internal async Task CheckTreeReorderAsync()
     {
         var action = new MenuNode { Name = "VLC media player", Kind = MenuNodeKind.Action, Action = new MenuAction() };

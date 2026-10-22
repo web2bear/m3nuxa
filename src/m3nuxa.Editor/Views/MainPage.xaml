@@ -3,12 +3,12 @@
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" RowDefinitions="Auto,Auto,*,Auto">
-        <Grid Grid.Row="0" Padding="20,14,20,14" ColumnDefinitions="*,Auto">
+        <Grid Grid.Row="0" Padding="20,14,20,14">
             <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
                 <TextBlock Text="m3nuxa" FontSize="22" FontWeight="SemiBold" VerticalAlignment="Center" />
                 <MenuBar VerticalAlignment="Center">
                     <MenuBarItem Title="Файл">
-                        <MenuFlyoutItem Text="Применить" Click="ApplyClicked" />
+                        <MenuFlyoutItem x:Name="ApplyMenuItem" Text="Применить" IsEnabled="False" Click="ApplyClicked" />
                         <MenuFlyoutItem Text="Загрузить конфигурацию…" Click="LoadClicked" />
                         <MenuFlyoutItem Text="Перезагрузить" Click="ReloadClicked" />
                         <MenuFlyoutSeparator />
@@ -20,11 +20,11 @@
                     </MenuBarItem>
                 </MenuBar>
             </StackPanel>
-            <TextBlock x:Name="StatusText" Grid.Column="1" Text="Загрузка…" Opacity="0.68" VerticalAlignment="Center" />
         </Grid>
 
-        <Grid Grid.Row="1" Padding="12,0,12,8" ColumnDefinitions="Auto,*,Auto">
-            <AppBarButton Icon="Add" Label="Создать" AutomationProperties.Name="Создать пункт меню">
+        <Grid Grid.Row="1" Padding="12,0,12,8" ColumnDefinitions="Auto,*">
+            <StackPanel Orientation="Horizontal">
+                <AppBarButton Icon="Add" Label="Создать" AutomationProperties.Name="Создать пункт меню">
                     <AppBarButton.Flyout>
                         <MenuFlyout>
                             <MenuFlyoutItem Text="Папка…" Click="AddFolderClicked" />
@@ -36,7 +36,10 @@
                             <MenuFlyoutItem Text="Разделитель" Click="AddSeparatorClicked" />
                         </MenuFlyout>
                     </AppBarButton.Flyout>
-            </AppBarButton>
+                </AppBarButton>
+                <AppBarButton x:Name="ApplyButton" Icon="Accept" Label="Применить" IsEnabled="False" ToolTipService.ToolTip="Нет изменений для применения" Click="ApplyClicked" />
+                <AppBarButton Icon="Refresh" Label="Перезагрузить" MinWidth="116" Click="ReloadClicked" />
+            </StackPanel>
             <CommandBar Grid.Column="1" Background="Transparent" DefaultLabelPosition="Collapsed" OverflowButtonVisibility="Auto">
                 <AppBarButton x:Name="CutButton" Icon="Cut" Label="Вырезать" Click="CutClicked" />
                 <AppBarButton x:Name="CopyButton" Icon="Copy" Label="Копировать" Click="CopyClicked" />
@@ -45,14 +48,13 @@
                 <AppBarButton x:Name="DuplicateButton" Icon="Copy" Label="Дублировать" Click="DuplicateClicked" />
                 <AppBarButton x:Name="DeleteButton" Icon="Delete" Label="Удалить" Click="DeleteClicked" />
             </CommandBar>
-            <AppBarToggleButton x:Name="DetailsButton" Grid.Column="2" Icon="View" Label="Сведения" IsChecked="True" Click="DetailsClicked" AutomationProperties.Name="Показать или скрыть сведения о пункте" />
         </Grid>
 
         <Grid x:Name="WorkspaceGrid" Grid.Row="2" Padding="20,0,20,0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition x:Name="MenuColumn" Width="380" />
-                <ColumnDefinition x:Name="DetailsGapColumn" Width="8" />
-                <ColumnDefinition x:Name="DetailsColumn" Width="*" />
+                <ColumnDefinition Width="380" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
             <Grid x:Name="MenuPanel" Grid.Column="0" RowDefinitions="Auto,*,Auto" AllowDrop="True" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="12">
                 <StackPanel Padding="18,17,18,10" Spacing="4">
