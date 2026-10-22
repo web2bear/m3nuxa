@@ -30,6 +30,10 @@ internal static class LauncherMenu
     }
     private static async void LoadIcon(MenuFlyoutItemBase item, MenuNode node)
     {
+        // The presenter determines its icon column when it opens.
+        var icon = new ImageIcon { Width = (double)Application.Current.Resources["LauncherIconSize"], Height = (double)Application.Current.Resources["LauncherIconSize"] };
+        if (item is MenuFlyoutItem action) action.Icon = icon;
+        else if (item is MenuFlyoutSubItem group) group.Icon = icon;
         try
         {
             var bytes = await ItemIcon.PngAsync(node);
@@ -37,9 +41,7 @@ internal static class LauncherMenu
             using var stream = new InMemoryRandomAccessStream();
             await stream.WriteAsync(bytes.AsBuffer()); stream.Seek(0);
             var bitmap = new BitmapImage(); await bitmap.SetSourceAsync(stream);
-            var icon = new ImageIcon { Source = bitmap, Width = (double)Application.Current.Resources["LauncherIconSize"], Height = (double)Application.Current.Resources["LauncherIconSize"] };
-            if (item is MenuFlyoutItem action) action.Icon = icon;
-            else if (item is MenuFlyoutSubItem group) group.Icon = icon;
+            icon.Source = bitmap;
         }
         catch (Exception ex) { DevLog.Write("menu", "Icon failed", ex); }
     }
