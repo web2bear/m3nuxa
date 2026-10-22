@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Windows.Forms;
+using Keys = Windows.System.VirtualKey;
 
 namespace m3nuxa.App;
 
@@ -255,8 +255,8 @@ public sealed class ConfigStore
                 modifiers |= modifier;
                 continue;
             }
-            if (key != Keys.None || !Enum.TryParse<Keys>(part, true, out var parsed)
-                || !Enum.IsDefined(parsed) || parsed is Keys.None or Keys.Control or Keys.Shift or Keys.Alt)
+            if (key != Keys.None || !HotkeyParser.TryKey(part, out var parsed)
+                || parsed is Keys.None or Keys.Control or Keys.Shift or Keys.Menu)
                 return false;
             key = parsed;
         }

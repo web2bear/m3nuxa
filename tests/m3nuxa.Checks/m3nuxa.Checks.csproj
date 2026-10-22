@@ -1,10 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <UseWindowsForms>true</UseWindowsForms>
+
   </PropertyGroup>
-  <ItemGroup><ProjectReference Include="../../src/m3nuxa.App/m3nuxa.App.csproj" /></ItemGroup>
+  <ItemGroup><Compile Include="../../src/m3nuxa.App/ConfigModels.cs" Link="ConfigModels.cs" /><Compile Include="../../src/m3nuxa.App/ConfigStore.cs" Link="ConfigStore.cs" /><Compile Include="../../src/m3nuxa.App/ItemIcon.cs" Link="ItemIcon.cs" /><Compile Include="../../src/m3nuxa.App/HotkeyParser.cs" Link="HotkeyParser.cs" /><PackageReference Include="System.Drawing.Common" Version="9.0.6" /></ItemGroup>
 </Project>

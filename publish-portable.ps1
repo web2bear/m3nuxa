@@ -16,10 +16,10 @@ foreach ($process in @(Get-Process -Name 'm3nuxa.App', 'm3nuxa.Editor' -ErrorAct
 dotnet publish (Join-Path $PSScriptRoot 'src/m3nuxa.Editor/m3nuxa.Editor.csproj') -c Release -p:Platform=$platform -r $RuntimeIdentifier --self-contained true -p:PublishTrimmed=false -p:PublishReadyToRun=false -o $output
 if ($LASTEXITCODE -ne 0) { throw 'Не удалось опубликовать редактор.' }
 
-dotnet publish (Join-Path $PSScriptRoot 'src/m3nuxa.App/m3nuxa.App.csproj') -c Release -r $RuntimeIdentifier --self-contained true -p:PublishSingleFile=true -p:PublishReadyToRun=false -o $output
+dotnet publish (Join-Path $PSScriptRoot 'src/m3nuxa.App/m3nuxa.App.csproj') -c Release -p:Platform=$platform -r $RuntimeIdentifier --self-contained true -p:PublishTrimmed=false -p:PublishReadyToRun=false -o $output
 if ($LASTEXITCODE -ne 0) { throw 'Не удалось опубликовать приложение.' }
 
-foreach ($name in @('m3nuxa.App.exe', 'm3nuxa.Editor.exe', 'm3nuxa.Editor.pri')) {
+foreach ($name in @('m3nuxa.App.exe', 'm3nuxa.Editor.exe', 'm3nuxa.Editor.pri', 'm3nuxa.App.pri')) {
     if (-not (Test-Path -LiteralPath (Join-Path $output $name))) { throw "В публикации отсутствует $name" }
 }
 
