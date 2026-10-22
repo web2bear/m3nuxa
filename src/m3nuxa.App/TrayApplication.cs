@@ -161,7 +161,7 @@ internal sealed class TrayApplication : ApplicationContext
         foreach (var node in nodes)
         {
             if (node.Kind == MenuNodeKind.Separator) { target.Add(new ToolStripSeparator { Margin = new Padding(0, 2, 0, 2) }); continue; }
-            var item = new ToolStripMenuItem(node.Name)
+            var item = new LauncherMenu.Item(node.Name)
             {
                 Image = ItemIcon.Load(node),
                 ShortcutKeyDisplayString = node.Hotkey,

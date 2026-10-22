@@ -6,6 +6,27 @@ namespace m3nuxa.App;
 internal static class LauncherMenu
 {
     private const int MenuCornerDiameter = 20;
+    private const int SubmenuOverlap = 10;
+
+    internal sealed class Item(string text) : ToolStripMenuItem(text)
+    {
+        protected override Point DropDownLocation
+        {
+            get
+            {
+                var location = base.DropDownLocation;
+                if (Owner is not ToolStripDropDown parent) return location;
+
+                // Keep the framework's choice of side near a screen edge, but
+                // overlap the parent menu as Windows 11 context menus do.
+                var width = DropDown.GetPreferredSize(Size.Empty).Width;
+                location.X = location.X >= parent.Left
+                    ? parent.Right - SubmenuOverlap
+                    : parent.Left - width + SubmenuOverlap;
+                return location;
+            }
+        }
+    }
 
     public static void Style(ToolStripDropDown menu)
     {
@@ -59,9 +80,24 @@ internal static class LauncherMenu
         }
         protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e)
         {
-            e.ArrowColor = foreground;
-            e.ArrowRectangle = new Rectangle(e.ArrowRectangle.X - 12, e.ArrowRectangle.Y, e.ArrowRectangle.Width, e.ArrowRectangle.Height);
-            base.OnRenderArrow(e);
+            if (e.Item is null) return;
+            if (e.Direction is not (ArrowDirection.Right or ArrowDirection.Left))
+            {
+                e.ArrowColor = foreground;
+                base.OnRenderArrow(e);
+                return;
+            }
+
+            var menuWidth = e.Item.Owner?.ClientSize.Width ?? e.Item.Width;
+            var tipX = menuWidth - e.Item.Bounds.Left - 25;
+            var centerY = e.Item.Height / 2;
+            var stemX = e.Direction == ArrowDirection.Right ? tipX - 4 : tipX + 4;
+            var color = SystemInformation.HighContrast && e.Item.Selected ? SystemColors.HighlightText : foreground;
+            using var pen = new Pen(color, 1.5f);
+            var smoothing = e.Graphics.SmoothingMode;
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            e.Graphics.DrawLines(pen, [new Point(stemX, centerY - 4), new Point(tipX, centerY), new Point(stemX, centerY + 4)]);
+            e.Graphics.SmoothingMode = smoothing;
         }
         protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
         {
