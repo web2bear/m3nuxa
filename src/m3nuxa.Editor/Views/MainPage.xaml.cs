@@ -244,21 +244,9 @@ public sealed partial class MainPage : Page
         PasteButton.IsEnabled = copiedNode is not null || cutNodeId is not null;
     }
 
-    private void DetailsClicked(object sender, RoutedEventArgs args) => SetDetailsVisible(DetailsButton.IsChecked == true);
-
-    private void SetDetailsVisible(bool visible)
-    {
-        DetailsButton.IsChecked = visible;
-        DetailsPanel.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-        MenuColumn.Width = visible ? new GridLength(380) : new GridLength(1, GridUnitType.Star);
-        DetailsGapColumn.Width = visible ? new GridLength(8) : new GridLength(0);
-        DetailsColumn.Width = visible ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
-    }
-
     private void RenameClicked(object sender, RoutedEventArgs args)
     {
         if (selected is null || selected.Kind == MenuNodeKind.Separator) return;
-        SetDetailsVisible(true);
         if (PropertiesPanel.Children.FirstOrDefault() is TextBox name)
         {
             name.Focus(FocusState.Programmatic);
