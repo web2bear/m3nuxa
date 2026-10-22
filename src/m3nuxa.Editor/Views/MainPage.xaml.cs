@@ -66,14 +66,23 @@ public sealed partial class MainPage : Page
         baseSnapshot = Snapshot();
         draftReady = true;
         dirty = false; undo.Clear(); redo.Clear();
-        RefreshTree(); SetStatus();
+        RefreshTree(); UpdateApplyState();
         DevLog.Write("editor", "Current configuration loaded");
     }
 
     private void Remember() { undo.Push(Snapshot()); redo.Clear(); }
     private string Snapshot() => JsonSerializer.Serialize(config, JsonOptions);
-    private void MarkDirty() { dirty = true; SetStatus(); }
-    private void SetStatus() => StatusText.Text = dirty ? "Есть несохранённые изменения" : "Все изменения сохранены";
+    private void MarkDirty()
+    {
+        dirty = baseSnapshot is not null && Snapshot() != baseSnapshot;
+        UpdateApplyState();
+    }
+    private void UpdateApplyState()
+    {
+        ApplyButton.IsEnabled = dirty;
+        ApplyMenuItem.IsEnabled = dirty;
+        ToolTipService.SetToolTip(ApplyButton, dirty ? "Есть несохранённые изменения. Применить их." : "Нет изменений для применения");
+    }
     private void ShowNotice(string message, InfoBarSeverity severity = InfoBarSeverity.Informational)
     {
         if (severity is InfoBarSeverity.Error or InfoBarSeverity.Warning)
@@ -442,7 +451,7 @@ public sealed partial class MainPage : Page
         draftReady = false;
         var draft = EditorPipeClient.ReadDraft(await client.BeginAsync());
         if (draft is not null) { config = draft.Config; baseSnapshot = Snapshot(); draftReady = true; }
-        dirty = false; undo.Clear(); redo.Clear(); SetStatus(); Notice.IsOpen = false;
+        dirty = false; undo.Clear(); redo.Clear(); UpdateApplyState(); Notice.IsOpen = false;
         var warnings = response.Data?["Validation"]?["Warnings"]?.Deserialize<string[]>() ?? [];
         if (warnings.Length > 0) ShowNotice(string.Join("\n", warnings), InfoBarSeverity.Warning);
         return true;
