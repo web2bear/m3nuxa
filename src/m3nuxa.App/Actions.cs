@@ -49,7 +49,7 @@ internal sealed record ActionResult(int Succeeded, int Skipped, IReadOnlyList<st
 internal static class ActionExecutor
 {
     public static async Task<ActionResult> ExecuteAsync(MenuAction action, InvocationContext context,
-        IWin32Window? owner = null, CancellationToken cancellationToken = default)
+        nint owner = 0, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -81,7 +81,7 @@ internal static class ActionExecutor
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            MessageBox.Show(owner, ex.Message, "Действие не выполнено", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show( ex.Message, "Действие не выполнено", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return new ActionResult(0, 0, [ex.Message], false);
         }
     }
@@ -134,7 +134,7 @@ internal static class ActionExecutor
         if (!NativeMethods.SetForegroundWindow(context.SourceWindow) ||
             NativeMethods.GetForegroundWindow() != context.SourceWindow)
             throw new InvalidOperationException("Не удалось вернуть фокус исходному окну. Сочетание не отправлено.");
-        SendKeys.SendWait(ToSendKeys(shortcut));
+        KeyboardSender.Send(shortcut);
     }
 
     private static void InsertText(string text, InvocationContext context)
@@ -144,57 +144,11 @@ internal static class ActionExecutor
             throw new InvalidOperationException("Исходное окно уже закрыто.");
         if (!NativeMethods.SetForegroundWindow(context.SourceWindow) || NativeMethods.GetForegroundWindow() != context.SourceWindow)
             throw new InvalidOperationException("Не удалось вернуть фокус исходному окну. Текст не отправлен.");
-        foreach (var character in text)
-        {
-            var input = new[]
-            {
-                new UnicodeInput(1, 0, character, 0x0004, 0, IntPtr.Zero),
-                new UnicodeInput(1, 0, character, 0x0006, 0, IntPtr.Zero)
-            };
-            if (SendInput((uint)input.Length, input, Marshal.SizeOf<UnicodeInput>()) != input.Length)
-                throw new InvalidOperationException("Не удалось вставить весь текст в исходное окно.");
-        }
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private readonly struct UnicodeInput(uint type, ushort virtualKey, ushort scanCode, uint flags, uint time, IntPtr extraInfo)
-    {
-        public readonly uint Type = type;
-        public readonly ushort VirtualKey = virtualKey;
-        public readonly ushort ScanCode = scanCode;
-        public readonly uint Flags = flags;
-        public readonly uint Time = time;
-        public readonly IntPtr ExtraInfo = extraInfo;
-    }
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern uint SendInput(uint inputCount, UnicodeInput[] inputs, int inputSize);
-
-    private static string ToSendKeys(string shortcut)
-    {
-        var parts = shortcut.Split('+', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length == 0) throw new InvalidOperationException("Сочетание не задано.");
-        var prefix = new StringBuilder();
-        foreach (var part in parts[..^1])
-            prefix.Append(part.ToLowerInvariant() switch
-            {
-                "ctrl" or "control" => "^",
-                "alt" => "%",
-                "shift" => "+",
-                _ => throw new InvalidOperationException($"Неизвестный модификатор сочетания: {part}")
-            });
-        var key = parts[^1].ToUpperInvariant();
-        if (key.Length == 1 && char.IsLetterOrDigit(key[0])) return prefix + key;
-        if (key is "ENTER" or "TAB" or "ESC" or "ESCAPE" or "SPACE" or "DELETE" or "BACKSPACE" or
-            "UP" or "DOWN" or "LEFT" or "RIGHT" or "HOME" or "END" or "PGUP" or "PGDN" or
-            "INSERT" or "F1" or "F2" or "F3" or "F4" or "F5" or "F6" or "F7" or "F8" or
-            "F9" or "F10" or "F11" or "F12")
-            return prefix + "{" + (key == "ESCAPE" ? "ESC" : key) + "}";
-        throw new InvalidOperationException($"Неизвестная клавиша: {key}");
+        KeyboardSender.InsertText(text);
     }
 
     private static async Task<ActionResult> ExecuteFileOperationAsync(MenuAction action, InvocationContext context,
-        IWin32Window? owner, CancellationToken cancellationToken)
+        nint owner, CancellationToken cancellationToken)
     {
         if (context.SelectedPaths.Count == 0)
             throw new InvalidOperationException("В исходном окне Проводника нет выделенных файлов или папок.");
@@ -204,21 +158,23 @@ internal static class ActionExecutor
         using var dialog = new FileOperationProgressDialog(context.SelectedPaths.Count);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         dialog.CancelRequested += (_, _) => linked.Cancel();
-        dialog.Show(owner);
-        var ui = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
+        dialog.Activate();
+        var ui = SynchronizationContext.Current ?? throw new InvalidOperationException("UI thread required.");
         var result = await Task.Run(() => CopyOrMove(context.SelectedPaths, destination, move, linked.Token,
             (index, item) => ui.Post(_ => dialog.Report(index, item), null),
             path =>
             {
                 FileConflictChoice choice = FileConflictChoice.Cancel;
-                ui.Send(_ => choice = dialog.AskConflict(path), null);
+                var completion = new TaskCompletionSource<FileConflictChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
+                ui.Post(async _ => { try { completion.SetResult(await dialog.AskConflict(path)); } catch (Exception ex) { completion.SetException(ex); } }, null);
+                choice = completion.Task.GetAwaiter().GetResult();
                 return choice;
             }));
-        dialog.Close();
+        dialog.Dispose();
         var summary = $"Успешно: {result.Succeeded}; пропущено: {result.Skipped}; ошибок: {result.Failures.Count}." +
             (result.Cancelled ? " Операция отменена; уже выполненные перемещения сохранены." : "") +
             (result.Failures.Count > 0 ? "\n\n" + string.Join("\n", result.Failures) : "");
-        MessageBox.Show(owner, summary, "Результат файловой операции", MessageBoxButtons.OK,
+        MessageBox.Show( summary, "Результат файловой операции", MessageBoxButtons.OK,
             result.Failures.Count > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
         return result;
     }
@@ -412,48 +368,6 @@ internal static class CommandLineTokenizer
 }
 
 internal enum FileConflictChoice { Replace, Skip, Cancel }
-
-internal sealed class FileOperationProgressDialog : Form
-{
-    private readonly ProgressBar _progress = new() { Dock = DockStyle.Top };
-    private readonly Label _label = new() { Dock = DockStyle.Fill, AutoEllipsis = true };
-    public event EventHandler? CancelRequested;
-
-    public FileOperationProgressDialog(int count)
-    {
-        Text = "Файловая операция";
-        Width = 500;
-        Height = 160;
-        FormBorderStyle = FormBorderStyle.FixedDialog;
-        MaximizeBox = false;
-        MinimizeBox = false;
-        _progress.Maximum = count;
-        var cancel = new Button { Text = "Отмена", Dock = DockStyle.Bottom };
-        cancel.Click += (_, _) => { cancel.Enabled = false; CancelRequested?.Invoke(this, EventArgs.Empty); };
-        Controls.Add(_label);
-        Controls.Add(_progress);
-        Controls.Add(cancel);
-    }
-
-    public void Report(int completed, string path)
-    {
-        if (IsDisposed) return;
-        _progress.Value = Math.Min(completed, _progress.Maximum);
-        _label.Text = path;
-    }
-
-    public FileConflictChoice AskConflict(string path)
-    {
-        var choice = MessageBox.Show(this, $"Объект уже существует:\n{path}\n\nДа — заменить, Нет — пропустить, Отмена — остановить.",
-            "Конфликт имён", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
-        return choice switch
-        {
-            DialogResult.Yes => FileConflictChoice.Replace,
-            DialogResult.No => FileConflictChoice.Skip,
-            _ => FileConflictChoice.Cancel
-        };
-    }
-}
 
 internal static partial class NativeMethods
 {

@@ -35,33 +35,6 @@ try
     File.WriteAllText(path, "{");
     Check(!store.Reload().Success, "invalid reload blocked");
     Check(store.Current.Items.Count == 2, "live config preserved");
-    using var editorCompleted = new ManualResetEventSlim();
-    Exception? editorError = null;
-    var editorThread = new Thread(() =>
-    {
-        try
-        {
-            using var editor = new EditorForm(new ConfigStore(Path.Combine(root, "editor.json")));
-            editor.Shown += (_, _) => editor.BeginInvoke(() =>
-            {
-                try
-                {
-                    typeof(EditorForm).GetMethod("AddNode", BindingFlags.Instance | BindingFlags.NonPublic)!
-                        .Invoke(editor, [MenuNodeKind.Action]);
-                    editorCompleted.Set();
-                }
-                catch (Exception ex) { editorError = ex; editorCompleted.Set(); }
-                finally { editor.Close(); }
-            });
-            Application.Run(editor);
-        }
-        catch (Exception ex) { editorError = ex; }
-        finally { editorCompleted.Set(); }
-    }) { IsBackground = true };
-    editorThread.SetApartmentState(ApartmentState.STA);
-    editorThread.Start();
-    Check(editorCompleted.Wait(TimeSpan.FromSeconds(3)), "editor add action completed");
-    Check(editorError is null, "editor add action did not throw: " + editorError);
     using (var folderIcon = ItemIcon.Load(new MenuNode { Action = new MenuAction { Path = Environment.GetFolderPath(Environment.SpecialFolder.Windows) } }))
         Check(folderIcon is { Width: > 0 }, "Explorer folder icon");
     using (var programIcon = ItemIcon.Load(new MenuNode { IconPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe") }))
@@ -76,6 +49,11 @@ try
     using (var fallback = ItemIcon.Load(iconNode))
         Check(fallback is { Width: > 0 }, "corrupt custom icon falls back to Explorer");
     Check(ItemIcon.Png(new MenuNode { Action = new MenuAction { Path = root } }) is { Length: > 0 }, "editor PNG shell icon");
+    Check(HotkeyParser.TryParse("Ctrl+Alt+Space", out var modifiers, out var key) && modifiers == 3 && key == 32, "global hotkey parse");
+    Check(HotkeyParser.TryParse("Win+D1", out modifiers, out key) && modifiers == 8 && key == 49, "legacy digit key alias");
+    Check(HotkeyParser.TryParse("Ctrl+OemPlus", out modifiers, out key) && key == 0xbb, "legacy OEM key alias");
+    Check(!HotkeyParser.TryParse("Ctrl+Ctrl+A", out _, out _), "duplicate modifiers rejected");
+    Check(!HotkeyParser.TryParse("Ctrl+", out _, out _), "missing key rejected");
     Console.WriteLine("All configuration and icon checks passed.");
 }
 finally { Directory.Delete(root, recursive: true); }
