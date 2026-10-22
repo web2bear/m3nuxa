@@ -1,3 +1,8 @@
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Windowing;
+using Windows.Graphics;
+using Windows.ApplicationModel.DataTransfer;
 using System.Runtime.InteropServices;
 using System.Diagnostics;
 using System.Text.Json;
@@ -5,62 +10,61 @@ using Microsoft.Win32;
 
 namespace m3nuxa.App;
 
-internal sealed class TrayApplication : ApplicationContext
+internal sealed class TrayApplication : IDisposable
 {
     private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private readonly ConfigStore _store;
-    private readonly NotifyIcon _tray;
-    private readonly HotkeyWindow _hotkeys;
+    private readonly ShellIntegration _tray;
+    private readonly Window _window = new() { Title = "m3nuxa" };
+    private readonly Grid _root = new();
     private readonly ForegroundTracker _foreground;
     private AgentPipe? _agentPipe;
     private readonly McpHttpServer _mcpHttp = new();
     private readonly string _mcpSettingsPath = Path.Combine(AppContext.BaseDirectory, "mcp-http.json");
-    private ToolStripMenuItem _mcpMenuItem = null!;
-    private ToolStripMenuItem _copyMcpAddressItem = null!;
-    private ToolStripMenuItem _startupMenuItem = null!;
+    private ToggleMenuFlyoutItem _mcpMenuItem = new();
+    private ToggleMenuFlyoutItem _copyMcpAddressItem = new();
+    private ToggleMenuFlyoutItem _startupMenuItem = null!;
     private Process? _editor;
-    private ContextMenuStrip? _menu;
+    private MenuFlyout? _menu;
 
     public TrayApplication(ConfigStore store)
     {
         DevLog.Write("app", "TrayApplication starting");
         _store = store;
         _foreground = new ForegroundTracker();
-        _hotkeys = new HotkeyWindow(OnHotkey);
-        _tray = new NotifyIcon { Icon = SystemIcons.Application, Text = "m3nuxa", Visible = true, ContextMenuStrip = BuildServiceMenu() };
-        _tray.MouseClick += (_, e) => { if (e.Button == MouseButtons.Left) ShowMenu(_store.Current.Items); };
+        _window.Content = _root;
+        _window.AppWindow.IsShownInSwitchers = false;
+        var presenter = (OverlappedPresenter)_window.AppWindow.Presenter;
+        presenter.SetBorderAndTitleBar(false, false);
+        presenter.IsResizable = false;
+        _window.AppWindow.Resize(new SizeInt32(2, 2));
+        _tray = new ShellIntegration(_window, service => _window.DispatcherQueue.TryEnqueue(() =>
+        {
+            if (service) ShowFlyout(BuildServiceMenu()); else ShowMenu(_store.Current.Items);
+        }), node => _window.DispatcherQueue.TryEnqueue(() => OnHotkey(node)));
         RegisterHotkeys();
-        Application.Idle += StartAgentPipe;
+        _agentPipe = new AgentPipe(_store, RegisterHotkeys);
+        if (ReadMcpEnabled()) _ = SetMcpEnabledAsync(true, false);
+        _window.Closed += (_, _) => Dispose();
         DevLog.Write("app", "TrayApplication ready");
     }
 
-    private void StartAgentPipe(object? sender, EventArgs e)
+    private MenuFlyout BuildServiceMenu()
     {
-        Application.Idle -= StartAgentPipe;
-        _agentPipe = new AgentPipe(_store, RegisterHotkeys);
-        if (ReadMcpEnabled()) _ = SetMcpEnabledAsync(true, false);
-    }
-
-    private ContextMenuStrip BuildServiceMenu()
-    {
-        var menu = new ContextMenuStrip();
-        menu.Items.Add("Открыть редактор", null, (_, _) => OpenEditor());
-        menu.Items.Add("Перезагрузить конфигурацию", null, (_, _) => Reload());
-        _mcpMenuItem = new ToolStripMenuItem("MCP HTTP-сервер", null, (_, _) => _ = SetMcpEnabledAsync(!_mcpHttp.IsRunning, true));
+        var menu = LauncherMenu.Create();
+        void Add(string text, Action action) { var item = new MenuFlyoutItem { Text = text }; item.Click += (_, _) => action(); menu.Items.Add(item); }
+        Add("Открыть редактор", OpenEditor);
+        Add("Перезагрузить конфигурацию", Reload);
+        _mcpMenuItem = new ToggleMenuFlyoutItem { Text = "MCP HTTP-сервер", IsChecked = _mcpHttp.IsRunning };
+        _mcpMenuItem.Click += (_, _) => _ = SetMcpEnabledAsync(!_mcpHttp.IsRunning, true);
         menu.Items.Add(_mcpMenuItem);
-        _copyMcpAddressItem = new ToolStripMenuItem("Копировать адрес MCP", null, (_, _) => Clipboard.SetText(McpHttpServer.Endpoint));
+        _copyMcpAddressItem = new ToggleMenuFlyoutItem { Text = "Копировать адрес MCP", IsEnabled = _mcpHttp.IsRunning };
+        _copyMcpAddressItem.Click += (_, _) => { var data = new DataPackage(); data.SetText(McpHttpServer.Endpoint); Clipboard.SetContent(data); };
         menu.Items.Add(_copyMcpAddressItem);
-        _startupMenuItem = new ToolStripMenuItem("Автозапуск", null, (_, _) => ToggleStartup());
-        menu.Items.Add(_startupMenuItem);
-        menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Выход", null, async (_, _) => { await _mcpHttp.StopAsync(); ExitThread(); });
-        menu.Opening += (_, _) =>
-        {
-            _mcpMenuItem.Checked = _mcpHttp.IsRunning;
-            _mcpMenuItem.Enabled = _agentPipe is not null;
-            _copyMcpAddressItem.Enabled = _mcpHttp.IsRunning;
-            _startupMenuItem.Checked = IsStartupEnabled();
-        };
+        _startupMenuItem = new ToggleMenuFlyoutItem { Text = "Автозапуск", IsChecked = IsStartupEnabled() };
+        _startupMenuItem.Click += (_, _) => ToggleStartup(); menu.Items.Add(_startupMenuItem);
+        menu.Items.Add(new MenuFlyoutSeparator());
+        Add("Выход", async () => { await _mcpHttp.StopAsync(); Dispose(); _window.Close(); Application.Current.Exit(); });
         return menu;
     }
 
@@ -81,7 +85,7 @@ internal sealed class TrayApplication : ApplicationContext
 
     private async Task SetMcpEnabledAsync(bool enabled, bool save)
     {
-        _mcpMenuItem.Enabled = false;
+        _mcpMenuItem.IsEnabled = false;
         try
         {
             if (enabled) await _mcpHttp.StartAsync(_agentPipe ?? throw new InvalidOperationException("Редакторский канал ещё не готов."));
@@ -95,9 +99,9 @@ internal sealed class TrayApplication : ApplicationContext
         }
         finally
         {
-            _mcpMenuItem.Checked = _mcpHttp.IsRunning;
-            _mcpMenuItem.Enabled = true;
-            _copyMcpAddressItem.Enabled = _mcpHttp.IsRunning;
+            _mcpMenuItem.IsChecked = _mcpHttp.IsRunning;
+            _mcpMenuItem.IsEnabled = true;
+            _copyMcpAddressItem.IsEnabled = _mcpHttp.IsRunning;
         }
     }
 
@@ -145,52 +149,32 @@ internal sealed class TrayApplication : ApplicationContext
     private void ShowMenu(IReadOnlyList<MenuNode> nodes)
     {
         var invocation = InvocationContext.Capture(_foreground.LastWindow);
-        DisposeMenu();
-        _menu = new ContextMenuStrip { AutoClose = true };
-        LauncherMenu.Style(_menu);
-        FillMenu(_menu.Items, nodes, invocation);
-        if (_menu.Items.Count == 0) _menu.Items.Add("Меню пусто").Enabled = false;
-        _menu.Show(Cursor.Position);
-        // A menu opened from a global hotkey has no active owner window. Give the
-        // visible drop-down foreground activation so outside clicks dismiss it.
-        NativeMethods.SetForegroundWindow(_menu.Handle);
+        var menu = LauncherMenu.Create();
+        LauncherMenu.Fill(menu.Items, nodes, node => _ = Execute(node, invocation));
+        if (menu.Items.Count == 0) menu.Items.Add(new MenuFlyoutItem { Text = "Меню пусто", IsEnabled = false });
+        ShowFlyout(menu);
     }
 
-    private void FillMenu(ToolStripItemCollection target, IEnumerable<MenuNode> nodes, InvocationContext invocation)
+    private void ShowFlyout(MenuFlyout menu)
     {
-        foreach (var node in nodes)
+        _menu?.Hide();
+        _menu = menu;
+        GetCursorPos(out var cursor);
+        _window.AppWindow.Move(new PointInt32(cursor.X, cursor.Y));
+        _window.Activate();
+        NativeMethods.SetForegroundWindow(WinRT.Interop.WindowNative.GetWindowHandle(_window));
+        menu.Closed += (_, _) =>
         {
-            if (node.Kind == MenuNodeKind.Separator) { target.Add(new ToolStripSeparator { Margin = new Padding(0, 2, 0, 2) }); continue; }
-            var item = new LauncherMenu.Item(node.Name)
-            {
-                Image = ItemIcon.Load(node),
-                ShortcutKeyDisplayString = node.Hotkey,
-                Margin = new Padding(20, 0, 8, 0),
-                Padding = new Padding(8, 10, 14, 10),
-                ImageAlign = ContentAlignment.MiddleLeft,
-                TextAlign = ContentAlignment.MiddleLeft
-            };
-            target.Add(item);
-            if (node.Kind == MenuNodeKind.Group) { LauncherMenu.Style(item.DropDown); FillMenu(item.DropDownItems, node.Children, invocation); }
-            else item.Click += async (_, _) => await Execute(node, invocation);
-        }
+            if (!ReferenceEquals(_menu, menu)) return;
+            _menu = null;
+            if (!_disposed) _window.AppWindow?.Hide();
+        };
+        void Show() { if (ReferenceEquals(_menu, menu)) { menu.ShowAt(_root, new Windows.Foundation.Point(0, 0)); DevLog.Write("menu", "WinUI menu opened"); } }
+        if (_root.XamlRoot is null) { RoutedEventHandler? loaded = null; loaded = (_, _) => { _root.Loaded -= loaded; Show(); }; _root.Loaded += loaded; }
+        else Show();
     }
-
-    private void DisposeMenu()
-    {
-        if (_menu is null) return;
-        void Release(ToolStripItemCollection items)
-        {
-            foreach (ToolStripItem item in items)
-            {
-                item.Image?.Dispose(); item.Image = null;
-                if (item is ToolStripMenuItem child && child.HasDropDownItems) Release(child.DropDownItems);
-            }
-        }
-        Release(_menu.Items);
-        _menu.Dispose();
-        _menu = null;
-    }
+    [StructLayout(LayoutKind.Sequential)] private struct CursorPoint { public int X, Y; }
+    [DllImport("user32.dll")] private static extern bool GetCursorPos(out CursorPoint point);
 
     private async Task Execute(MenuNode node, InvocationContext? context)
     {
@@ -221,7 +205,7 @@ internal sealed class TrayApplication : ApplicationContext
             }
         }
         Walk(_store.Current.Items);
-        var unavailable = _hotkeys.Register(bindings);
+        var unavailable = _tray.Register(bindings);
         if (unavailable.Count > 0) _tray.ShowBalloonTip(5000, "Горячие клавиши недоступны", string.Join(", ", unavailable), ToolTipIcon.Warning);
     }
 
@@ -235,69 +219,17 @@ internal sealed class TrayApplication : ApplicationContext
     {
         using var key = Registry.CurrentUser.CreateSubKey(RunKey);
         if (key.GetValue("m3nuxa") is not null) key.DeleteValue("m3nuxa", false);
-        else key.SetValue("m3nuxa", $"\"{Application.ExecutablePath}\"");
+        else key.SetValue("m3nuxa", $"\"{Environment.ProcessPath}\"");
     }
 
-    protected override void ExitThreadCore()
+    private bool _disposed;
+    public void Dispose()
     {
-        _tray.Visible = false;
+        if (_disposed) return;
+        _disposed = true;
         _tray.Dispose();
-        DisposeMenu();
-        _hotkeys.Dispose();
+        _menu?.Hide();
         _foreground.Dispose();
         _agentPipe?.Dispose();
-        base.ExitThreadCore();
     }
-}
-
-internal sealed class HotkeyWindow : NativeWindow, IDisposable
-{
-    private readonly Action<MenuNode?> _onHotkey;
-    private readonly Dictionary<int, MenuNode?> _bindings = [];
-    private int _nextId;
-
-    public HotkeyWindow(Action<MenuNode?> onHotkey) { _onHotkey = onHotkey; CreateHandle(new CreateParams()); }
-
-    public List<string> Register(IEnumerable<(string Hotkey, MenuNode? Node)> bindings)
-    {
-        foreach (var id in _bindings.Keys) UnregisterHotKey(Handle, id);
-        _bindings.Clear();
-        var unavailable = new List<string>();
-        foreach (var (hotkey, node) in bindings)
-        {
-            if (!TryParse(hotkey, out var modifiers, out var key)) { if (!string.IsNullOrWhiteSpace(hotkey)) unavailable.Add(hotkey); continue; }
-            var id = ++_nextId;
-            if (RegisterHotKey(Handle, id, modifiers | 0x4000, key)) _bindings.Add(id, node);
-            else unavailable.Add(hotkey);
-        }
-        return unavailable;
-    }
-
-    private static bool TryParse(string hotkey, out uint modifiers, out uint key)
-    {
-        modifiers = key = 0;
-        foreach (var part in hotkey.Split('+', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
-        {
-            switch (part.ToLowerInvariant())
-            {
-                case "ctrl": case "control": modifiers |= 2; break;
-                case "alt": modifiers |= 1; break;
-                case "shift": modifiers |= 4; break;
-                case "win": modifiers |= 8; break;
-                default: if (!Enum.TryParse<Keys>(part, true, out var parsed)) return false; key = (uint)parsed & 0xffff; break;
-            }
-        }
-        return key != 0;
-    }
-
-    protected override void WndProc(ref Message message)
-    {
-        if (message.Msg == 0x0312 && _bindings.TryGetValue(message.WParam.ToInt32(), out var node)) _onHotkey(node);
-        base.WndProc(ref message);
-    }
-
-    public void Dispose() { foreach (var id in _bindings.Keys) UnregisterHotKey(Handle, id); DestroyHandle(); }
-
-    [DllImport("user32.dll", SetLastError = true)] private static extern bool RegisterHotKey(IntPtr window, int id, uint modifiers, uint key);
-    [DllImport("user32.dll", SetLastError = true)] private static extern bool UnregisterHotKey(IntPtr window, int id);
 }

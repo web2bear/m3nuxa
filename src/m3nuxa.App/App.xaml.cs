@@ -1,18 +1,15 @@
 namespace m3nuxa.App;
 
-static class Program
+public partial class App : Microsoft.UI.Xaml.Application
 {
-    /// <summary>
-    ///  The main entry point for the application.
-    /// </summary>
-    [STAThread]
-    static void Main()
+    private TrayApplication? tray;
+
+    public App() { InitializeComponent(); UnhandledException += (_, e) => DevLog.Write("app", "XAML error", e.Exception); }
+
+    protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
         DevLog.Write("app", "Main started");
-        // To customize application configuration such as set high DPI settings or default font,
-        // see https://aka.ms/applicationconfiguration.
-        ApplicationConfiguration.Initialize();
-        Application.SetColorMode(SystemColorMode.Dark);
+
         ConfigStore store;
         try { store = new ConfigStore(); }
         catch (Exception ex) when (ex is InvalidDataException or System.Text.Json.JsonException)
@@ -23,12 +20,12 @@ static class Program
             if (choice == DialogResult.Yes)
             {
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("notepad.exe", path) { UseShellExecute = true });
-                return;
+                Exit(); return;
             }
-            if (choice != DialogResult.No) return;
+            if (choice != DialogResult.No) { Exit(); return; }
             store = ConfigStore.CreateDefaultAfterInvalid(path);
             var result = store.Apply(store.CreateDraft());
-            if (!result.Success) { MessageBox.Show(result.Error, "m3nuxa"); return; }
+            if (!result.Success) { MessageBox.Show(result.Error, "m3nuxa"); Exit(); return; }
         }
         if (!File.Exists(store.FilePath))
         {
@@ -36,11 +33,11 @@ static class Program
             if (!initial.Success)
             {
                 MessageBox.Show(initial.Error ?? "Не удалось создать конфигурацию рядом с приложением.", "m3nuxa");
-                return;
+                Exit(); return;
             }
         }
-        try { Application.Run(new TrayApplication(store)); }
+        try { tray = new TrayApplication(store); }
         catch (Exception ex) { DevLog.Write("app", "Fatal UI error", ex); throw; }
-        finally { DevLog.Write("app", "Main stopped"); }
+
     }    
 }
