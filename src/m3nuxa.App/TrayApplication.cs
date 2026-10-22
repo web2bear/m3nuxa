@@ -160,13 +160,13 @@ internal sealed class TrayApplication : ApplicationContext
     {
         foreach (var node in nodes)
         {
-            if (node.Kind == MenuNodeKind.Separator) { target.Add(new ToolStripSeparator()); continue; }
+            if (node.Kind == MenuNodeKind.Separator) { target.Add(new ToolStripSeparator { Margin = new Padding(0, 2, 0, 2) }); continue; }
             var item = new ToolStripMenuItem(node.Name)
             {
                 Image = ItemIcon.Load(node),
                 ShortcutKeyDisplayString = node.Hotkey,
-                Margin = new Padding(12, 0, 8, 0),
-                Padding = new Padding(6, 6, 12, 6),
+                Margin = new Padding(20, 0, 8, 0),
+                Padding = new Padding(8, 10, 14, 10),
                 ImageAlign = ContentAlignment.MiddleLeft,
                 TextAlign = ContentAlignment.MiddleLeft
             };
