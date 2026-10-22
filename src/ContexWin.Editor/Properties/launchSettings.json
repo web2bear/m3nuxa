@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "ContexWin.Editor (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "ContexWin.Editor (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

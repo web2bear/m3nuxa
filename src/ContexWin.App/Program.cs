@@ -8,9 +8,11 @@ static class Program
     [STAThread]
     static void Main()
     {
+        DevLog.Write("app", "Main started");
         // To customize application configuration such as set high DPI settings or default font,
         // see https://aka.ms/applicationconfiguration.
         ApplicationConfiguration.Initialize();
+        Application.SetColorMode(SystemColorMode.Dark);
         ConfigStore store;
         try { store = new ConfigStore(); }
         catch (Exception ex) when (ex is InvalidDataException or System.Text.Json.JsonException)
@@ -37,6 +39,8 @@ static class Program
                 return;
             }
         }
-        Application.Run(new TrayApplication(store));
+        try { Application.Run(new TrayApplication(store)); }
+        catch (Exception ex) { DevLog.Write("app", "Fatal UI error", ex); throw; }
+        finally { DevLog.Write("app", "Main stopped"); }
     }    
 }

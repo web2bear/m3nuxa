@@ -7,7 +7,7 @@ namespace ContexWin.App;
 
 internal sealed class AgentPipe : IDisposable
 {
-    private static readonly JsonSerializerOptions JsonOptions = new() { Converters = { new JsonStringEnumConverter() } };
+    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true, Converters = { new JsonStringEnumConverter() } };
     private readonly ConfigStore _store;
     private readonly Action _applied;
     private readonly SynchronizationContext _ui;
@@ -24,17 +24,44 @@ internal sealed class AgentPipe : IDisposable
 
     public static string PipeName => $"ContexWin-{Environment.UserName}-{Environment.ProcessId}";
 
+    public async Task<JsonNode> ExecuteAsync(string session, string operation, JsonObject? arguments = null)
+    {
+        var request = new JsonObject
+        {
+            ["session"] = session,
+            ["operation"] = operation,
+            ["arguments"] = arguments ?? new JsonObject()
+        };
+        var response = JsonNode.Parse(await Dispatch(request.ToJsonString()))!;
+        if (response["error"] is JsonNode error) throw new InvalidOperationException(error.GetValue<string>());
+        return response;
+    }
+
     private async Task Listen()
     {
         while (!_stop.IsCancellationRequested)
         {
             try
             {
-                using var pipe = new NamedPipeServerStream(PipeName, PipeDirection.InOut, 1,
+                var pipe = new NamedPipeServerStream(PipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
                     PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
-                await pipe.WaitForConnectionAsync(_stop.Token);
-                using var reader = new StreamReader(pipe, leaveOpen: true);
-                using var writer = new StreamWriter(pipe, leaveOpen: true) { AutoFlush = true };
+                try { await pipe.WaitForConnectionAsync(_stop.Token); }
+                catch { pipe.Dispose(); throw; }
+                _ = ServeClient(pipe);
+            }
+            catch (OperationCanceledException) { break; }
+            catch (Exception ex) { DevLog.Write("app-pipe", "Listener error", ex); await Task.Delay(250); }
+        }
+    }
+
+    private async Task ServeClient(NamedPipeServerStream pipe)
+    {
+        using (pipe)
+        using (var reader = new StreamReader(pipe, leaveOpen: true))
+        using (var writer = new StreamWriter(pipe, leaveOpen: true) { AutoFlush = true })
+        {
+            try
+            {
                 while (pipe.IsConnected && !_stop.IsCancellationRequested)
                 {
                     var line = await reader.ReadLineAsync(_stop.Token);
@@ -43,8 +70,8 @@ internal sealed class AgentPipe : IDisposable
                     await writer.WriteLineAsync(response);
                 }
             }
-            catch (OperationCanceledException) { break; }
-            catch (Exception) { await Task.Delay(250); }
+            catch (OperationCanceledException) { }
+            catch (IOException ex) { DevLog.Write("app-pipe", "Client connection ended", ex); }
         }
     }
 
@@ -63,6 +90,7 @@ internal sealed class AgentPipe : IDisposable
     {
         var session = request["session"]?.GetValue<string>() ?? throw new ArgumentException("Требуется session.");
         var operation = request["operation"]?.GetValue<string>() ?? throw new ArgumentException("Требуется operation.");
+        DevLog.Write("app-pipe", $"Handling {operation}");
         var args = request["arguments"] as JsonObject ?? new JsonObject();
         if (operation == "read") return JsonSerializer.SerializeToNode(new { version = _store.Version, config = _store.Current }, JsonOptions)!;
         if (operation == "begin")
@@ -70,7 +98,19 @@ internal sealed class AgentPipe : IDisposable
             _drafts[session] = _store.CreateDraft();
             return JsonSerializer.SerializeToNode(new { version = _drafts[session].BaseVersion, config = _drafts[session].Config }, JsonOptions)!;
         }
+        if (operation == "reload")
+        {
+            var result = _store.Reload();
+            if (result.Success) { _drafts.Clear(); _applied(); }
+            return JsonSerializer.SerializeToNode(result, JsonOptions)!;
+        }
         if (!_drafts.TryGetValue(session, out var draft)) throw new InvalidOperationException("Сначала вызовите begin.");
+        if (operation == "replaceDraft")
+        {
+            draft.Config = args["config"]?.Deserialize<AppConfig>(JsonOptions)
+                ?? throw new ArgumentException("Требуется config.");
+            return JsonSerializer.SerializeToNode(new { version = draft.BaseVersion, config = draft.Config }, JsonOptions)!;
+        }
         var items = draft.Config.Items;
         if (operation == "validate") return JsonSerializer.SerializeToNode(_store.Validate(draft.Config), JsonOptions)!;
         if (operation == "apply")

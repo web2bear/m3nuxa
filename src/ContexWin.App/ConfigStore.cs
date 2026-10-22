@@ -218,6 +218,11 @@ public sealed class ConfigStore
                 if (string.IsNullOrWhiteSpace(action.Shortcut)) errors.Add($"{label}: требуется сочетание для отправки.");
                 return;
             }
+            if (action.Kind == ActionKind.InsertText)
+            {
+                if (string.IsNullOrEmpty(action.Text)) errors.Add($"{label}: требуется текст сниппета.");
+                return;
+            }
             if (string.IsNullOrWhiteSpace(action.Path)) { errors.Add($"{label}: требуется путь."); return; }
             if (action.Kind is ActionKind.OpenFolder or ActionKind.RunProgram or ActionKind.RunScript or ActionKind.CopySelection or ActionKind.MoveSelection)
             {

@@ -1,0 +1,196 @@
+{
+  "repository": "https://github.com/microsoft/fluentui-system-icons",
+  "modification": "PNG, 48px, blue #60a5fa for light and dark surfaces",
+  "icons": [
+    {
+      "name": "Folder",
+      "style": "regular",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Folder/SVG/ic_fluent_folder_24_regular.svg"
+    },
+    {
+      "name": "Folder",
+      "style": "filled",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Folder/SVG/ic_fluent_folder_24_filled.svg"
+    },
+    {
+      "name": "Document",
+      "style": "regular",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Document/SVG/ic_fluent_document_24_regular.svg"
+    },
+    {
+      "name": "Document",
+      "style": "filled",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Document/SVG/ic_fluent_document_24_filled.svg"
+    },
+    {
+      "name": "Settings",
+      "style": "regular",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Settings/SVG/ic_fluent_settings_24_regular.svg"
+    },
+    {
+      "name": "Settings",
+      "style": "filled",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Settings/SVG/ic_fluent_settings_24_filled.svg"
+    },
+    {
+      "name": "Apps",
+      "style": "regular",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Apps/SVG/ic_fluent_apps_24_regular.svg"
+    },
+    {
+      "name": "Apps",
+      "style": "filled",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Apps/SVG/ic_fluent_apps_24_filled.svg"
+    },
+    {
+      "name": "Globe",
+      "style": "regular",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Globe/SVG/ic_fluent_globe_24_regular.svg"
+    },
+    {
+      "name": "Globe",
+      "style": "filled",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Globe/SVG/ic_fluent_globe_24_filled.svg"
+    },
+    {
+      "name": "Code",
+      "style": "regular",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Code/SVG/ic_fluent_code_24_regular.svg"
+    },
+    {
+      "name": "Code",
+      "style": "filled",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Code/SVG/ic_fluent_code_24_filled.svg"
+    },
+    {
+      "name": "Mail",
+      "style": "regular",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Mail/SVG/ic_fluent_mail_24_regular.svg"
+    },
+    {
+      "name": "Mail",
+      "style": "filled",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Mail/SVG/ic_fluent_mail_24_filled.svg"
+    },
+    {
+      "name": "Calendar",
+      "style": "regular",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Calendar/SVG/ic_fluent_calendar_24_regular.svg"
+    },
+    {
+      "name": "Calendar",
+      "style": "filled",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Calendar/SVG/ic_fluent_calendar_24_filled.svg"
+    },
+    {
+      "name": "Camera",
+      "style": "regular",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Camera/SVG/ic_fluent_camera_24_regular.svg"
+    },
+    {
+      "name": "Camera",
+      "style": "filled",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Camera/SVG/ic_fluent_camera_24_filled.svg"
+    },
+    {
+      "name": "Image",
+      "style": "regular",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Image/SVG/ic_fluent_image_24_regular.svg"
+    },
+    {
+      "name": "Image",
+      "style": "filled",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Image/SVG/ic_fluent_image_24_filled.svg"
+    },
+    {
+      "name": "Music Note 2",
+      "style": "regular",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Music%20Note%202/SVG/ic_fluent_music_note_2_24_regular.svg"
+    },
+    {
+      "name": "Music Note 2",
+      "style": "filled",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Music%20Note%202/SVG/ic_fluent_music_note_2_24_filled.svg"
+    },
+    {
+      "name": "Video",
+      "style": "regular",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Video/SVG/ic_fluent_video_24_regular.svg"
+    },
+    {
+      "name": "Video",
+      "style": "filled",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Video/SVG/ic_fluent_video_24_filled.svg"
+    },
+    {
+      "name": "Games",
+      "style": "regular",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Games/SVG/ic_fluent_games_24_regular.svg"
+    },
+    {
+      "name": "Games",
+      "style": "filled",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Games/SVG/ic_fluent_games_24_filled.svg"
+    },
+    {
+      "name": "Search",
+      "style": "regular",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Search/SVG/ic_fluent_search_24_regular.svg"
+    },
+    {
+      "name": "Search",
+      "style": "filled",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Search/SVG/ic_fluent_search_24_filled.svg"
+    },
+    {
+      "name": "Save",
+      "style": "regular",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Save/SVG/ic_fluent_save_24_regular.svg"
+    },
+    {
+      "name": "Save",
+      "style": "filled",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Save/SVG/ic_fluent_save_24_filled.svg"
+    },
+    {
+      "name": "Delete",
+      "style": "regular",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Delete/SVG/ic_fluent_delete_24_regular.svg"
+    },
+    {
+      "name": "Delete",
+      "style": "filled",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Delete/SVG/ic_fluent_delete_24_filled.svg"
+    },
+    {
+      "name": "Copy",
+      "style": "regular",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Copy/SVG/ic_fluent_copy_24_regular.svg"
+    },
+    {
+      "name": "Copy",
+      "style": "filled",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Copy/SVG/ic_fluent_copy_24_filled.svg"
+    },
+    {
+      "name": "Clipboard",
+      "style": "regular",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Clipboard/SVG/ic_fluent_clipboard_24_regular.svg"
+    },
+    {
+      "name": "Clipboard",
+      "style": "filled",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Clipboard/SVG/ic_fluent_clipboard_24_filled.svg"
+    },
+    {
+      "name": "Home",
+      "style": "regular",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Home/SVG/ic_fluent_home_24_regular.svg"
+    },
+    {
+      "name": "Home",
+      "style": "filled",
+      "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main/assets/Home/SVG/ic_fluent_home_24_filled.svg"
+    }
+  ]
+}

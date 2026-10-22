@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Security.Principal;
 using System.Text.Json;
 
 namespace ContexWin.App;
@@ -9,7 +10,7 @@ public sealed class EditorForm : Form
     private ConfigDraft draft;
     private readonly Action? applied;
     private readonly TreeView tree = new() { Dock = DockStyle.Fill, HideSelection = false, AllowDrop = true };
-    private readonly TableLayoutPanel fields = new() { Dock = DockStyle.Fill, AutoScroll = true, ColumnCount = 2, Padding = new Padding(12) };
+    private readonly TableLayoutPanel fields = new() { Dock = DockStyle.Fill, AutoScroll = true, ColumnCount = 2, Padding = new Padding(20) };
     private readonly Stack<string> undo = new();
     private readonly Stack<string> redo = new();
     private readonly TextBox mainHotkey = new() { Width = 160 };
@@ -23,25 +24,52 @@ public sealed class EditorForm : Form
         this.applied = applied;
         draft = store.CreateDraft();
         Text = "ContexWin — редактор меню";
-        Width = 1050; Height = 700; MinimumSize = new Size(740, 470);
-        var toolbar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 42, AutoSize = false, WrapContents = false };
-        AddButton(toolbar, "Группа", () => AddNode(MenuNodeKind.Group));
-        AddButton(toolbar, "Действие", () => AddNode(MenuNodeKind.Action));
-        AddButton(toolbar, "Разделитель", () => AddNode(MenuNodeKind.Separator));
-        AddButton(toolbar, "Дублировать", Duplicate);
-        AddButton(toolbar, "Удалить", Delete);
-        AddButton(toolbar, "Отменить", Undo);
-        AddButton(toolbar, "Повторить", Redo);
-        AddButton(toolbar, "Применить", Apply);
-        AddButton(toolbar, "Загрузить файл", LoadFile);
-        AddButton(toolbar, "Перезагрузить", Reload);
-        toolbar.Controls.Add(new Label { Text = "Вызов меню:", AutoSize = true, Padding = new Padding(8, 9, 0, 0) });
-        toolbar.Controls.Add(mainHotkey);
+        Width = 1120; Height = 760; MinimumSize = new Size(800, 550);
+        Font = new Font("Segoe UI Variable Text", 10);
+        var menu = new MenuStrip { Dock = DockStyle.Top };
+        var fileMenu = new ToolStripMenuItem("Файл");
+        ((ToolStripMenuItem)fileMenu.DropDownItems.Add("Применить", null, (_, _) => Apply())).ShortcutKeys = Keys.Control | Keys.S;
+        fileMenu.DropDownItems.Add("Загрузить конфигурацию…", null, (_, _) => LoadFile());
+        fileMenu.DropDownItems.Add("Перезагрузить с диска", null, (_, _) => Reload());
+        fileMenu.DropDownItems.Add("Сохранить черновик отдельно…", null, (_, _) => SaveDraft());
+        var editMenu = new ToolStripMenuItem("Правка");
+        ((ToolStripMenuItem)editMenu.DropDownItems.Add("Отменить", null, (_, _) => Undo())).ShortcutKeys = Keys.Control | Keys.Z;
+        ((ToolStripMenuItem)editMenu.DropDownItems.Add("Повторить", null, (_, _) => Redo())).ShortcutKeys = Keys.Control | Keys.Y;
+        menu.Items.Add(fileMenu); menu.Items.Add(editMenu);
+        MainMenuStrip = menu;
+
+        var addArea = new Panel { Dock = DockStyle.Top, Height = 116, Padding = new Padding(16, 12, 12, 4) };
+        var addTitle = new Label { Text = "Добавить", Dock = DockStyle.Top, Height = 28, Font = new Font(Font, FontStyle.Bold) };
+        var addButtons = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 42, WrapContents = false, Margin = Padding.Empty };
+        AddIconButton(addButtons, "\uE8B7", "Папку", AddFolder);
+        AddIconButton(addButtons, "\uE8A5", "Файл или скрипт", AddFiles);
+        AddIconButton(addButtons, "\uE8D2", "Сниппет", AddSnippet);
+        AddIconButton(addButtons, "\uE902", "Группу", () => AddNode(MenuNodeKind.Group));
+        AddIconButton(addButtons, "\uE71B", "Разделитель", () => AddNode(MenuNodeKind.Separator));
+        addArea.Controls.Add(addButtons); addArea.Controls.Add(addTitle);
+        var addHint = new Label
+        {
+            Dock = DockStyle.Bottom, Height = 24, AutoEllipsis = true,
+            Text = IsElevated() ? "Перетаскивание из Проводника требует запуска без прав администратора." : "Перетащите файлы и папки из Проводника в дерево."
+        };
+        addArea.Controls.Add(addHint);
+
+        var treeMenu = new ContextMenuStrip();
+        treeMenu.Items.Add("Дублировать", null, (_, _) => Duplicate());
+        treeMenu.Items.Add("Удалить", null, (_, _) => Delete());
+        treeMenu.Opening += (_, e) => { if (tree.SelectedNode is null) e.Cancel = true; };
+        tree.ContextMenuStrip = treeMenu;
+        tree.NodeMouseClick += (_, e) => { if (e.Button == MouseButtons.Right) tree.SelectedNode = e.Node; };
+
+        var hotkeyArea = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 54, Padding = new Padding(16, 10, 8, 4), WrapContents = false };
+        hotkeyArea.Controls.Add(new Label { Text = "Вызов меню", AutoSize = true, Padding = new Padding(0, 5, 10, 0) });
+        hotkeyArea.Controls.Add(mainHotkey);
         mainHotkey.TextChanged += (_, _) => { if (!loading) { Remember(); draft.Config.MainHotkey = mainHotkey.Text; MarkDirty(); } };
-        var split = new SplitContainer { Dock = DockStyle.Fill, SplitterDistance = 380 };
-        split.Panel1.Controls.Add(tree);
-        split.Panel2.Controls.Add(fields);
-        Controls.Add(split); Controls.Add(toolbar);
+        var split = new SplitContainer { Dock = DockStyle.Fill, SplitterDistance = 400 };
+        split.Panel1.Controls.Add(tree); split.Panel1.Controls.Add(hotkeyArea); split.Panel1.Controls.Add(addArea);
+        var propertiesTitle = new Label { Text = "Свойства пункта", Dock = DockStyle.Top, Height = 56, Padding = new Padding(20, 17, 0, 0), Font = new Font(Font.FontFamily, 15, FontStyle.Bold) };
+        split.Panel2.Controls.Add(fields); split.Panel2.Controls.Add(propertiesTitle);
+        Controls.Add(split); Controls.Add(menu);
         tree.AfterSelect += (_, _) => ShowProperties();
         tree.ItemDrag += (_, e) => tree.DoDragDrop(e.Item!, DragDropEffects.Move);
         tree.DragEnter += (_, e) => e.Effect = e.Data?.GetDataPresent(DataFormats.FileDrop) == true ? DragDropEffects.Copy : e.Data?.GetDataPresent(typeof(TreeNode)) == true ? DragDropEffects.Move : DragDropEffects.None;
@@ -52,10 +80,60 @@ public sealed class EditorForm : Form
         RefreshTree();
     }
 
-    private static void AddButton(FlowLayoutPanel panel, string name, Action action)
+    private static void AddIconButton(FlowLayoutPanel panel, string glyph, string name, Action action)
     {
-        var button = new Button { Text = name, AutoSize = true, Height = 30 };
+        var button = new Button { Text = glyph, Width = 40, Height = 38, Margin = new Padding(0, 0, 8, 0), Font = new Font("Segoe Fluent Icons", 16), AccessibleName = name };
+        new ToolTip().SetToolTip(button, name);
         button.Click += (_, _) => action(); panel.Controls.Add(button);
+    }
+
+    private static bool IsElevated()
+    {
+        using var identity = WindowsIdentity.GetCurrent();
+        return new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
+    }
+
+    private void AddFolder()
+    {
+        using var dialog = new FolderBrowserDialog { Description = "Выберите папку для пункта меню" };
+        if (dialog.ShowDialog(this) == DialogResult.OK) AddPaths([dialog.SelectedPath]);
+    }
+
+    private void AddFiles()
+    {
+        using var dialog = new OpenFileDialog { Title = "Добавить файл или скрипт", Multiselect = true,
+            Filter = "Программы, скрипты и ярлыки|*.exe;*.bat;*.cmd;*.ps1;*.lnk|Все файлы|*.*" };
+        if (dialog.ShowDialog(this) == DialogResult.OK) AddPaths(dialog.FileNames);
+    }
+
+    private void AddSnippet()
+    {
+        Remember();
+        var item = new MenuNode { Kind = MenuNodeKind.Action, Name = "Новый сниппет", Action = new MenuAction { Kind = ActionKind.InsertText } };
+        var parent = selected?.Kind == MenuNodeKind.Group ? selected : tree.SelectedNode?.Parent is null ? null : Find((string?)tree.SelectedNode.Parent.Tag);
+        (parent?.Children ?? draft.Config.Items).Add(item);
+        MarkDirty(); RefreshTree(item.Id);
+    }
+
+    private void AddPaths(IEnumerable<string> paths, List<MenuNode>? destination = null, int index = -1)
+    {
+        destination ??= selected?.Kind == MenuNodeKind.Group ? selected.Children : Siblings(tree.SelectedNode);
+        if (index < 0 || index > destination.Count) index = destination.Count;
+        var errors = new List<string>();
+        string? lastId = null;
+        foreach (var path in paths)
+        {
+            try
+            {
+                var item = Import(path);
+                if (lastId is null) Remember();
+                destination.Insert(index++, item);
+                lastId = item.Id;
+            }
+            catch (Exception ex) { errors.Add($"{path}: {ex.Message}"); }
+        }
+        if (lastId is not null) { MarkDirty(); RefreshTree(lastId); }
+        if (errors.Count > 0) MessageBox.Show(this, string.Join(Environment.NewLine, errors), "Не удалось добавить некоторые объекты", MessageBoxButtons.OK, MessageBoxIcon.Warning);
     }
 
     private string Snapshot() => JsonSerializer.Serialize(draft.Config);
@@ -136,9 +214,14 @@ public sealed class EditorForm : Form
             {
                 item.Action ??= new MenuAction();
                 var action = item.Action;
-                var kind = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 250, DataSource = Enum.GetValues<ActionKind>() };
+                var kind = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 250 };
+                kind.Items.AddRange(Enum.GetValues<ActionKind>().Cast<object>().ToArray());
                 kind.SelectedItem = action.Kind;
-                kind.SelectedValueChanged += (_, _) => { Remember(); action.Kind = (ActionKind)kind.SelectedItem!; MarkDirty(); ShowProperties(); };
+                kind.SelectedIndexChanged += (_, _) =>
+                {
+                    if (loading || kind.SelectedItem is not ActionKind chosen || chosen == action.Kind) return;
+                    Remember(); action.Kind = chosen; MarkDirty(); ShowProperties();
+                };
                 AddControl("Тип действия", kind);
                 if (action.Kind is ActionKind.OpenFolder or ActionKind.RunProgram or ActionKind.RunScript or ActionKind.CopySelection or ActionKind.MoveSelection)
                     AddField(action.Kind is ActionKind.CopySelection or ActionKind.MoveSelection ? "Папка назначения" : "Путь", action.Path, value => action.Path = value, true);
@@ -155,6 +238,13 @@ public sealed class EditorForm : Form
                     AddControl("Консоль", hide);
                 }
                 if (action.Kind == ActionKind.SendShortcut) AddField("Отправить сочетание", action.Shortcut, value => action.Shortcut = value);
+                if (action.Kind == ActionKind.InsertText)
+                {
+                    var textBox = new TextBox { Text = action.Text, Multiline = true, ScrollBars = ScrollBars.Vertical, Height = 180, Width = 430, AcceptsReturn = true };
+                    textBox.Enter += (_, _) => Remember();
+                    textBox.TextChanged += (_, _) => { if (loading) return; action.Text = textBox.Text; MarkDirty(); };
+                    AddControl("Текст", textBox);
+                }
             }
         }
         fields.ResumeLayout();
@@ -225,16 +315,9 @@ public sealed class EditorForm : Form
         if (e.Data?.GetDataPresent(DataFormats.FileDrop) == true)
         {
             var files = (string[]?)e.Data.GetData(DataFormats.FileDrop); if (files is null) return;
-            Remember(); var errors = new List<string>(); string? lastId = null;
             var siblings = placement.Parent?.Children ?? draft.Config.Items;
             var index = InsertionIndex(siblings, placement.Anchor, placement.After);
-            foreach (var file in files)
-            {
-                try { var item = Import(file); siblings.Insert(index++, item); lastId = item.Id; }
-                catch (Exception ex) { errors.Add($"{file}: {ex.Message}"); }
-            }
-            if (lastId != null) { MarkDirty(); RefreshTree(lastId); }
-            if (errors.Count > 0) MessageBox.Show(this, string.Join(Environment.NewLine, errors), "Не удалось добавить некоторые объекты", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            AddPaths(files, siblings, index);
             return;
         }
         if (e.Data?.GetData(typeof(TreeNode)) is not TreeNode source) return;

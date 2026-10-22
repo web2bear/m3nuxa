@@ -1,4 +1,6 @@
 using System.Runtime.InteropServices;
+using System.Diagnostics;
+using System.Text.Json;
 using Microsoft.Win32;
 
 namespace ContexWin.App;
@@ -11,11 +13,17 @@ internal sealed class TrayApplication : ApplicationContext
     private readonly HotkeyWindow _hotkeys;
     private readonly ForegroundTracker _foreground;
     private AgentPipe? _agentPipe;
-    private EditorForm? _editor;
+    private readonly McpHttpServer _mcpHttp = new();
+    private readonly string _mcpSettingsPath = Path.Combine(AppContext.BaseDirectory, "mcp-http.json");
+    private ToolStripMenuItem _mcpMenuItem = null!;
+    private ToolStripMenuItem _copyMcpAddressItem = null!;
+    private ToolStripMenuItem _startupMenuItem = null!;
+    private Process? _editor;
     private ContextMenuStrip? _menu;
 
     public TrayApplication(ConfigStore store)
     {
+        DevLog.Write("app", "TrayApplication starting");
         _store = store;
         _foreground = new ForegroundTracker();
         _hotkeys = new HotkeyWindow(OnHotkey);
@@ -23,12 +31,14 @@ internal sealed class TrayApplication : ApplicationContext
         _tray.MouseClick += (_, e) => { if (e.Button == MouseButtons.Left) ShowMenu(_store.Current.Items); };
         RegisterHotkeys();
         Application.Idle += StartAgentPipe;
+        DevLog.Write("app", "TrayApplication ready");
     }
 
     private void StartAgentPipe(object? sender, EventArgs e)
     {
         Application.Idle -= StartAgentPipe;
         _agentPipe = new AgentPipe(_store, RegisterHotkeys);
+        if (ReadMcpEnabled()) _ = SetMcpEnabledAsync(true, false);
     }
 
     private ContextMenuStrip BuildServiceMenu()
@@ -36,18 +46,93 @@ internal sealed class TrayApplication : ApplicationContext
         var menu = new ContextMenuStrip();
         menu.Items.Add("Открыть редактор", null, (_, _) => OpenEditor());
         menu.Items.Add("Перезагрузить конфигурацию", null, (_, _) => Reload());
-        menu.Items.Add("Автозапуск", null, (_, _) => ToggleStartup());
+        _mcpMenuItem = new ToolStripMenuItem("MCP HTTP-сервер", null, (_, _) => _ = SetMcpEnabledAsync(!_mcpHttp.IsRunning, true));
+        menu.Items.Add(_mcpMenuItem);
+        _copyMcpAddressItem = new ToolStripMenuItem("Копировать адрес MCP", null, (_, _) => Clipboard.SetText(McpHttpServer.Endpoint));
+        menu.Items.Add(_copyMcpAddressItem);
+        _startupMenuItem = new ToolStripMenuItem("Автозапуск", null, (_, _) => ToggleStartup());
+        menu.Items.Add(_startupMenuItem);
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Выход", null, (_, _) => ExitThread());
-        menu.Opening += (_, _) => { if (menu.Items[2] is ToolStripMenuItem item) item.Checked = IsStartupEnabled(); };
+        menu.Items.Add("Выход", null, async (_, _) => { await _mcpHttp.StopAsync(); ExitThread(); });
+        menu.Opening += (_, _) =>
+        {
+            _mcpMenuItem.Checked = _mcpHttp.IsRunning;
+            _mcpMenuItem.Enabled = _agentPipe is not null;
+            _copyMcpAddressItem.Enabled = _mcpHttp.IsRunning;
+            _startupMenuItem.Checked = IsStartupEnabled();
+        };
         return menu;
+    }
+
+    private bool ReadMcpEnabled()
+    {
+        try
+        {
+            if (!File.Exists(_mcpSettingsPath)) return false;
+            using var document = JsonDocument.Parse(File.ReadAllText(_mcpSettingsPath));
+            return document.RootElement.TryGetProperty("enabled", out var enabled) && enabled.GetBoolean();
+        }
+        catch (Exception ex)
+        {
+            DevLog.Write("mcp-http", "Could not read saved state", ex);
+            return false;
+        }
+    }
+
+    private async Task SetMcpEnabledAsync(bool enabled, bool save)
+    {
+        _mcpMenuItem.Enabled = false;
+        try
+        {
+            if (enabled) await _mcpHttp.StartAsync(_agentPipe ?? throw new InvalidOperationException("Редакторский канал ещё не готов."));
+            else await _mcpHttp.StopAsync();
+            if (save) File.WriteAllText(_mcpSettingsPath, JsonSerializer.Serialize(new { enabled }));
+        }
+        catch (Exception ex)
+        {
+            DevLog.Write("mcp-http", "Toggle failed", ex);
+            _tray.ShowBalloonTip(5000, "MCP HTTP-сервер", ex.Message, ToolTipIcon.Error);
+        }
+        finally
+        {
+            _mcpMenuItem.Checked = _mcpHttp.IsRunning;
+            _mcpMenuItem.Enabled = true;
+            _copyMcpAddressItem.Enabled = _mcpHttp.IsRunning;
+        }
     }
 
     private void OpenEditor()
     {
-        if (_editor is { IsDisposed: false }) { _editor.Activate(); return; }
-        _editor = new EditorForm(_store, RegisterHotkeys);
-        _editor.Show();
+        DevLog.Write("app", "OpenEditor requested");
+        if (_editor is { HasExited: false })
+        {
+            DevLog.Write("app", $"Editor already running pid={_editor.Id} hwnd={_editor.MainWindowHandle}");
+            if (_editor.MainWindowHandle != IntPtr.Zero) NativeMethods.SetForegroundWindow(_editor.MainWindowHandle);
+            return;
+        }
+        var path = Path.Combine(AppContext.BaseDirectory, "ContexWin.Editor.exe");
+        if (!File.Exists(path))
+        {
+            DevLog.Write("app", $"Editor not found: {path}");
+            MessageBox.Show($"Редактор WinUI 3 не найден: {path}", "ContexWin", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return;
+        }
+        try
+        {
+            _editor = Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+            DevLog.Write("app", $"Editor process started pid={_editor?.Id}");
+            if (_editor is not null)
+            {
+                var launchedEditor = _editor;
+                launchedEditor.Exited += (_, _) => DevLog.Write("app", $"Editor process exited pid={launchedEditor.Id} code={launchedEditor.ExitCode}");
+                launchedEditor.EnableRaisingEvents = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            DevLog.Write("app", "Editor process failed to start", ex);
+            MessageBox.Show(ex.Message, "ContexWin", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
     }
 
     private void Reload()
@@ -60,8 +145,9 @@ internal sealed class TrayApplication : ApplicationContext
     private void ShowMenu(IReadOnlyList<MenuNode> nodes)
     {
         var invocation = InvocationContext.Capture(_foreground.LastWindow);
-        _menu?.Dispose();
+        DisposeMenu();
         _menu = new ContextMenuStrip();
+        LauncherMenu.Style(_menu);
         FillMenu(_menu.Items, nodes, invocation);
         if (_menu.Items.Count == 0) _menu.Items.Add("Меню пусто").Enabled = false;
         _menu.Show(Cursor.Position);
@@ -72,15 +158,32 @@ internal sealed class TrayApplication : ApplicationContext
         foreach (var node in nodes)
         {
             if (node.Kind == MenuNodeKind.Separator) { target.Add(new ToolStripSeparator()); continue; }
-            var item = new ToolStripMenuItem(node.Name);
-            if (!string.IsNullOrWhiteSpace(node.IconPath))
+            var item = new ToolStripMenuItem(node.Name)
             {
-                try { item.Image = Image.FromFile(node.IconPath); } catch { }
-            }
+                Image = ItemIcon.Load(node),
+                ShortcutKeyDisplayString = node.Hotkey,
+                Padding = new Padding(4, 5, 8, 5)
+            };
             target.Add(item);
-            if (node.Kind == MenuNodeKind.Group) FillMenu(item.DropDownItems, node.Children, invocation);
+            if (node.Kind == MenuNodeKind.Group) { LauncherMenu.Style(item.DropDown); FillMenu(item.DropDownItems, node.Children, invocation); }
             else item.Click += async (_, _) => await Execute(node, invocation);
         }
+    }
+
+    private void DisposeMenu()
+    {
+        if (_menu is null) return;
+        void Release(ToolStripItemCollection items)
+        {
+            foreach (ToolStripItem item in items)
+            {
+                item.Image?.Dispose(); item.Image = null;
+                if (item is ToolStripMenuItem child && child.HasDropDownItems) Release(child.DropDownItems);
+            }
+        }
+        Release(_menu.Items);
+        _menu.Dispose();
+        _menu = null;
     }
 
     private async Task Execute(MenuNode node, InvocationContext? context)
@@ -133,7 +236,7 @@ internal sealed class TrayApplication : ApplicationContext
     {
         _tray.Visible = false;
         _tray.Dispose();
-        _menu?.Dispose();
+        DisposeMenu();
         _hotkeys.Dispose();
         _foreground.Dispose();
         _agentPipe?.Dispose();

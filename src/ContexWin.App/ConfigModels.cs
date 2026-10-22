@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace ContexWin.App;
 
 public enum MenuNodeKind { Group, Action, Separator }
-public enum ActionKind { OpenFolder, RunProgram, RunScript, SendShortcut, CopySelection, MoveSelection }
+public enum ActionKind { OpenFolder, RunProgram, RunScript, SendShortcut, CopySelection, MoveSelection, InsertText }
 
 public sealed class MenuAction
 {
@@ -12,6 +12,7 @@ public sealed class MenuAction
     public string Arguments { get; set; } = "";
     public string WorkingDirectory { get; set; } = "";
     public string Shortcut { get; set; } = "";
+    public string Text { get; set; } = "";
     public string Interpreter { get; set; } = "";
     public bool HideConsole { get; set; }
 }

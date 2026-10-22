@@ -69,6 +69,9 @@ internal static class ActionExecutor
                 case ActionKind.SendShortcut:
                     SendShortcut(action.Shortcut, context);
                     return Ok();
+                case ActionKind.InsertText:
+                    InsertText(TemplateExpander.Expand(action.Text, context), context);
+                    return Ok();
                 case ActionKind.CopySelection:
                 case ActionKind.MoveSelection:
                     return await ExecuteFileOperationAsync(action, context, owner, cancellationToken);
@@ -133,6 +136,39 @@ internal static class ActionExecutor
             throw new InvalidOperationException("Не удалось вернуть фокус исходному окну. Сочетание не отправлено.");
         SendKeys.SendWait(ToSendKeys(shortcut));
     }
+
+    private static void InsertText(string text, InvocationContext context)
+    {
+        if (string.IsNullOrEmpty(text)) throw new InvalidOperationException("Текст сниппета пуст.");
+        if (context.SourceWindow == IntPtr.Zero || !NativeMethods.IsWindow(context.SourceWindow))
+            throw new InvalidOperationException("Исходное окно уже закрыто.");
+        if (!NativeMethods.SetForegroundWindow(context.SourceWindow) || NativeMethods.GetForegroundWindow() != context.SourceWindow)
+            throw new InvalidOperationException("Не удалось вернуть фокус исходному окну. Текст не отправлен.");
+        foreach (var character in text)
+        {
+            var input = new[]
+            {
+                new UnicodeInput(1, 0, character, 0x0004, 0, IntPtr.Zero),
+                new UnicodeInput(1, 0, character, 0x0006, 0, IntPtr.Zero)
+            };
+            if (SendInput((uint)input.Length, input, Marshal.SizeOf<UnicodeInput>()) != input.Length)
+                throw new InvalidOperationException("Не удалось вставить весь текст в исходное окно.");
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private readonly struct UnicodeInput(uint type, ushort virtualKey, ushort scanCode, uint flags, uint time, IntPtr extraInfo)
+    {
+        public readonly uint Type = type;
+        public readonly ushort VirtualKey = virtualKey;
+        public readonly ushort ScanCode = scanCode;
+        public readonly uint Flags = flags;
+        public readonly uint Time = time;
+        public readonly IntPtr ExtraInfo = extraInfo;
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint SendInput(uint inputCount, UnicodeInput[] inputs, int inputSize);
 
     private static string ToSendKeys(string shortcut)
     {

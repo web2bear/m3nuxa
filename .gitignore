@@ -8,3 +8,8 @@ resources/
 dist/
 .build-temp/
 .editor-build/
+.verify-*/
+.verify-*.png
+integrity-probe.txt
+*.log
+mcp-http.json
