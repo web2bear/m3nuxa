@@ -165,6 +165,7 @@ internal sealed class TrayApplication : ApplicationContext
             {
                 Image = ItemIcon.Load(node),
                 ShortcutKeyDisplayString = node.Hotkey,
+                Margin = new Padding(12, 0, 8, 0),
                 Padding = new Padding(6, 6, 12, 6),
                 ImageAlign = ContentAlignment.MiddleLeft,
                 TextAlign = ContentAlignment.MiddleLeft

@@ -41,18 +41,22 @@ internal static class LauncherMenu
             if (!e.Item.Selected || !e.Item.Enabled) return;
             using var brush = new SolidBrush(selection);
             using var path = new GraphicsPath();
-            path.AddRoundedRectangle(new Rectangle(2, 1, e.Item.Width - 4, e.Item.Height - 2), new Size(4, 4));
+            path.AddRoundedRectangle(new Rectangle(2, 1, e.Item.Width - 12, e.Item.Height - 2), new Size(4, 4));
             e.Graphics.FillPath(brush, path);
         }
         protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
         {
             e.TextColor = !e.Item.Enabled ? SystemColors.GrayText : SystemInformation.HighContrast && e.Item.Selected ? SystemColors.HighlightText : foreground;
             // Segoe UI glyphs sit optically above the center of the image slot.
-            e.TextRectangle = new Rectangle(e.TextRectangle.X, e.TextRectangle.Y + 2, e.TextRectangle.Width, e.TextRectangle.Height);
+            e.TextRectangle = new Rectangle(e.TextRectangle.X, e.TextRectangle.Y + 4, e.TextRectangle.Width, e.TextRectangle.Height);
             base.OnRenderItemText(e);
         }
         protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e)
-        { e.ArrowColor = foreground; base.OnRenderArrow(e); }
+        {
+            e.ArrowColor = foreground;
+            e.ArrowRectangle = new Rectangle(e.ArrowRectangle.X - 12, e.ArrowRectangle.Y, e.ArrowRectangle.Width, e.ArrowRectangle.Height);
+            base.OnRenderArrow(e);
+        }
         protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
         {
             using var pen = new Pen(Color.FromArgb(65, foreground));
