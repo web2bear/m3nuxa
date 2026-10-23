@@ -14,6 +14,7 @@ internal sealed class ShellIntegration : IDisposable
     private readonly Dictionary<int, MenuNode?> bindings = [];
     private readonly uint taskbarCreated = RegisterWindowMessage("TaskbarCreated");
     private NotifyData data;
+    private readonly System.Drawing.Icon trayIcon;
     public ShellIntegration(Window window, Action<bool> clicked, Action<MenuNode?> hotkey)
     {
         hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
@@ -24,8 +25,11 @@ internal sealed class ShellIntegration : IDisposable
         this.clicked = clicked; this.hotkey = hotkey;
         callback = ProcessMessage;
         if (!SetWindowSubclass(hwnd, callback, 1, 0)) throw new System.ComponentModel.Win32Exception();
+        using var iconStream = typeof(ShellIntegration).Assembly.GetManifestResourceStream("m3nuxa.App.Assets.TrayIcon.ico")
+            ?? throw new InvalidOperationException("Tray icon resource is missing.");
+        trayIcon = new System.Drawing.Icon(iconStream, 32, 32);
         data = new NotifyData { Size = (uint)Marshal.SizeOf<NotifyData>(), Window = hwnd, Id = 1, Flags = 7, Message = 0x8001,
-            Icon = LoadIcon(0, (nint)32512), Tip = "m3nuxa", Info = "", Title = "" };
+            Icon = trayIcon.Handle, Tip = "m3nuxa", Info = "", Title = "" };
         AddIcon();
     }
     private void AddIcon() { if (!Shell_NotifyIcon(0, ref data)) DevLog.Write("tray", "Shell_NotifyIcon failed"); }
@@ -62,6 +66,7 @@ internal sealed class ShellIntegration : IDisposable
     {
         foreach (var id in bindings.Keys) UnregisterHotKey(hwnd, id);
         Shell_NotifyIcon(2, ref data); RemoveWindowSubclass(hwnd, callback, 1);
+        trayIcon.Dispose();
     }
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct NotifyData
@@ -87,7 +92,6 @@ internal sealed class ShellIntegration : IDisposable
     [DllImport("comctl32.dll")] private static extern nint DefSubclassProc(nint hwnd, uint msg, nuint wparam, nint lparam);
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)] private static extern bool Shell_NotifyIcon(uint message, ref NotifyData data);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern uint RegisterWindowMessage(string name);
-    [DllImport("user32.dll")] private static extern nint LoadIcon(nint module, nint name);
     [DllImport("user32.dll")] private static extern bool RegisterHotKey(nint hwnd, int id, uint modifiers, uint key);
     [DllImport("user32.dll")] private static extern bool UnregisterHotKey(nint hwnd, int id);
 }

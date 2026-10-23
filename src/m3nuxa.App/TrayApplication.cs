@@ -39,6 +39,8 @@ internal sealed class TrayApplication : IDisposable
         var presenter = (OverlappedPresenter)_window.AppWindow.Presenter;
         presenter.SetBorderAndTitleBar(false, false);
         presenter.IsResizable = false;
+        // Owned menu popups must stay above the topmost tray overflow panel.
+        presenter.IsAlwaysOnTop = true;
         _window.AppWindow.Resize(new SizeInt32(2, 2));
         _tray = new ShellIntegration(_window, service => _window.DispatcherQueue.TryEnqueue(() =>
         {
@@ -59,7 +61,7 @@ internal sealed class TrayApplication : IDisposable
     {
         var menu = LauncherMenu.Create();
         void Add(string text, Action action) { var item = new MenuFlyoutItem { Text = text }; item.Click += (_, _) => action(); menu.Items.Add(item); }
-        Add("Открыть редактор", OpenEditor);
+        Add("Редактор конфигурации", OpenEditor);
         Add("Перезагрузить конфигурацию", Reload);
         _mcpMenuItem = new ToggleMenuFlyoutItem { Text = "MCP HTTP-сервер", IsChecked = _mcpHttp.IsRunning };
         _mcpMenuItem.Click += (_, _) => _ = SetMcpEnabledAsync(!_mcpHttp.IsRunning, true);

@@ -54,7 +54,8 @@ internal sealed class ShortcutEditor : StackPanel
         Unloaded += async (_, _) => { App.MainWindow.Activated -= WindowActivated; await StopAsync(); };
         LostFocus += (_, _) => DispatcherQueue.TryEnqueue(async () =>
         {
-            if (recording && XamlRoot is not null && !Contains(FocusManager.GetFocusedElement(XamlRoot) as DependencyObject)) await StopAsync();
+            if (recording && XamlRoot is not null && !Contains(FocusManager.GetFocusedElement(XamlRoot) as DependencyObject))
+            { DevLog.Write("shortcut", "Recording canceled on focus loss"); await StopAsync(); }
         });
         Refresh();
     }
@@ -65,7 +66,7 @@ internal sealed class ShortcutEditor : StackPanel
         return false;
     }
     private async void WindowActivated(object sender, WindowActivatedEventArgs args)
-    { if (args.WindowActivationState == WindowActivationState.Deactivated) await StopAsync(); }
+    { if (args.WindowActivationState == WindowActivationState.Deactivated && recording) { DevLog.Write("shortcut", "Recording canceled on window deactivation"); await StopAsync(); } }
 
     internal void Refresh()
     {
@@ -104,7 +105,7 @@ internal sealed class ShortcutEditor : StackPanel
             capture = new KeyboardCapture(App.MainWindow, (value, complete) => DispatcherQueue.TryEnqueue(async () =>
             {
                 if (!recording || version != generation) return;
-                if (complete) await StopAsync(value);
+                if (complete) { DevLog.Write("shortcut", value is null ? "Keyboard capture canceled" : "Keyboard capture completed"); await StopAsync(value); }
                 else valueText.Text = value is null ? "Нажмите новое сочетание…" : value.Length == 0 ? "Нужно одно сочетание" : value.Replace("+", " + ");
             }));
         }
