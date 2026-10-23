@@ -26,6 +26,8 @@ internal sealed class TrayApplication : IDisposable
     private ToggleMenuFlyoutItem _startupMenuItem = null!;
     private Process? _editor;
     private MenuFlyout? _menu;
+    private bool _hotkeysSuspended;
+    private IReadOnlyList<string> _unavailableHotkeys = [];
 
     public TrayApplication(ConfigStore store)
     {
@@ -43,7 +45,11 @@ internal sealed class TrayApplication : IDisposable
             if (service) ShowFlyout(BuildServiceMenu()); else ShowMenu(_store.Current.Items);
         }), node => _window.DispatcherQueue.TryEnqueue(() => OnHotkey(node)));
         RegisterHotkeys();
-        _agentPipe = new AgentPipe(_store, RegisterHotkeys);
+        _agentPipe = new AgentPipe(_store, RegisterHotkeys, suspended =>
+        {
+            _hotkeysSuspended = suspended;
+            return RegisterHotkeyBindings();
+        }, () => _unavailableHotkeys);
         if (ReadMcpEnabled()) _ = SetMcpEnabledAsync(true, false);
         _window.Closed += (_, _) => Dispose();
         DevLog.Write("app", "TrayApplication ready");
@@ -188,14 +194,20 @@ internal sealed class TrayApplication : IDisposable
 
     private void OnHotkey(MenuNode? node)
     {
+        if (_hotkeysSuspended) return;
         if (node is null) ShowMenu(_store.Current.Items);
         else if (node.Kind == MenuNodeKind.Group) ShowMenu(node.Children);
         else _ = Execute(node, InvocationContext.Capture(_foreground.LastWindow));
     }
 
     private void RegisterHotkeys()
+        => RegisterHotkeyBindings();
+
+    private IReadOnlyList<string> RegisterHotkeyBindings()
     {
-        var bindings = new List<(string Hotkey, MenuNode? Node)> { (_store.Current.MainHotkey, null) };
+        if (_hotkeysSuspended) return _tray.Register([]);
+        var bindings = new List<(string Hotkey, MenuNode? Node)>();
+        if (!string.IsNullOrWhiteSpace(_store.Current.MainHotkey)) bindings.Add((_store.Current.MainHotkey, null));
         void Walk(IEnumerable<MenuNode> nodes)
         {
             foreach (var node in nodes)
@@ -206,7 +218,9 @@ internal sealed class TrayApplication : IDisposable
         }
         Walk(_store.Current.Items);
         var unavailable = _tray.Register(bindings);
+        _unavailableHotkeys = unavailable;
         if (unavailable.Count > 0) _tray.ShowBalloonTip(5000, "Горячие клавиши недоступны", string.Join(", ", unavailable), ToolTipIcon.Warning);
+        return unavailable;
     }
 
     private static bool IsStartupEnabled()

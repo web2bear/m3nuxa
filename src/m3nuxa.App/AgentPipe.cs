@@ -13,11 +13,16 @@ internal sealed class AgentPipe : IDisposable
     private readonly SynchronizationContext _ui;
     private readonly CancellationTokenSource _stop = new();
     private readonly Dictionary<string, ConfigDraft> _drafts = [];
+    private readonly Func<bool, IReadOnlyList<string>>? _captureHotkeys;
+    private int _captureConnections;
+    private readonly Func<IReadOnlyList<string>>? _hotkeyStatus;
 
-    public AgentPipe(ConfigStore store, Action applied)
+    public AgentPipe(ConfigStore store, Action applied, Func<bool, IReadOnlyList<string>>? captureHotkeys = null, Func<IReadOnlyList<string>>? hotkeyStatus = null)
     {
         _store = store;
         _applied = applied;
+        _captureHotkeys = captureHotkeys;
+        _hotkeyStatus = hotkeyStatus;
         _ui = SynchronizationContext.Current ?? throw new InvalidOperationException("Нужен UI поток.");
         _ = Listen();
     }
@@ -56,6 +61,7 @@ internal sealed class AgentPipe : IDisposable
 
     private async Task ServeClient(NamedPipeServerStream pipe)
     {
+        var capturing = false;
         using (pipe)
         using (var reader = new StreamReader(pipe, leaveOpen: true))
         using (var writer = new StreamWriter(pipe, leaveOpen: true) { AutoFlush = true })
@@ -66,13 +72,43 @@ internal sealed class AgentPipe : IDisposable
                 {
                     var line = await reader.ReadLineAsync(_stop.Token);
                     if (line is null) break;
+                    if (JsonNode.Parse(line)?["operation"]?.GetValue<string>() == "captureHotkeys")
+                    {
+                        await SetCaptureAsync(true);
+                        capturing = true;
+                        await writer.WriteLineAsync("{}");
+                        // The open pipe owns the pause; EOF also restores keys after an editor crash.
+                        await reader.ReadLineAsync(_stop.Token);
+                        var unavailable = await SetCaptureAsync(false);
+                        capturing = false;
+                        await writer.WriteLineAsync(JsonSerializer.Serialize(new { unavailableHotkeys = unavailable }));
+                        break;
+                    }
                     var response = await Dispatch(line);
                     await writer.WriteLineAsync(response);
                 }
             }
             catch (OperationCanceledException) { }
             catch (IOException ex) { DevLog.Write("app-pipe", "Client connection ended", ex); }
+            catch (Exception ex) { DevLog.Write("app-pipe", "Capture failed", ex); }
+            finally { if (capturing) await SetCaptureAsync(false); }
         }
+    }
+
+    private Task<IReadOnlyList<string>> SetCaptureAsync(bool start)
+    {
+        var completion = new TaskCompletionSource<IReadOnlyList<string>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _ui.Post(_ =>
+        {
+            try
+            {
+                if (_captureHotkeys is null) throw new InvalidOperationException("Запись сочетаний не поддерживается приложением в трее.");
+                _captureConnections += start ? 1 : -1;
+                completion.SetResult(_captureHotkeys(_captureConnections > 0));
+            }
+            catch (Exception ex) { completion.SetException(ex); }
+        }, null);
+        return completion.Task;
     }
 
     private Task<string> Dispatch(string line)
@@ -92,7 +128,7 @@ internal sealed class AgentPipe : IDisposable
         var operation = request["operation"]?.GetValue<string>() ?? throw new ArgumentException("Требуется operation.");
         DevLog.Write("app-pipe", $"Handling {operation}");
         var args = request["arguments"] as JsonObject ?? new JsonObject();
-        if (operation == "read") return JsonSerializer.SerializeToNode(new { version = _store.Version, config = _store.Current }, JsonOptions)!;
+        if (operation == "read") return JsonSerializer.SerializeToNode(new { version = _store.Version, config = _store.Current, unavailableHotkeys = _hotkeyStatus?.Invoke() }, JsonOptions)!;
         if (operation == "begin")
         {
             _drafts[session] = _store.CreateDraft();
@@ -102,7 +138,9 @@ internal sealed class AgentPipe : IDisposable
         {
             var result = _store.Reload();
             if (result.Success) { _drafts.Clear(); _applied(); }
-            return JsonSerializer.SerializeToNode(result, JsonOptions)!;
+            var response = JsonSerializer.SerializeToNode(result, JsonOptions)!;
+            response["unavailableHotkeys"] = JsonSerializer.SerializeToNode(_hotkeyStatus?.Invoke(), JsonOptions);
+            return response;
         }
         if (!_drafts.TryGetValue(session, out var draft)) throw new InvalidOperationException("Сначала вызовите begin.");
         if (operation == "replaceDraft")
@@ -117,7 +155,9 @@ internal sealed class AgentPipe : IDisposable
         {
             var result = _store.Apply(draft);
             if (result.Success) { _drafts.Remove(session); _applied(); }
-            return JsonSerializer.SerializeToNode(result, JsonOptions)!;
+            var response = JsonSerializer.SerializeToNode(result, JsonOptions)!;
+            response["unavailableHotkeys"] = JsonSerializer.SerializeToNode(_hotkeyStatus?.Invoke(), JsonOptions);
+            return response;
         }
         if (operation == "create")
         {

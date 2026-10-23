@@ -29,6 +29,7 @@
 
     <ItemGroup>
         <Compile Include="..\m3nuxa.App\ConfigModels.cs" Link="ConfigModels.cs" />
+        <Compile Include="..\m3nuxa.App\HotkeyParser.cs" Link="HotkeyParser.cs" />
         <Compile Include="..\m3nuxa.App\DevLog.cs" Link="DevLog.cs" />
         <Compile Include="..\m3nuxa.App\ItemIcon.cs" Link="ItemIcon.cs" />
         <Content Include="..\..\assets\icon-packs\**\*" Link="icon-packs\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

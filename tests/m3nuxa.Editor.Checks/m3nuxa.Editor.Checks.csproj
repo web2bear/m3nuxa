@@ -22,6 +22,10 @@
     <Compile Include="../../src/m3nuxa.Editor/Views/MainPage.xaml.cs" Link="Views/MainPage.xaml.cs" />
     <Compile Include="../../src/m3nuxa.Editor/Imports.cs" Link="Imports.cs" />
     <Compile Include="../../src/m3nuxa.Editor/EditorPipeClient.cs" Link="EditorPipeClient.cs" />
+    <Compile Include="../../src/m3nuxa.Editor/ShortcutEditor.cs" Link="ShortcutEditor.cs" />
+    <Compile Include="../../src/m3nuxa.Editor/KeyboardCapture.cs" Link="KeyboardCapture.cs" />
+    <Compile Include="../../src/m3nuxa.Editor/HotkeyCaptureConnection.cs" Link="HotkeyCaptureConnection.cs" />
+    <Compile Include="../../src/m3nuxa.App/HotkeyParser.cs" Link="HotkeyParser.cs" />
     <Compile Include="../../src/m3nuxa.Editor/IconFilePicker.cs" Link="IconFilePicker.cs" />
     <Compile Include="../../src/m3nuxa.App/ConfigModels.cs" Link="ConfigModels.cs" />
     <Compile Include="../../src/m3nuxa.App/DevLog.cs" Link="DevLog.cs" />
