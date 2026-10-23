@@ -27,6 +27,10 @@ public sealed partial class MainPage : Page
     private string? baseSnapshot;
     private string? copiedNode;
     private string? cutNodeId;
+    private ShortcutEditor? activeShortcut;
+    private ShortcutEditor mainShortcut = null!;
+    private readonly Dictionary<ShortcutEditor, Func<string>> globalShortcuts = [];
+    private readonly HashSet<string> unavailableHotkeys = [];
 
     public MainPage()
     {
@@ -37,11 +41,15 @@ public sealed partial class MainPage : Page
         MenuPanel.AddHandler(DragOverEvent, new DragEventHandler(MenuTreeDragOver), true);
         MenuPanel.AddHandler(DropEvent, new DragEventHandler(MenuTreeDrop), true);
         Loaded += MainPageLoaded;
-        MainHotkeyBox.GotFocus += (_, _) => { if (!rendering) Remember(); };
+        mainShortcut = CreateShortcutEditor("MainHotkey", "Вызов меню", "Открывает основное меню из любого приложения.",
+            () => config.MainHotkey, value => config.MainHotkey = value, null, true);
+        MainHotkeyPanel.Children.Add(mainShortcut);
         App.MainWindow.AppWindow.Closing += async (_, args) =>
         {
-            if (!dirty || allowClose) return;
+            if (allowClose) return;
             args.Cancel = true;
+            if (activeShortcut is not null) await activeShortcut.StopAsync();
+            if (!dirty) { allowClose = true; App.MainWindow.Close(); return; }
             var answer = await ConfirmAsync("Несохранённые изменения", "Применить изменения перед закрытием?", "Применить", "Отбросить");
             if (answer == ContentDialogResult.Primary && !await ApplyAsync()) return;
             if (answer == ContentDialogResult.None) return;
@@ -67,6 +75,7 @@ public sealed partial class MainPage : Page
         draftReady = true;
         dirty = false; undo.Clear(); redo.Clear();
         RefreshTree(); UpdateApplyState();
+        ShowHotkeyAvailability(await client.ReadAsync());
         DevLog.Write("editor", "Current configuration loaded");
     }
 
@@ -97,7 +106,7 @@ public sealed partial class MainPage : Page
         {
             MenuTree.RootNodes.Clear();
             foreach (var node in config.Items) MenuTree.RootNodes.Add(BuildNode(node));
-            MainHotkeyBox.Text = config.MainHotkey;
+            mainShortcut.Refresh();
             MenuTree.SelectedNode = FindTreeNode(MenuTree.RootNodes, selectId);
         }
         finally { rendering = false; }
@@ -137,6 +146,7 @@ public sealed partial class MainPage : Page
         {
             selected = MenuTree.SelectedNode?.Content is NodeDisplay display ? display.Model : null;
             UpdateSelectionCommands();
+            foreach (var field in globalShortcuts.Keys.Where(field => field != mainShortcut).ToArray()) globalShortcuts.Remove(field);
             PropertiesPanel.Children.Clear();
             PropertiesHint.Text = selected is null ? "Выберите пункт слева" : selected.Kind == MenuNodeKind.Group ? "Группа меню" : selected.Kind == MenuNodeKind.Separator ? "Разделитель" : "Действие";
             if (selected is null)
@@ -153,7 +163,9 @@ public sealed partial class MainPage : Page
                 if (FindTreeNode(MenuTree.RootNodes, item.Id) is { } itemNode)
                     itemNode.Content = new NodeDisplay(item);
             });
-            AddText("Горячая клавиша", item.Hotkey, value => item.Hotkey = value, placeholder: "Например, Ctrl+Alt+K");
+            PropertiesPanel.Children.Add(CreateShortcutEditor("ItemHotkey", "Горячая клавиша пункта",
+                item.Kind == MenuNodeKind.Group ? "Открывает эту группу из любого приложения." : "Выполняет это действие из любого приложения.",
+                () => item.Hotkey, value => item.Hotkey = value, item.Id));
             AddIconPicker(item);
             if (item.Kind != MenuNodeKind.Action) return;
             item.Action ??= new MenuAction();
@@ -180,10 +192,62 @@ public sealed partial class MainPage : Page
                 hidden.Toggled += (_, _) => { if (rendering) return; Remember(); action.HideConsole = hidden.IsOn; MarkDirty(); };
                 PropertiesPanel.Children.Add(hidden);
             }
-            if (action.Kind == ActionKind.SendShortcut) AddText("Отправляемое сочетание", action.Shortcut, value => action.Shortcut = value);
+            if (action.Kind == ActionKind.SendShortcut)
+                PropertiesPanel.Children.Add(CreateShortcutEditor("SentShortcut", "Отправляемое сочетание",
+                    "Нажимается в окне, из которого было вызвано действие.", () => action.Shortcut, value => action.Shortcut = value, item.Id, sent: true));
             if (action.Kind == ActionKind.InsertText) AddText("Текст сниппета", action.Text, value => action.Text = value, multiline: true);
         }
         finally { rendering = false; }
+    }
+
+    private ShortcutEditor CreateShortcutEditor(string id, string label, string help, Func<string> getter, Action<string> setter,
+        string? itemId, bool main = false, bool sent = false)
+    {
+        ShortcutEditor field = null!;
+        field = new ShortcutEditor(id, label, help, getter, value =>
+        {
+            if (getter() == value) return;
+            Remember(); setter(value); MarkDirty();
+        }, value => sent ? null : FindHotkeyConflict(value, itemId, main), async () =>
+        {
+            if (activeShortcut is not null && activeShortcut != field) await activeShortcut.StopAsync();
+            activeShortcut = field;
+        });
+        if (!sent)
+        {
+            globalShortcuts[field] = getter;
+            if (unavailableHotkeys.Contains(CanonicalHotkey(getter()))) field.SetError("Сочетание недоступно: занято другой программой или зарезервировано Windows.");
+        }
+        return field;
+    }
+
+    private static string CanonicalHotkey(string value) => HotkeyParser.TryParse(value, out var modifiers, out var key) ? $"{modifiers}:{key}" : value;
+
+    private string? FindHotkeyConflict(string value, string? itemId, bool main)
+    {
+        var key = CanonicalHotkey(value);
+        if (!main && key == CanonicalHotkey(config.MainHotkey)) return "Уже назначено для вызова основного меню.";
+        return Visit(config.Items, "");
+        string? Visit(IEnumerable<MenuNode> nodes, string parent)
+        {
+            foreach (var node in nodes)
+            {
+                var path = parent + node.Name;
+                if (node.Id != itemId && node.Kind != MenuNodeKind.Separator && !string.IsNullOrWhiteSpace(node.Hotkey) && key == CanonicalHotkey(node.Hotkey))
+                    return $"Уже назначено пункту «{path}».";
+                if (Visit(node.Children, path + " / ") is { } conflict) return conflict;
+            }
+            return null;
+        }
+    }
+
+    private void ShowHotkeyAvailability(EditorResponse response)
+    {
+        if (response.Data?["unavailableHotkeys"] is not System.Text.Json.Nodes.JsonArray unavailable) return;
+        unavailableHotkeys.Clear();
+        foreach (var value in unavailable) if (value?.GetValue<string>() is { } text) unavailableHotkeys.Add(CanonicalHotkey(text));
+        foreach (var (field, getter) in globalShortcuts)
+            field.SetError(unavailableHotkeys.Contains(CanonicalHotkey(getter())) ? "Сочетание недоступно: занято другой программой или зарезервировано Windows." : null);
     }
 
     private void AddText(string label, string value, Action<string> setter, bool variables = false, bool multiline = false, string placeholder = "")
@@ -427,8 +491,6 @@ public sealed partial class MainPage : Page
     }
     private void DeleteClicked(object sender, RoutedEventArgs args)
     { if (selected is null) return; Remember(); SelectedSiblings().Remove(selected); MarkDirty(); RefreshTree(); }
-    private void MainHotkeyChanged(object sender, TextChangedEventArgs args)
-    { if (rendering) return; config.MainHotkey = MainHotkeyBox.Text; MarkDirty(); }
     private void UndoClicked(object sender, RoutedEventArgs args)
     { if (undo.Count == 0) return; redo.Push(Snapshot()); config = JsonSerializer.Deserialize<AppConfig>(undo.Pop(), JsonOptions)!; MarkDirty(); RefreshTree(); }
     private void RedoClicked(object sender, RoutedEventArgs args)
@@ -437,6 +499,7 @@ public sealed partial class MainPage : Page
     private async void ApplyClicked(object sender, RoutedEventArgs args) => await ApplyAsync();
     private async Task<bool> ApplyAsync()
     {
+        if (activeShortcut is not null) await activeShortcut.StopAsync();
         if (!draftReady && !await RestoreDraftAsync()) return false;
         var staged = await client.ReplaceDraftAsync(config);
         if (!staged.Success && staged.Message == "Сначала вызовите begin.")
@@ -447,10 +510,11 @@ public sealed partial class MainPage : Page
         }
         if (!staged.Success) { ShowNotice(staged.Message ?? "Не удалось подготовить конфигурацию.", InfoBarSeverity.Error); return false; }
         var response = await client.ApplyAsync();
+        ShowHotkeyAvailability(response);
         if (!response.Success) { ShowNotice(response.Message ?? "Не удалось применить конфигурацию.", InfoBarSeverity.Error); return false; }
         draftReady = false;
         var draft = EditorPipeClient.ReadDraft(await client.BeginAsync());
-        if (draft is not null) { config = draft.Config; baseSnapshot = Snapshot(); draftReady = true; }
+        if (draft is not null) { config = draft.Config; baseSnapshot = Snapshot(); draftReady = true; RefreshTree(selected?.Id); }
         dirty = false; undo.Clear(); redo.Clear(); UpdateApplyState(); Notice.IsOpen = false;
         var warnings = response.Data?["Validation"]?["Warnings"]?.Deserialize<string[]>() ?? [];
         if (warnings.Length > 0) ShowNotice(string.Join("\n", warnings), InfoBarSeverity.Warning);

@@ -216,6 +216,7 @@ public sealed class ConfigStore
             if (action.Kind == ActionKind.SendShortcut)
             {
                 if (string.IsNullOrWhiteSpace(action.Shortcut)) errors.Add($"{label}: требуется сочетание для отправки.");
+                else if (!HotkeyParser.TryParse(action.Shortcut, out _, out _)) errors.Add($"{label}: некорректное сочетание для отправки.");
                 return;
             }
             if (action.Kind == ActionKind.InsertText)
@@ -256,7 +257,7 @@ public sealed class ConfigStore
                 continue;
             }
             if (key != Keys.None || !HotkeyParser.TryKey(part, out var parsed)
-                || parsed is Keys.None or Keys.Control or Keys.Shift or Keys.Menu)
+                || HotkeyParser.IsModifier((uint)parsed))
                 return false;
             key = parsed;
         }

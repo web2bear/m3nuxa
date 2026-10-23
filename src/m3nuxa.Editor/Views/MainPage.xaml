@@ -80,7 +80,7 @@
                     <Border AllowDrop="True" Padding="10,8" CornerRadius="6" BorderThickness="1" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}">
                         <TextBlock x:Name="DropHint" Text="Перетащите файлы и папки сюда" FontSize="12" Opacity="0.7" TextWrapping="Wrap" />
                     </Border>
-                    <TextBox x:Name="MainHotkeyBox" Header="Вызов меню" TextChanged="MainHotkeyChanged" />
+                    <StackPanel x:Name="MainHotkeyPanel" />
                 </StackPanel>
             </Grid>
             <Border Grid.Column="1" Width="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
