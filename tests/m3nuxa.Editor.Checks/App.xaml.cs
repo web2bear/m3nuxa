@@ -45,7 +45,8 @@ public partial class App : Application
             await page.CheckExplorerIconsAsync();
             await page.CheckTreeReorderAsync();
             page.CheckApplyAvailability();
-            await File.WriteAllTextAsync(resultPath, "PASS: initial tree and property icons agree; Explorer icons, shortcut import, image preview; tree labels, models and properties after reparenting and refresh; apply availability and tooltip track net changes.");
+            await page.CheckShortcutRecordingAsync();
+            await File.WriteAllTextAsync(resultPath, "PASS: icons, tree reorder, apply availability; real shortcut recording, release-to-commit, Undo/Redo, Esc, duplicate conflict, sent shortcut, selection cancellation, clear, tray pause and EOF recovery.");
             Environment.Exit(0);
         }
         catch (Exception ex)

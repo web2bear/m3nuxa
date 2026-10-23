@@ -1,23 +1,33 @@
-<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-  <!-- Basic launcher appearance. Colors follow the Windows light/dark theme. -->
-  <x:Double x:Key="LauncherFontSize">16</x:Double>
-  <x:Double x:Key="LauncherIconSize">24</x:Double>
-  <Thickness x:Key="LauncherItemPadding">12,10,16,10</Thickness>
-  <Style x:Key="LauncherPresenterStyle" TargetType="MenuFlyoutPresenter">
-    <Setter Property="MinWidth" Value="260" />
-    <Setter Property="MaxWidth" Value="560" />
-    <Setter Property="Padding" Value="8" />
-    <Setter Property="CornerRadius" Value="10" />
-    <Setter Property="Background" Value="{ThemeResource MenuFlyoutPresenterBackground}" />
-  </Style>
-  <Style TargetType="MenuFlyoutItem">
-    <Setter Property="FontFamily" Value="Segoe UI Variable Text" />
-    <Setter Property="FontSize" Value="{StaticResource LauncherFontSize}" />
-    <Setter Property="Padding" Value="{StaticResource LauncherItemPadding}" />
-    <Setter Property="CornerRadius" Value="4" />
-  </Style>
-  <Style TargetType="MenuFlyoutSubItem">
-    <Setter Property="FontSize" Value="{StaticResource LauncherFontSize}" />
-    <Setter Property="Padding" Value="{StaticResource LauncherItemPadding}" />
-  </Style>
-</ResourceDictionary>
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- Basic launcher appearance. Colors follow the Windows light/dark theme. -->
+  <x:Double x:Key="LauncherFontSize">12</x:Double>
+  <x:Double x:Key="LauncherIconSize">16</x:Double>
+  <!-- Match WinUI's internal mouse padding so mixed item types stay aligned. -->
+  <Thickness x:Key="LauncherItemPadding">11,4,11,5</Thickness>
+  <Thickness x:Key="MenuFlyoutItemPlaceholderThemeThickness">24,0,0,0</Thickness>
+  <Style x:Key="LauncherPresenterStyle" TargetType="MenuFlyoutPresenter">
+    <Setter Property="MinWidth" Value="260" />
+    <Setter Property="MaxWidth" Value="560" />
+    <Setter Property="Padding" Value="4" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Background" Value="{ThemeResource MenuFlyoutPresenterBackground}" />
+  </Style>
+  <Style TargetType="MenuFlyoutItem">
+    <Setter Property="FontFamily" Value="Segoe UI Variable Text" />
+    <Setter Property="FontSize" Value="{StaticResource LauncherFontSize}" />
+    <Setter Property="Padding" Value="{StaticResource LauncherItemPadding}" />
+    <Setter Property="MinHeight" Value="28" />
+    <Setter Property="CornerRadius" Value="4" />
+  </Style>
+  <Style TargetType="ToggleMenuFlyoutItem">
+    <Setter Property="FontFamily" Value="Segoe UI Variable Text" />
+    <Setter Property="FontSize" Value="{StaticResource LauncherFontSize}" />
+    <Setter Property="Padding" Value="{StaticResource LauncherItemPadding}" />
+    <Setter Property="MinHeight" Value="28" />
+  </Style>
+  <Style TargetType="MenuFlyoutSubItem">
+    <Setter Property="MinHeight" Value="28" />
+    <Setter Property="FontSize" Value="{StaticResource LauncherFontSize}" />
+    <Setter Property="Padding" Value="{StaticResource LauncherItemPadding}" />
+  </Style>
+</ResourceDictionary>
