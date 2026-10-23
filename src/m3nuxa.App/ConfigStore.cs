@@ -33,6 +33,7 @@ public sealed class ConfigStore
         }
     }
 
+    public Func<string>? GlobalHotkey { get; set; }
     public string FilePath => path;
     public AppConfig Current { get { lock (gate) return Clone(current); } }
     public long Version { get { lock (gate) return version; } }
@@ -152,7 +153,7 @@ public sealed class ConfigStore
         ?? throw new InvalidDataException("JSON не содержит конфигурацию.");
 
     private static AppConfig Clone(AppConfig value) =>
-        JsonSerializer.Deserialize<AppConfig>(JsonSerializer.Serialize(value, JsonOptions), JsonOptions)!;
+        new() { SchemaVersion = value.SchemaVersion, MainHotkey = value.MainHotkey, Items = JsonSerializer.Deserialize<List<MenuNode>>(JsonSerializer.Serialize(value.Items, JsonOptions), JsonOptions)! };
 
     private static string Fingerprint(string file)
     {
@@ -174,9 +175,10 @@ public sealed class ConfigStore
         if (config.SchemaVersion != 1) errors.Add("Неподдерживаемая версия схемы.");
         if (config.Items is null) errors.Add("Отсутствует дерево меню.");
         var hotkeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (!string.IsNullOrWhiteSpace(config.MainHotkey))
+        var mainHotkey = GlobalHotkey?.Invoke() ?? "";
+        if (!string.IsNullOrWhiteSpace(mainHotkey))
         {
-            if (TryNormalizeHotkey(config.MainHotkey, out var normalized)) hotkeys.Add(normalized);
+            if (TryNormalizeHotkey(mainHotkey, out var normalized)) hotkeys.Add(normalized);
             else errors.Add("Основное меню: некорректное сочетание клавиш.");
         }
         var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

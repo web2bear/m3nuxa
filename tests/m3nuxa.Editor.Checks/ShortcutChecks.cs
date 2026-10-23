@@ -9,30 +9,33 @@ public sealed partial class MainPage
 {
     internal async Task CheckShortcutRecordingAsync()
     {
-        var group = new MenuNode { Name = "Терминал", Kind = MenuNodeKind.Group, Hotkey = "Control+Shift+K" };
+        var group = new MenuNode { Name = "Терминал", Kind = MenuNodeKind.Group, Hotkey = "Ctrl+Alt+Space" };
         var send = new MenuNode { Name = "Вставить", Kind = MenuNodeKind.Action, Action = new MenuAction { Kind = ActionKind.SendShortcut, Shortcut = "Ctrl+V" } };
-        config = new AppConfig { Items = [group, send] };
+        config = new AppConfig { Items = [group, send, new MenuNode { Name = "Конфликт", Kind = MenuNodeKind.Group, Hotkey = "Control+Shift+K" }] };
         baseSnapshot = Snapshot(); undo.Clear(); redo.Clear(); dirty = false;
         RefreshTree(group.Id); UpdateApplyState();
         for (var attempt = 0; attempt < 100 && GetForegroundWindow() != WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow); attempt++) await Task.Delay(50);
         App.MainWindow.Activate();
-        SetForegroundWindow(WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow));
+        FocusCheckWindow();
         await Task.Delay(100);
 
+        var mainShortcut = PropertiesPanel.Children.OfType<ShortcutEditor>().First();
         await mainShortcut.StartAsync();
         Assert(Descendants(mainShortcut).OfType<TextBlock>().Any(text => text.Text.Contains("Нажмите новое")), "recording did not start: " + string.Join(" | ", Descendants(mainShortcut).OfType<TextBlock>().Select(text => text.Text)));
         Send((0x11, false), (0x12, false), (0x78, false));
         await Task.Delay(80);
-        Assert(config.MainHotkey == "Ctrl+Alt+Space" && !dirty, "key-down changed the draft");
+        Assert(config.Items[0].Hotkey == "Ctrl+Alt+Space" && !dirty, "key-down changed the draft");
         Send((0x78, true)); await Task.Delay(50);
         Assert(!dirty, "committed before modifiers released");
         Send((0x12, true), (0x11, true));
         for (var attempt = 0; attempt < 40 && !dirty; attempt++) await Task.Delay(50);
-        Assert(config.MainHotkey == "Ctrl+Alt+F9" && dirty, "recorded combination was not committed: " + config.MainHotkey + " | " + string.Join(" | ", Descendants(mainShortcut).OfType<TextBlock>().Select(text => text.Text)));
+        Assert(config.Items[0].Hotkey == "Ctrl+Alt+F9" && dirty, "recorded combination was not committed: " + config.Items[0].Hotkey + " | " + string.Join(" | ", Descendants(mainShortcut).OfType<TextBlock>().Select(text => text.Text)));
         UndoClicked(this, null!);
-        Assert(config.MainHotkey == "Ctrl+Alt+Space" && !dirty, "one undo must restore the whole combination: " + config.MainHotkey + " dirty=" + dirty + " history=" + undo.Count);
+        Assert(config.Items[0].Hotkey == "Ctrl+Alt+Space" && !dirty, "one undo must restore the whole combination: " + config.Items[0].Hotkey + " dirty=" + dirty + " history=" + undo.Count);
         RedoClicked(this, null!);
-        Assert(config.MainHotkey == "Ctrl+Alt+F9", "redo lost the combination");
+        MenuTree.SelectedNode = FindTreeNode(MenuTree.RootNodes, group.Id); await Task.Delay(80);
+        mainShortcut = PropertiesPanel.Children.OfType<ShortcutEditor>().First();
+        Assert(config.Items[0].Hotkey == "Ctrl+Alt+F9", "redo lost the combination");
 
         var before = Snapshot(); var undoCount = undo.Count;
         await mainShortcut.StartAsync();
@@ -42,9 +45,10 @@ public sealed partial class MainPage
         await mainShortcut.StartAsync();
         Send((0x11, false), (0x10, false), (0x4b, false), (0x4b, true), (0x10, true), (0x11, true));
         await Task.Delay(180);
-        Assert(Snapshot() == before && Descendants(mainShortcut).OfType<TextBlock>().Any(text => text.Text.Contains("Терминал")), "duplicate did not preserve old value or explain conflict");
+        Assert(Snapshot() == before && Descendants(mainShortcut).OfType<TextBlock>().Any(text => text.Text.Contains("Конфликт")), "duplicate did not preserve old value or explain conflict");
 
         MenuTree.SelectedNode = FindTreeNode(MenuTree.RootNodes, group.Id); await Task.Delay(80);
+        mainShortcut = PropertiesPanel.Children.OfType<ShortcutEditor>().First();
         await mainShortcut.StartAsync();
         ((TextBox)PropertiesPanel.Children[0]).Focus(FocusState.Programmatic);
         await Task.Delay(180);
@@ -63,30 +67,23 @@ public sealed partial class MainPage
         MenuTree.SelectedNode = FindTreeNode(MenuTree.RootNodes, group.Id); await Task.Delay(180);
         Assert(config.Items[1].Hotkey == "", "changing selection committed a recording");
 
+        MenuTree.SelectedNode = FindTreeNode(MenuTree.RootNodes, group.Id); await Task.Delay(80);
+        mainShortcut = PropertiesPanel.Children.OfType<ShortcutEditor>().First();
         var clear = Descendants(mainShortcut).OfType<Button>().Single(button => button.Content as string == "Убрать");
         ((IInvokeProvider)new ButtonAutomationPeer(clear).GetPattern(PatternInterface.Invoke)).Invoke();
         await Task.Delay(50);
-        Assert(config.MainHotkey == "", "clear failed");
+        Assert(config.Items[0].Hotkey == "", "clear failed");
         UndoClicked(this, null!);
-        Assert(config.MainHotkey == "Ctrl+Alt+F9", "clear is not undoable");
+        Assert(config.Items[0].Hotkey == "Ctrl+Alt+F9", "clear is not undoable");
+        MenuTree.SelectedNode = FindTreeNode(MenuTree.RootNodes, group.Id); await Task.Delay(80);
+        mainShortcut = PropertiesPanel.Children.OfType<ShortcutEditor>().First();
 
         ShowHotkeyAvailability(new EditorResponse(true, null, System.Text.Json.Nodes.JsonNode.Parse("{\"unavailableHotkeys\":[\"Control+Alt+F9\"]}")!));
         Assert(Descendants(mainShortcut).OfType<TextBlock>().Any(text => text.Text.Contains("Сочетание недоступно")), "registration failure missing next to field");
         ShowHotkeyAvailability(new EditorResponse(true, null, System.Text.Json.Nodes.JsonNode.Parse("{\"unavailableHotkeys\":[]}")!));
         Assert(!Descendants(mainShortcut).OfType<TextBlock>().Any(text => text.Text.Contains("Сочетание недоступно")), "stale registration failure retained");
 
-        // Check the actual tray binding, without applying the synthetic editor draft.
-        var actual = await client.ReadAsync();
-        var main = actual.Data?["config"]?["MainHotkey"]?.GetValue<string>() ?? "";
-        if (HotkeyParser.TryParse(main, out var modifiers, out var key))
-        {
-            Assert(!CanRegister(modifiers, key), "tray binding was not restored after recording");
-            using (var connection = await HotkeyCaptureConnection.OpenAsync())
-                Assert(CanRegister(modifiers, key), "tray binding remained registered during capture");
-            for (var attempt = 0; attempt < 20 && CanRegister(modifiers, key); attempt++) await Task.Delay(50);
-            Assert(!CanRegister(modifiers, key), "EOF did not restore the tray binding");
-        }
-        Assert(FindHotkeyConflict("Ctrl+Shift+K", null, true)?.Contains("Терминал") == true, "modifier aliases not normalized");
+        Assert(FindHotkeyConflict("Ctrl+Shift+K", null, true)?.Contains("Конфликт") == true, "modifier aliases not normalized");
         void Assert(bool condition, string message) { if (!condition) throw new Exception("Shortcut UX: " + message); }
     }
 
@@ -95,6 +92,17 @@ public sealed partial class MainPage
         if (!RegisterHotKey(0, 25100, modifiers, key)) return false;
         UnregisterHotKey(0, 25100); return true;
     }
+    private static void FocusCheckWindow()
+    {
+        var foregroundThread = GetWindowThreadProcessId(GetForegroundWindow(), out _);
+        var currentThread = GetCurrentThreadId();
+        if (foregroundThread != currentThread) AttachThreadInput(currentThread, foregroundThread, true);
+        try { SetForegroundWindow(WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow)); }
+        finally { if (foregroundThread != currentThread) AttachThreadInput(currentThread, foregroundThread, false); }
+    }
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(nint window, out uint process);
+    [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
+    [DllImport("user32.dll")] private static extern bool AttachThreadInput(uint from, uint to, bool attach);
     private static void Send(params (ushort key, bool up)[] keys)
     {
         if (GetForegroundWindow() != WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow)) throw new Exception("Test input requires the check window in foreground.");

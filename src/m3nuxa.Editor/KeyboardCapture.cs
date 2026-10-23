@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using m3nuxa.App;
+using Microsoft.UI.Xaml;
 
 namespace m3nuxa.Editor;
 

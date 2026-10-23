@@ -16,6 +16,7 @@
     <ApplicationIcon>Assets/TrayIcon.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../m3nuxa.Editor/KeyboardCapture.cs" Link="KeyboardCapture.cs" />
     <EmbeddedResource Include="Assets/TrayIcon.ico" />
     <Content Include="../../assets/icon-packs/**/*" Link="icon-packs/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
