@@ -14,8 +14,10 @@ public sealed partial class MainPage
         config = new AppConfig { Items = [group, send] };
         baseSnapshot = Snapshot(); undo.Clear(); redo.Clear(); dirty = false;
         RefreshTree(group.Id); UpdateApplyState();
-        await Task.Delay(100);
+        for (var attempt = 0; attempt < 100 && GetForegroundWindow() != WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow); attempt++) await Task.Delay(50);
+        App.MainWindow.Activate();
         SetForegroundWindow(WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow));
+        await Task.Delay(100);
 
         await mainShortcut.StartAsync();
         Assert(Descendants(mainShortcut).OfType<TextBlock>().Any(text => text.Text.Contains("Нажмите новое")), "recording did not start: " + string.Join(" | ", Descendants(mainShortcut).OfType<TextBlock>().Select(text => text.Text)));
@@ -24,7 +26,8 @@ public sealed partial class MainPage
         Assert(config.MainHotkey == "Ctrl+Alt+Space" && !dirty, "key-down changed the draft");
         Send((0x78, true)); await Task.Delay(50);
         Assert(!dirty, "committed before modifiers released");
-        Send((0x12, true), (0x11, true)); await Task.Delay(180);
+        Send((0x12, true), (0x11, true));
+        for (var attempt = 0; attempt < 40 && !dirty; attempt++) await Task.Delay(50);
         Assert(config.MainHotkey == "Ctrl+Alt+F9" && dirty, "recorded combination was not committed: " + config.MainHotkey + " | " + string.Join(" | ", Descendants(mainShortcut).OfType<TextBlock>().Select(text => text.Text)));
         UndoClicked(this, null!);
         Assert(config.MainHotkey == "Ctrl+Alt+Space" && !dirty, "one undo must restore the whole combination: " + config.MainHotkey + " dirty=" + dirty + " history=" + undo.Count);
@@ -94,6 +97,7 @@ public sealed partial class MainPage
     }
     private static void Send(params (ushort key, bool up)[] keys)
     {
+        if (GetForegroundWindow() != WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow)) throw new Exception("Test input requires the check window in foreground.");
         var inputs = keys.Select(key => new KeyboardInput { Type = 1, Key = key.key, Flags = key.up ? 2u : 0u }).ToArray();
         if (SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<KeyboardInput>()) != inputs.Length)
             throw new Exception("Cannot inject shortcut test input.");
@@ -102,6 +106,7 @@ public sealed partial class MainPage
     { [FieldOffset(0)] public uint Type; [FieldOffset(8)] public ushort Key; [FieldOffset(12)] public uint Flags; }
     [DllImport("user32.dll")] private static extern uint SendInput(uint count, KeyboardInput[] inputs, int size);
     [DllImport("user32.dll")] private static extern bool SetForegroundWindow(nint window);
+    [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
     [DllImport("user32.dll")] private static extern bool RegisterHotKey(nint window, int id, uint modifiers, uint key);
     [DllImport("user32.dll")] private static extern bool UnregisterHotKey(nint window, int id);
 }
