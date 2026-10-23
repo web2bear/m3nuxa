@@ -6,5 +6,5 @@
     <Nullable>enable</Nullable>
 
   </PropertyGroup>
-  <ItemGroup><Compile Include="../../src/m3nuxa.App/ConfigModels.cs" Link="ConfigModels.cs" /><Compile Include="../../src/m3nuxa.App/ConfigStore.cs" Link="ConfigStore.cs" /><Compile Include="../../src/m3nuxa.App/ItemIcon.cs" Link="ItemIcon.cs" /><Compile Include="../../src/m3nuxa.App/HotkeyParser.cs" Link="HotkeyParser.cs" /><PackageReference Include="System.Drawing.Common" Version="9.0.6" /></ItemGroup>
+  <ItemGroup><Compile Include="../../src/m3nuxa.App/SettingsStore.cs" Link="SettingsStore.cs" /><Compile Include="../../src/m3nuxa.App/ConfigModels.cs" Link="ConfigModels.cs" /><Compile Include="../../src/m3nuxa.App/ConfigStore.cs" Link="ConfigStore.cs" /><Compile Include="../../src/m3nuxa.App/ItemIcon.cs" Link="ItemIcon.cs" /><Compile Include="../../src/m3nuxa.App/HotkeyParser.cs" Link="HotkeyParser.cs" /><PackageReference Include="System.Drawing.Common" Version="9.0.6" /></ItemGroup>
 </Project>

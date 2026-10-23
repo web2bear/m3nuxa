@@ -15,6 +15,7 @@
     <ApplicationManifest>../../src/m3nuxa.App/app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../src/m3nuxa.Editor/KeyboardCapture.cs" Link="KeyboardCapture.cs" />
     <EmbeddedResource Include="../../src/m3nuxa.App/Assets/TrayIcon.ico" LogicalName="m3nuxa.App.Assets.TrayIcon.ico" />
     <Compile Include="../../src/m3nuxa.App/*.cs" Exclude="../../src/m3nuxa.App/App.xaml.cs" />
     <ApplicationDefinition Include="../../src/m3nuxa.App/App.xaml" Link="App.xaml" />

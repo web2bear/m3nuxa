@@ -46,7 +46,7 @@ public partial class App : Application
             await page.CheckTreeReorderAsync();
             page.CheckApplyAvailability();
             await page.CheckShortcutRecordingAsync();
-            await File.WriteAllTextAsync(resultPath, "PASS: icons, tree reorder, apply availability; real shortcut recording, release-to-commit, Undo/Redo, Esc, duplicate conflict, sent shortcut, selection cancellation, clear, tray pause and EOF recovery.");
+            await File.WriteAllTextAsync(resultPath, "PASS: icons, tree reorder, apply availability; real shortcut recording, release-to-commit, Undo/Redo, Esc, duplicate conflict, sent shortcut, selection cancellation, clear.");
             Environment.Exit(0);
         }
         catch (Exception ex)

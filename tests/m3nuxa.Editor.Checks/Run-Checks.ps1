@@ -13,10 +13,8 @@ if (-not (Get-Process -Name 'm3nuxa.App' -ErrorAction SilentlyContinue)) {
 }
 try {
 $checkProcess = Start-Process -FilePath (Join-Path $checkDirectory 'm3nuxa.Editor.Checks.exe') -WorkingDirectory $checkDirectory -WindowStyle Hidden -PassThru
-winapp ui wait-for MainHotkeyEdit -a $checkProcess.Id -t 5000
+winapp ui wait-for OpenSettings -a $checkProcess.Id -t 5000
 if ($LASTEXITCODE -ne 0) { throw 'Тестовое окно не готово к вводу.' }
-winapp ui focus MainHotkeyEdit -a $checkProcess.Id
-if ($LASTEXITCODE -ne 0) { throw 'Не удалось передать фокус тестовому окну.' }
 if (-not $checkProcess.WaitForExit(20000)) {
     Stop-Process -Id $checkProcess.Id
     throw 'Проверки редактора не завершились за 20 секунд.'

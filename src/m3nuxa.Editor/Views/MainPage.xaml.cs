@@ -28,7 +28,7 @@ public sealed partial class MainPage : Page
     private string? copiedNode;
     private string? cutNodeId;
     private ShortcutEditor? activeShortcut;
-    private ShortcutEditor mainShortcut = null!;
+    private string currentMainHotkey = "";
     private readonly Dictionary<ShortcutEditor, Func<string>> globalShortcuts = [];
     private readonly HashSet<string> unavailableHotkeys = [];
 
@@ -41,9 +41,6 @@ public sealed partial class MainPage : Page
         MenuPanel.AddHandler(DragOverEvent, new DragEventHandler(MenuTreeDragOver), true);
         MenuPanel.AddHandler(DropEvent, new DragEventHandler(MenuTreeDrop), true);
         Loaded += MainPageLoaded;
-        mainShortcut = CreateShortcutEditor("MainHotkey", "Вызов меню", "Открывает основное меню из любого приложения.",
-            () => config.MainHotkey, value => config.MainHotkey = value, null, true);
-        MainHotkeyPanel.Children.Add(mainShortcut);
         App.MainWindow.AppWindow.Closing += async (_, args) =>
         {
             if (allowClose) return;
@@ -56,7 +53,13 @@ public sealed partial class MainPage : Page
             allowClose = true;
             App.MainWindow.Close();
         };
-        DropHint.Text = "Перетащите файлы и папки сюда. Проводник и редактор должны работать с одинаковыми правами.";
+        ToolTipService.SetToolTip(DropHint, "Проводник и редактор должны работать с одинаковыми правами.");
+    }
+
+    private async void SettingsClicked(object sender, RoutedEventArgs args)
+    {
+        var response = await client.SendAsync("openSettings");
+        if (!response.Success) ShowNotice(response.Message ?? "Не удалось открыть настройки.", InfoBarSeverity.Error);
     }
 
     private async void MainPageLoaded(object sender, RoutedEventArgs args) => await LoadCurrentAsync();
@@ -106,7 +109,6 @@ public sealed partial class MainPage : Page
         {
             MenuTree.RootNodes.Clear();
             foreach (var node in config.Items) MenuTree.RootNodes.Add(BuildNode(node));
-            mainShortcut.Refresh();
             MenuTree.SelectedNode = FindTreeNode(MenuTree.RootNodes, selectId);
         }
         finally { rendering = false; }
@@ -146,7 +148,7 @@ public sealed partial class MainPage : Page
         {
             selected = MenuTree.SelectedNode?.Content is NodeDisplay display ? display.Model : null;
             UpdateSelectionCommands();
-            foreach (var field in globalShortcuts.Keys.Where(field => field != mainShortcut).ToArray()) globalShortcuts.Remove(field);
+            foreach (var field in globalShortcuts.Keys.ToArray()) globalShortcuts.Remove(field);
             PropertiesPanel.Children.Clear();
             PropertiesHint.Text = selected is null ? "Выберите пункт слева" : selected.Kind == MenuNodeKind.Group ? "Группа меню" : selected.Kind == MenuNodeKind.Separator ? "Разделитель" : "Действие";
             if (selected is null)
@@ -211,6 +213,11 @@ public sealed partial class MainPage : Page
         }, value => sent ? null : FindHotkeyConflict(value, itemId, main), async () =>
         {
             if (activeShortcut is not null && activeShortcut != field) await activeShortcut.StopAsync();
+            if (!sent)
+            {
+                var response = await client.ReadAsync();
+                if (response.Success) currentMainHotkey = response.Data?["mainHotkey"]?.GetValue<string>() ?? "";
+            }
             activeShortcut = field;
         });
         if (!sent)
@@ -226,7 +233,7 @@ public sealed partial class MainPage : Page
     private string? FindHotkeyConflict(string value, string? itemId, bool main)
     {
         var key = CanonicalHotkey(value);
-        if (!main && key == CanonicalHotkey(config.MainHotkey)) return "Уже назначено для вызова основного меню.";
+        if (!main && currentMainHotkey.Length > 0 && key == CanonicalHotkey(currentMainHotkey)) return "Уже назначено для вызова основного меню.";
         return Visit(config.Items, "");
         string? Visit(IEnumerable<MenuNode> nodes, string parent)
         {

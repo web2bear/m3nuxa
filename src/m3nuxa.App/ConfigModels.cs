@@ -31,7 +31,11 @@ public sealed class MenuNode
 public sealed class AppConfig
 {
     public int SchemaVersion { get; set; } = 1;
+    [JsonIgnore]
     public string MainHotkey { get; set; } = "Ctrl+Alt+Space";
+    // Read old configurations once; new menu files contain only the tree.
+    [JsonPropertyName("MainHotkey"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? LegacyMainHotkey { get => null; set { if (value is not null) MainHotkey = value; } }
     public List<MenuNode> Items { get; set; } = [];
 }
 

@@ -10,6 +10,7 @@ internal sealed class AgentPipe : IDisposable
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true, Converters = { new JsonStringEnumConverter() } };
     private readonly ConfigStore _store;
     private readonly Action _applied;
+    public Action? OpenSettings { get; set; }
     private readonly SynchronizationContext _ui;
     private readonly CancellationTokenSource _stop = new();
     private readonly Dictionary<string, ConfigDraft> _drafts = [];
@@ -117,7 +118,7 @@ internal sealed class AgentPipe : IDisposable
         _ui.Post(_ =>
         {
             try { completion.SetResult(Handle(JsonNode.Parse(line)!.AsObject()).ToJsonString(JsonOptions)); }
-            catch (Exception ex) { completion.SetResult(new JsonObject { ["error"] = ex.Message }.ToJsonString()); }
+            catch (Exception ex) { DevLog.Write("app-pipe", "Request failed", ex); completion.SetResult(new JsonObject { ["error"] = ex.Message }.ToJsonString()); }
         }, null);
         return completion.Task;
     }
@@ -128,7 +129,8 @@ internal sealed class AgentPipe : IDisposable
         var operation = request["operation"]?.GetValue<string>() ?? throw new ArgumentException("Требуется operation.");
         DevLog.Write("app-pipe", $"Handling {operation}");
         var args = request["arguments"] as JsonObject ?? new JsonObject();
-        if (operation == "read") return JsonSerializer.SerializeToNode(new { version = _store.Version, config = _store.Current, unavailableHotkeys = _hotkeyStatus?.Invoke() }, JsonOptions)!;
+        if (operation == "openSettings") { OpenSettings?.Invoke(); return new JsonObject(); }
+        if (operation == "read") return JsonSerializer.SerializeToNode(new { version = _store.Version, config = _store.Current, mainHotkey = _store.GlobalHotkey?.Invoke(), unavailableHotkeys = _hotkeyStatus?.Invoke() }, JsonOptions)!;
         if (operation == "begin")
         {
             _drafts[session] = _store.CreateDraft();

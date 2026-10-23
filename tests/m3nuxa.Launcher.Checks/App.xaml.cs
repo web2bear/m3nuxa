@@ -20,6 +20,7 @@ public partial class App : Application
         {
             var config = new ConfigStore(Path.Combine(root, "config.json"));
             tray = new TrayApplication(config);
+            await CheckSettingsAsync(tray, config);
             var displays = Microsoft.UI.Windowing.DisplayArea.FindAll();
             var testArea = displays[0].WorkArea;
             for (var i = 0; i < displays.Count; i++) if (!displays[i].IsPrimary) { testArea = displays[i].WorkArea; break; }
@@ -106,7 +107,7 @@ public partial class App : Application
             }
             service.Hide();
             overflow.Close();
-            await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, "result.txt"), "PASS: visible icons in root group, root action and nested action; WinUI menu popup, nested hierarchy, hide/reopen, empty menu; compact aligned service items and toggles; Exit above topmost overflow at bottom edge; isolated configuration.");
+            await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, "result.txt"), "PASS: settings immediate registration, occupied-key rollback, independent menu drafts, singleton settings window, recording pause/cancel, nested font size; visible icons in root group, root action and nested action; WinUI menu popup, nested hierarchy, hide/reopen, empty menu; compact aligned service items and toggles; Exit above topmost overflow at bottom edge; isolated configuration.");
             tray.Dispose(); Directory.Delete(root, true); Environment.Exit(0);
         }
         catch (Exception ex) { await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, "result.txt"), "FAIL: " + ex); tray?.Dispose(); Directory.Delete(root, true); Environment.Exit(1); }

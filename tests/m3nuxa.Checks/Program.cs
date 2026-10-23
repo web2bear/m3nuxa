@@ -7,6 +7,26 @@ try
 {
     var path = Path.Combine(root, "config.json");
     var store = new ConfigStore(path);
+    var legacyPath = Path.Combine(root, "legacy.json");
+    File.WriteAllText(legacyPath, "{\"MainHotkey\":\"Ctrl+Shift+F8\",\"Items\":[]}");
+    Check(new ConfigStore(legacyPath).Current.MainHotkey == "Ctrl+Shift+F8", "legacy shortcut read from existing JSON");
+    var settingsPath = Path.Combine(root, "settings.json");
+    var settings = new SettingsStore(settingsPath, "Ctrl+Shift+F8");
+    Check(settings.Current.MainHotkey == "Ctrl+Shift+F8", "legacy global shortcut migrated");
+    settings.Save(settings.Current with { MainHotkey = "Ctrl+Alt+F9", MenuFontSize = 16 });
+    Check(new SettingsStore(settingsPath, "Ctrl+Shift+F8").Current == settings.Current, "settings survive restart and migration does not overwrite");
+    store.GlobalHotkey = () => settings.Current.MainHotkey;
+    var settingsDraft = store.CreateDraft();
+    settingsDraft.Config.MainHotkey = "Ctrl+Alt+F1";
+    Check(store.Apply(settingsDraft).Success && settings.Current.MainHotkey == "Ctrl+Alt+F9", "menu draft cannot overwrite global settings");
+    Check(!File.ReadAllText(path).Contains("MainHotkey"), "new menu file excludes global shortcut");
+    var conflictDraft = store.CreateDraft();
+    conflictDraft.Config.Items.Add(new MenuNode { Name = "Conflict", Kind = MenuNodeKind.Group, Hotkey = "Control+Alt+F9" });
+    Check(!store.Validate(conflictDraft.Config).IsValid, "item shortcut validated against current settings");
+    try { settings.Save(settings.Current with { MenuFontSize = double.NaN }); throw new Exception("invalid font accepted"); }
+    catch (InvalidDataException) { Check(settings.Current.MenuFontSize == 16, "invalid settings preserve current state"); }
+    File.Delete(path);
+    store = new ConfigStore(path);
     var first = store.CreateDraft();
     first.Config.Items.Add(new MenuNode { Name = "Work", Kind = MenuNodeKind.Group });
     Check(store.Apply(first).Success, "first apply");
