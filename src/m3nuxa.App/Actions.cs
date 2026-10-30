@@ -60,6 +60,12 @@ internal static class ActionExecutor
                     if (!Directory.Exists(folder)) throw new DirectoryNotFoundException($"Папка недоступна: {folder}");
                     Process.Start(new ProcessStartInfo("explorer.exe") { ArgumentList = { "/n", folder }, UseShellExecute = false });
                     return Ok();
+                case ActionKind.OpenItem:
+                    var target = ExpandSingle(action.Path, context);
+                    if (!(Uri.TryCreate(target, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https") && !File.Exists(target))
+                        throw new FileNotFoundException($"Файл недоступен: {target}");
+                    _ = Process.Start(new ProcessStartInfo(target) { UseShellExecute = true });
+                    return Ok();
                 case ActionKind.RunProgram:
                     StartProcess(action, context, false);
                     return Ok();

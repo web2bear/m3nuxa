@@ -20,6 +20,8 @@
     <ApplicationDefinition Include="../../src/m3nuxa.Editor/App.xaml" Link="App.xaml" />
     <Page Include="../../src/m3nuxa.Editor/Views/MainPage.xaml" Link="Views/MainPage.xaml" />
     <Compile Include="../../src/m3nuxa.Editor/Views/MainPage.xaml.cs" Link="Views/MainPage.xaml.cs" />
+    <Compile Include="../../src/m3nuxa.Editor/EditorOleDropTarget.cs" Link="EditorOleDropTarget.cs" />
+    <Compile Include="../../src/m3nuxa.Editor/ExplorerFileDropHook.cs" Link="ExplorerFileDropHook.cs" />
     <Compile Include="../../src/m3nuxa.Editor/Imports.cs" Link="Imports.cs" />
     <Compile Include="../../src/m3nuxa.Editor/EditorPipeClient.cs" Link="EditorPipeClient.cs" />
     <Compile Include="../../src/m3nuxa.Editor/ShortcutEditor.cs" Link="ShortcutEditor.cs" />

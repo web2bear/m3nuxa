@@ -27,6 +27,24 @@ public partial class App : Application
             MainWindow.Content = page;
             MainWindow.Activate();
             await Task.Delay(100);
+            if (Environment.GetEnvironmentVariable("m3nuxa_DROP_CHECK") is { } snapshotPath)
+            {
+                page.SetupDropChecks();
+                IDisposable hook;
+                if (Environment.GetEnvironmentVariable("m3nuxa_OLE_PROBE") is { } log)
+                {
+                    hook = new EditorOleDropTarget(MainWindow, page.AddDroppedPaths, page.AddProbeText, log);
+                    hook.Dispose();
+                    hook = new EditorOleDropTarget(MainWindow, page.AddDroppedPaths, page.AddProbeText, log);
+                }
+                else hook = ExplorerFileDropHook.Attach(MainWindow, page.AddDroppedPaths);
+                using (hook)
+                while (true)
+                {
+                    await File.WriteAllTextAsync(snapshotPath, page.DropCheckSnapshot());
+                    await Task.Delay(200);
+                }
+            }
             var pickerRoot = Path.Combine(Path.GetTempPath(), "m3nuxa-picker-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(pickerRoot);
             try

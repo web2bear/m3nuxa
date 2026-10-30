@@ -1,0 +1,6 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>m3nuxa browser drag fixture</title>
+<style>body {font: 24px Arial; padding: 30px} p {margin: 40px 0} a {display:inline-block;padding:25px;background:#ddd}</style></head>
+<body><p><a href="https://example.com/m3nuxa-drag-test">Drag test link</a></p>
+<p id="sample">m3nuxa selected text fixture</p>
+<button id="select" onclick="const r=document.createRange();r.selectNodeContents(document.getElementById('sample'));window.getSelection().removeAllRanges();window.getSelection().addRange(r);">Select sample text</button></body></html>
