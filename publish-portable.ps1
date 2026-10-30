@@ -1,16 +1,22 @@
 param(
     [ValidateSet('win-x64', 'win-x86', 'win-arm64')]
-    [string]$RuntimeIdentifier = 'win-x64'
+    [string]$RuntimeIdentifier = 'win-x64',
+    [string]$OutputDirectory = (Join-Path $PSScriptRoot 'dist/m3nuxa'),
+    [switch]$NoLaunch,
+    [switch]$NoStop
 )
 
 $ErrorActionPreference = 'Stop'
-$output = Join-Path $PSScriptRoot 'dist/m3nuxa'
+$output = [IO.Path]::GetFullPath($OutputDirectory)
 $platform = $RuntimeIdentifier.Substring(4)
 
+if (-not $NoStop) {
 foreach ($process in @(Get-Process -Name 'm3nuxa.App', 'm3nuxa.Editor' -ErrorAction SilentlyContinue)) {
     Write-Host "Останавливаю $($process.ProcessName) (PID $($process.Id)) перед публикацией."
     Stop-Process -Id $process.Id -Force
     Wait-Process -Id $process.Id -Timeout 10 -ErrorAction SilentlyContinue
+}
+
 }
 
 dotnet publish (Join-Path $PSScriptRoot 'src/m3nuxa.Editor/m3nuxa.Editor.csproj') -c Release -p:Platform=$platform -r $RuntimeIdentifier --self-contained true -p:PublishTrimmed=false -p:PublishReadyToRun=false -o $output
@@ -47,5 +53,7 @@ foreach ($directory in Get-ChildItem -LiteralPath $output -Directory) {
 }
 
 Write-Host "Portable-папка готова: $output"
+if (-not $NoLaunch) {
 $app = Start-Process -FilePath (Join-Path $output 'm3nuxa.App.exe') -WorkingDirectory $output -PassThru
 Write-Host "m3nuxa.App запущен (PID $($app.Id))."
+}
