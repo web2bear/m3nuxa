@@ -38,10 +38,12 @@
                     </AppBarButton.Flyout>
                 </AppBarButton>
                 <AppBarButton x:Name="ApplyButton" Icon="Accept" Label="Применить" IsEnabled="False" ToolTipService.ToolTip="Нет изменений для применения" Click="ApplyClicked" />
+                <AppBarToggleButton x:Name="PinButton" Icon="Pin" Label="Поверх окон" AutomationProperties.Name="Закрепить редактор поверх окон" ToolTipService.ToolTip="Закрепить редактор поверх других окон" Click="PinClicked" />
             </StackPanel>
             <CommandBar Grid.Column="1" Background="Transparent" DefaultLabelPosition="Collapsed" OverflowButtonVisibility="Auto">
                 <AppBarButton x:Name="CutButton" Icon="Cut" Label="Вырезать" Click="CutClicked" />
                 <AppBarButton x:Name="CopyButton" Icon="Copy" Label="Копировать" Click="CopyClicked" />
+                <AppBarButton Icon="Paste" Label="Вставить текст" AutomationProperties.Name="Создать сниппет из буфера обмена" Click="PasteTextClicked" />
                 <AppBarButton x:Name="PasteButton" Icon="Paste" Label="Вставить" Click="PasteClicked" />
                 <AppBarButton x:Name="RenameButton" Icon="Rename" Label="Переименовать" Click="RenameClicked" />
                 <AppBarButton x:Name="DuplicateButton" Icon="Copy" Label="Дублировать" Click="DuplicateClicked" />
@@ -76,7 +78,7 @@
                         </MenuFlyout>
                     </TreeView.ContextFlyout>
                 </TreeView>
-                <TextBlock Grid.Row="2" x:Name="DropHint" Margin="12,6,12,10" Text="Перетащите файлы и папки сюда" FontSize="12" Opacity="0.6" TextWrapping="Wrap" />
+                <TextBlock Grid.Row="2" x:Name="DropHint" Margin="12,6,12,10" Text="Перетащите файлы, папки или текст сюда" FontSize="12" Opacity="0.6" TextWrapping="Wrap" />
             </Grid>
             <Border Grid.Column="1" Width="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
             <Grid x:Name="DetailsPanel" Grid.Column="2" RowDefinitions="Auto,*" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="12">

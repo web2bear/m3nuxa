@@ -5,6 +5,21 @@ namespace m3nuxa.Editor.Views;
 
 public sealed partial class MainPage
 {
+    internal void SetupDropChecks()
+    {
+        config = new AppConfig { Items = [new MenuNode { Name = "Drop group", Kind = MenuNodeKind.Group }] };
+        baseSnapshot = Snapshot();
+        RefreshTree();
+    }
+    internal string DropCheckSnapshot() => Snapshot();
+    internal void AddProbeText(string text, bool isUrl, int x, int y)
+    {
+        var (destination, index) = NativeDropDestination(x, y);
+        if (index < 0) index = destination.Count;
+        if (!isUrl) { AddDroppedText(text, destination, index); return; }
+        var node = new MenuNode { Name = text, Kind = MenuNodeKind.Action, Action = new MenuAction { Kind = ActionKind.OpenItem, Path = text } };
+        Remember(); destination.Insert(index, node); MarkDirty(); RefreshTree(node.Id);
+    }
     internal void DisableConfigurationLoadForChecks() => Loaded -= MainPageLoaded;
 
     internal async Task CheckTreeIconConsistencyAsync()

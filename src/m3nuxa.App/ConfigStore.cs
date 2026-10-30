@@ -227,7 +227,8 @@ public sealed class ConfigStore
                 return;
             }
             if (string.IsNullOrWhiteSpace(action.Path)) { errors.Add($"{label}: требуется путь."); return; }
-            if (action.Kind is ActionKind.OpenFolder or ActionKind.RunProgram or ActionKind.RunScript or ActionKind.CopySelection or ActionKind.MoveSelection)
+            if (action.Kind == ActionKind.OpenItem && Uri.TryCreate(action.Path, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https") return;
+            if (action.Kind is ActionKind.OpenItem or ActionKind.OpenFolder or ActionKind.RunProgram or ActionKind.RunScript or ActionKind.CopySelection or ActionKind.MoveSelection)
             {
                 if (!action.Path.Contains('{') && !File.Exists(action.Path) && !Directory.Exists(action.Path))
                     warnings.Add($"{label}: путь сейчас недоступен: {action.Path}");

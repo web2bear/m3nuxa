@@ -38,6 +38,9 @@ public sealed partial class MainPage : Page
         InitializeComponent();
         DevLog.Write("editor", "MainPage XAML initialized");
         UpdateSelectionCommands();
+        var pasteText = new KeyboardAccelerator { Key = Windows.System.VirtualKey.V, Modifiers = Windows.System.VirtualKeyModifiers.Control };
+        pasteText.Invoked += (_, args) => { PasteTextClicked(MenuTree, null!); args.Handled = true; };
+        MenuTree.KeyboardAccelerators.Add(pasteText);
         MenuPanel.AddHandler(DragOverEvent, new DragEventHandler(MenuTreeDragOver), true);
         MenuPanel.AddHandler(DropEvent, new DragEventHandler(MenuTreeDrop), true);
         Loaded += MainPageLoaded;
@@ -54,6 +57,12 @@ public sealed partial class MainPage : Page
             App.MainWindow.Close();
         };
         ToolTipService.SetToolTip(DropHint, "Проводник и редактор должны работать с одинаковыми правами.");
+    }
+
+    private void PinClicked(object sender, RoutedEventArgs args)
+    {
+        if (App.MainWindow.AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter)
+            presenter.IsAlwaysOnTop = PinButton.IsChecked == true;
     }
 
     private async void SettingsClicked(object sender, RoutedEventArgs args)
@@ -180,7 +189,7 @@ public sealed partial class MainPage : Page
                 Remember(); action.Kind = choice.Kind; MarkDirty(); RenderProperties();
             };
             PropertiesPanel.Children.Add(combo);
-            if (action.Kind is ActionKind.OpenFolder or ActionKind.RunProgram or ActionKind.RunScript or ActionKind.CopySelection or ActionKind.MoveSelection)
+            if (action.Kind is ActionKind.OpenItem or ActionKind.OpenFolder or ActionKind.RunProgram or ActionKind.RunScript or ActionKind.CopySelection or ActionKind.MoveSelection)
                 AddText(action.Kind is ActionKind.CopySelection or ActionKind.MoveSelection ? "Папка назначения" : "Путь", action.Path, value => action.Path = value, variables: true);
             if (action.Kind is ActionKind.RunProgram or ActionKind.RunScript)
             {
@@ -350,6 +359,20 @@ public sealed partial class MainPage : Page
         UpdateSelectionCommands();
     }
 
+    private async void PasteTextClicked(object sender, RoutedEventArgs args)
+    {
+        try
+        {
+            var data = Clipboard.GetContent();
+            if (!data.Contains(StandardDataFormats.Text)) { ShowNotice("В буфере обмена нет текста.", InfoBarSeverity.Warning); return; }
+            var text = await data.GetTextAsync();
+            if (string.IsNullOrWhiteSpace(text)) { ShowNotice("В буфере обмена нет текста.", InfoBarSeverity.Warning); return; }
+            var destination = AddDestination();
+            AddDroppedText(text, destination, destination.Count);
+        }
+        catch (Exception ex) { ShowNotice(ex.Message, InfoBarSeverity.Error); }
+    }
+
     private void PasteClicked(object sender, RoutedEventArgs args)
     {
         if (cutNodeId is { } id)
@@ -435,6 +458,15 @@ public sealed partial class MainPage : Page
         }
         if (errors.Count > 0) ShowNotice(string.Join("\n", errors), InfoBarSeverity.Warning);
     }
+    internal void AddExternalText(string text, bool isUrl, int x, int y)
+    {
+        var (destination, index) = NativeDropDestination(x, y);
+        if (index < 0) index = destination.Count;
+        if (!isUrl) { AddDroppedText(text, destination, index); return; }
+        var node = new MenuNode { Name = text, Kind = MenuNodeKind.Action, Action = new MenuAction { Kind = ActionKind.OpenItem, Path = text } };
+        Remember(); destination.Insert(index, node); MarkDirty(); RefreshTree(node.Id);
+    }
+
     internal void AddDroppedPaths(IReadOnlyList<string> paths, int x, int y)
     {
         if (!DispatcherQueue.HasThreadAccess)
@@ -475,8 +507,8 @@ public sealed partial class MainPage : Page
     private static MenuNode Import(string path)
     {
         var directory = Directory.Exists(path); var extension = Path.GetExtension(path).ToLowerInvariant();
-        if (!directory && extension is not (".exe" or ".bat" or ".cmd" or ".ps1" or ".lnk")) throw new InvalidOperationException("Тип файла не поддерживается.");
-        var action = new MenuAction { Path = path, Kind = directory ? ActionKind.OpenFolder : extension is ".bat" or ".cmd" or ".ps1" ? ActionKind.RunScript : ActionKind.RunProgram };
+        if (!directory && !File.Exists(path)) throw new FileNotFoundException("Файл недоступен.", path);
+        var action = new MenuAction { Path = path, Kind = directory ? ActionKind.OpenFolder : extension is ".bat" or ".cmd" or ".ps1" ? ActionKind.RunScript : extension is ".exe" or ".lnk" ? ActionKind.RunProgram : ActionKind.OpenItem };
         if (extension == ".lnk")
         {
             var type = Type.GetTypeFromProgID("WScript.Shell") ?? throw new InvalidOperationException("Служба ярлыков недоступна.");
@@ -604,7 +636,7 @@ public sealed partial class MainPage : Page
             DevLog.Write("editor", $"External DragOver: storageItems={args.DataView.Contains(StandardDataFormats.StorageItems)}");
             dragOverLogged = true;
         }
-        if (!args.DataView.Contains(StandardDataFormats.StorageItems)) return;
+        if (dragSnapshot is not null || (!args.DataView.Contains(StandardDataFormats.StorageItems) && !args.DataView.Contains(StandardDataFormats.Text))) return;
         args.AcceptedOperation = DataPackageOperation.Copy;
         args.DragUIOverride.Caption = "Добавить в меню";
         args.Handled = true;
@@ -613,17 +645,38 @@ public sealed partial class MainPage : Page
     {
         dragOverLogged = false;
         DevLog.Write("editor", $"External Drop: storageItems={args.DataView.Contains(StandardDataFormats.StorageItems)}");
-        if (!args.DataView.Contains(StandardDataFormats.StorageItems)) return;
+        if (dragSnapshot is not null || (!args.DataView.Contains(StandardDataFormats.StorageItems) && !args.DataView.Contains(StandardDataFormats.Text))) return;
         var deferral = args.GetDeferral(); args.Handled = true;
         try
         {
             var (destination, index) = DropDestination(args);
-            var files = await args.DataView.GetStorageItemsAsync();
-            ImportPaths(files.Select(file => file.Path), destination, index);
+            if (args.DataView.Contains(StandardDataFormats.StorageItems))
+            {
+                var files = await args.DataView.GetStorageItemsAsync();
+                ImportPaths(files.Select(file => file.Path), destination, index);
+            }
+            else
+            {
+                var text = await args.DataView.GetTextAsync();
+                if (string.IsNullOrWhiteSpace(text)) return;
+                var candidate = text.Trim().Trim('"');
+                if (File.Exists(candidate) || Directory.Exists(candidate)) ImportPaths([candidate], destination, index);
+                else if (Path.IsPathFullyQualified(candidate) || (Uri.TryCreate(candidate, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https"))
+                    ShowNotice("Ссылку или недоступный путь нельзя добавить как сниппет.", InfoBarSeverity.Warning);
+                else AddDroppedText(text, destination, index);
+            }
         }
         catch (Exception ex) { DevLog.Write("editor", "Explorer drop failed", ex); ShowNotice(ex.Message, InfoBarSeverity.Error); }
         finally { deferral.Complete(); }
     }
+    private void AddDroppedText(string text, List<MenuNode> destination, int index)
+    {
+        var title = text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim() ?? "Сниппет";
+        if (title.Length > 60) title = title[..60] + "…";
+        var node = new MenuNode { Name = title, Kind = MenuNodeKind.Action, Action = new MenuAction { Kind = ActionKind.InsertText, Text = text } };
+        Remember(); destination.Insert(Math.Clamp(index, 0, destination.Count), node); MarkDirty(); RefreshTree(node.Id);
+    }
+
     private (List<MenuNode>, int) DropDestination(DragEventArgs args)
     {
         DependencyObject? current = args.OriginalSource as DependencyObject;
@@ -637,7 +690,7 @@ public sealed partial class MainPage : Page
     }
 
     private static ActionChoice[] ActionChoices() =>
-    [new(ActionKind.OpenFolder, "Открыть папку"), new(ActionKind.RunProgram, "Запустить программу"), new(ActionKind.RunScript, "Запустить скрипт"), new(ActionKind.SendShortcut, "Отправить сочетание"), new(ActionKind.CopySelection, "Копировать выделенные объекты"), new(ActionKind.MoveSelection, "Переместить выделенные объекты"), new(ActionKind.InsertText, "Вставить текст")];
+    [new(ActionKind.OpenItem, "Открыть файл или ссылку"), new(ActionKind.OpenFolder, "Открыть папку"), new(ActionKind.RunProgram, "Запустить программу"), new(ActionKind.RunScript, "Запустить скрипт"), new(ActionKind.SendShortcut, "Отправить сочетание"), new(ActionKind.CopySelection, "Копировать выделенные объекты"), new(ActionKind.MoveSelection, "Переместить выделенные объекты"), new(ActionKind.InsertText, "Вставить текст")];
     private sealed record ActionChoice(ActionKind Kind, string Label);
     private static FrameworkElement CreateItemIcon(MenuNode node, int size)
     {
