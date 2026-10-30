@@ -28,7 +28,7 @@ internal sealed record InvocationContext(IntPtr SourceWindow, IReadOnlyList<stri
                             paths.Add((string)item.Path);
                         break;
                     }
-                    catch (Exception) { }
+                    catch (Exception ex) { DevLog.Write("context", "Could not capture Explorer window context", ex); }
                 }
             }
         }

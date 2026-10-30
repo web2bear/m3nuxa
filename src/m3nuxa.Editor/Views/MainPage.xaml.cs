@@ -190,15 +190,15 @@ public sealed partial class MainPage : Page
             };
             PropertiesPanel.Children.Add(combo);
             if (action.Kind is ActionKind.OpenItem or ActionKind.OpenFolder or ActionKind.RunProgram or ActionKind.RunScript or ActionKind.CopySelection or ActionKind.MoveSelection)
-                AddText(action.Kind is ActionKind.CopySelection or ActionKind.MoveSelection ? "Папка назначения" : "Путь", action.Path, value => action.Path = value, variables: true);
+                AddText(action.Kind is ActionKind.CopySelection or ActionKind.MoveSelection ? "Папка назначения" : "Путь", action.Path, value => action.Path = value, variables: true, browse: action.Kind is ActionKind.OpenFolder or ActionKind.CopySelection or ActionKind.MoveSelection ? "folder" : "file");
             if (action.Kind is ActionKind.RunProgram or ActionKind.RunScript)
             {
                 AddText("Аргументы", action.Arguments, value => action.Arguments = value, variables: true);
-                AddText("Рабочая папка", action.WorkingDirectory, value => action.WorkingDirectory = value, variables: true);
+                AddText("Рабочая папка", action.WorkingDirectory, value => action.WorkingDirectory = value, variables: true, browse: "folder");
             }
             if (action.Kind == ActionKind.RunScript)
             {
-                AddText("Интерпретатор PowerShell", action.Interpreter, value => action.Interpreter = value);
+                AddText("Интерпретатор PowerShell", action.Interpreter, value => action.Interpreter = value, browse: "file");
                 var hidden = new ToggleSwitch { Header = "Консоль", OnContent = "Скрыта", OffContent = "Видима", IsOn = action.HideConsole };
                 hidden.Toggled += (_, _) => { if (rendering) return; Remember(); action.HideConsole = hidden.IsOn; MarkDirty(); };
                 PropertiesPanel.Children.Add(hidden);
@@ -266,26 +266,85 @@ public sealed partial class MainPage : Page
             field.SetError(unavailableHotkeys.Contains(CanonicalHotkey(getter())) ? "Сочетание недоступно: занято другой программой или зарезервировано Windows." : null);
     }
 
-    private void AddText(string label, string value, Action<string> setter, bool variables = false, bool multiline = false, string placeholder = "")
+    private void AddText(string label, string value, Action<string> setter, bool variables = false, bool multiline = false, string placeholder = "", string? browse = null)
     {
         var text = new TextBox { Header = label, Text = value, PlaceholderText = placeholder, HorizontalAlignment = HorizontalAlignment.Stretch,
             AcceptsReturn = multiline, TextWrapping = multiline ? TextWrapping.Wrap : TextWrapping.NoWrap, MinHeight = multiline ? 160 : 0 };
         text.GotFocus += (_, _) => { if (!rendering) Remember(); };
         text.TextChanged += (_, _) => { if (rendering) return; setter(text.Text); MarkDirty(); };
-        if (!variables) { PropertiesPanel.Children.Add(text); return; }
+        if (!variables && browse is null) { PropertiesPanel.Children.Add(text); return; }
         var row = new Grid { ColumnDefinitions = { new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }, new ColumnDefinition { Width = GridLength.Auto } }, ColumnSpacing = 8 };
         row.Children.Add(text);
-        var picker = new Button { Content = new FontIcon { Glyph = "\uE943", FontSize = 16 }, VerticalAlignment = VerticalAlignment.Bottom, Width = 36, Height = 32 };
-        ToolTipService.SetToolTip(picker, "Вставить переменную");
-        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(picker, "Вставить переменную");
-        var flyout = new MenuFlyout();
-        foreach (var variable in new[] { "selectedPaths", "selectedPath", "currentFolder", "fileName", "extension", "parentFolder" })
+        if (browse is not null)
         {
-            var option = new MenuFlyoutItem { Text = "{" + variable + "}" };
-            option.Click += (_, _) => { var start = text.SelectionStart; text.Text = text.Text.Insert(start, option.Text); text.SelectionStart = start + option.Text.Length; text.Focus(FocusState.Programmatic); };
-            flyout.Items.Add(option);
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var browseButton = new Button { Content = "…", VerticalAlignment = VerticalAlignment.Bottom, Width = 36, Height = 32 };
+            var browseLabel = browse == "folder" ? "Выбрать папку" : "Выбрать файл";
+            ToolTipService.SetToolTip(browseButton, browseLabel);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(browseButton, browseLabel + ": " + label);
+            browseButton.Click += async (_, _) =>
+            {
+                try
+                {
+                    string? path;
+                    if (browse == "folder")
+                    {
+                        var dialog = new FolderPicker(); dialog.FileTypeFilter.Add("*");
+                        InitializeWithWindow.Initialize(dialog, WindowNative.GetWindowHandle(App.MainWindow));
+                        path = (await dialog.PickSingleFolderAsync())?.Path;
+                    }
+                    else
+                    {
+                        var dialog = new FileOpenPicker(); dialog.FileTypeFilter.Add("*");
+                        InitializeWithWindow.Initialize(dialog, WindowNative.GetWindowHandle(App.MainWindow));
+                        path = (await dialog.PickSingleFileAsync())?.Path;
+                    }
+                    if (path is null || path == text.Text) return;
+                    Remember(); text.Text = path;
+                }
+                catch (Exception ex) { ShowNotice(ex.Message, InfoBarSeverity.Error); }
+            };
+            Grid.SetColumn(browseButton, 1); row.Children.Add(browseButton);
         }
-        picker.Flyout = flyout; Grid.SetColumn(picker, 1); row.Children.Add(picker); PropertiesPanel.Children.Add(row);
+        if (!variables) { PropertiesPanel.Children.Add(row); return; }
+        var picker = new Button { Content = new FontIcon { Glyph = "\uE8EF", FontSize = 14 }, VerticalAlignment = VerticalAlignment.Bottom, Width = 36, Height = 32, Padding = new Thickness(0) };
+        ToolTipService.SetToolTip(picker, "Вставить переменную контекста");
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(picker, "Вставить переменную контекста: " + label);
+        picker.Click += async (_, _) =>
+        {
+            var position = text.SelectionStart;
+            var (dialog, list) = CreateVariableDialog();
+            if (await dialog.ShowAsync() != ContentDialogResult.Primary || list.SelectedItem is not ListViewItem { Tag: string variable }) return;
+            if (!PropertiesPanel.Children.Contains(row)) return;
+            position = Math.Min(position, text.Text.Length);
+            Remember();
+            text.Text = text.Text.Insert(position, variable);
+            text.SelectionStart = position + variable.Length;
+            text.Focus(FocusState.Programmatic);
+        };
+        Grid.SetColumn(picker, browse is null ? 1 : 2); row.Children.Add(picker); PropertiesPanel.Children.Add(row);
+    }
+
+    private (ContentDialog dialog, ListView list) CreateVariableDialog()
+    {
+        var list = new ListView { SelectionMode = ListViewSelectionMode.Single, MaxHeight = 360, HorizontalContentAlignment = HorizontalAlignment.Stretch };
+        void Group(string title, params (string name, string description)[] variables)
+        {
+            list.Items.Add(new ListViewItem { Content = new TextBlock { Text = title, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold }, IsEnabled = false });
+            foreach (var (name, description) in variables)
+            {
+                var columns = new Grid { ColumnSpacing = 12, ColumnDefinitions = { new ColumnDefinition { Width = new GridLength(150) }, new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) } } };
+                columns.Children.Add(new TextBlock { Text = name, TextWrapping = TextWrapping.Wrap });
+                var detail = new TextBlock { Text = description, TextWrapping = TextWrapping.Wrap };
+                Grid.SetColumn(detail, 1); columns.Children.Add(detail);
+                list.Items.Add(new ListViewItem { Tag = name, Content = columns, HorizontalContentAlignment = HorizontalAlignment.Stretch });
+            }
+        }
+        Group("Выделенные объекты", ("{selectedPaths}", "Все выделенные пути; только отдельным аргументом."), ("{selectedPath}", "Путь первого выделенного объекта."), ("{fileName}", "Имя первого выделенного файла или папки."), ("{extension}", "Расширение первого выделенного объекта."), ("{parentFolder}", "Родительская папка первого выделенного объекта."));
+        Group("Проводник", ("{currentFolder}", "Текущая папка окна Проводника."));
+        var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = "Переменные контекста", Content = list, PrimaryButtonText = "Вставить", CloseButtonText = "Отмена", IsPrimaryButtonEnabled = false, DefaultButton = ContentDialogButton.Primary };
+        list.SelectionChanged += (_, _) => dialog.IsPrimaryButtonEnabled = list.SelectedItem is ListViewItem { Tag: string };
+        return (dialog, list);
     }
 
     private void AddIconPicker(MenuNode item)
