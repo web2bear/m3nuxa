@@ -695,6 +695,7 @@ public sealed partial class MainPage : Page
     private static FrameworkElement CreateItemIcon(MenuNode node, int size)
     {
         var panel = new Grid { Width = size, Height = size };
+        if (node.Kind == MenuNodeKind.Separator) return panel;
         panel.Children.Add(new SymbolIcon(SymbolFor(node)));
         panel.Loaded += async (_, _) =>
         {
@@ -715,7 +716,7 @@ public sealed partial class MainPage : Page
         };
         return panel;
     }
-    private static Symbol SymbolFor(MenuNode item) => item.Kind == MenuNodeKind.Group ? Symbol.Folder : item.Kind == MenuNodeKind.Separator ? Symbol.Remove : item.Action?.Kind == ActionKind.InsertText ? Symbol.Paste : Symbol.Document;
+    private static Symbol SymbolFor(MenuNode item) => item.Kind == MenuNodeKind.Group ? Symbol.Folder : item.Action?.Kind == ActionKind.InsertText ? Symbol.Paste : Symbol.Document;
     private sealed class NodeDisplay : StackPanel
     {
         public MenuNode Model { get; }

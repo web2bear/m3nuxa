@@ -2,4 +2,7 @@
   <PropertyGroup>
     <SatelliteResourceLanguages>en-US;ru-RU</SatelliteResourceLanguages>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Roslynator.Analyzers" Version="5.0.0" PrivateAssets="all" />
+  </ItemGroup>
 </Project>

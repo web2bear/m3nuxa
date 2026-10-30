@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Windowing;
 using Windows.Graphics;
 using m3nuxa.Editor;
 
@@ -28,6 +29,10 @@ internal sealed class SettingsWindow : Window
         SystemBackdrop = new MicaBackdrop();
         AppWindow.Resize(new SizeInt32(580, 620));
         var panel = new StackPanel { Padding = new Thickness(20), Spacing = 14 };
+        void UpdateTitleBarTheme() => AppWindow.TitleBar.PreferredTheme =
+            panel.ActualTheme == ElementTheme.Dark ? TitleBarTheme.Dark : TitleBarTheme.Light;
+        panel.Loaded += (_, _) => UpdateTitleBarTheme();
+        panel.ActualThemeChanged += (_, _) => UpdateTitleBarTheme();
         panel.Children.Add(new TextBlock { Text = "Настройки", FontSize = 22, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
         panel.Children.Add(new TextBlock { Text = "Изменения сохраняются автоматически", FontSize = 12, Opacity = .65 });
         panel.Children.Add(new TextBlock { Text = "Сочетание вызова меню" });
