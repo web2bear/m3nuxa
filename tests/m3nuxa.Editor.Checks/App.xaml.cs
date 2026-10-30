@@ -59,12 +59,13 @@ public partial class App : Application
                 if (picker.StartFolder != bundled) throw new Exception("Deleted last folder must fall back to the bundle.");
             }
             finally { Directory.Delete(pickerRoot, true); }
+            await page.CheckContextVariablesAsync();
             await page.CheckTreeIconConsistencyAsync();
             await page.CheckExplorerIconsAsync();
             await page.CheckTreeReorderAsync();
             page.CheckApplyAvailability();
             await page.CheckShortcutRecordingAsync();
-            await File.WriteAllTextAsync(resultPath, "PASS: icons, tree reorder, apply availability; real shortcut recording, release-to-commit, Undo/Redo, Esc, duplicate conflict, sent shortcut, selection cancellation, clear.");
+            await File.WriteAllTextAsync(resultPath, "PASS: context variables and button order, icons, tree reorder, apply availability; real shortcut recording, release-to-commit, Undo/Redo, Esc, duplicate conflict, sent shortcut, selection cancellation, clear.");
             Environment.Exit(0);
         }
         catch (Exception ex)
