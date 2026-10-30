@@ -8,7 +8,7 @@ namespace m3nuxa.Editor;
 public partial class App : Application
 {
     public static Window MainWindow { get; private set; } = null!;
-    private ExplorerFileDropHook? dropHook;
+    private EditorOleDropTarget? dropHook;
     private bool dropHookScheduled;
 
     public App()
@@ -44,8 +44,8 @@ public partial class App : Application
         void AttachDropHook()
         {
             dropHook?.Dispose();
-            dropHook = ExplorerFileDropHook.Attach(MainWindow, page.AddDroppedPaths);
-            DevLog.Write("editor", "Explorer file drop hook attached");
+            dropHook = new EditorOleDropTarget(MainWindow, page.AddDroppedPaths, page.AddExternalText, "");
+            DevLog.Write("editor", "OLE drop target attached");
         }
         DevLog.Write("editor", "Activating window");
         MainWindow.Activate();
