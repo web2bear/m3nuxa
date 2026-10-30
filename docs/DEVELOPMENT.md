@@ -45,3 +45,5 @@ dotnet run --project .\tests\m3nuxa.Checks\m3nuxa.Checks.csproj
 `publish-portable.ps1` публикует App и Editor в общую папку, проверяет наличие EXE и PRI, удаляет устаревший отдельный MCP EXE и лишние языковые ресурсы. В поставке оставляются ресурсы `en-US` и `ru-RU`. Подробности перехода на WinUI — в [WINUI_MIGRATION.md](WINUI_MIGRATION.md).
 
 [На главную](../README.md)
+
+GitHub Actions собирает portable-архивы x64, x86 и ARM64 при отправке тега `v*` и публикует их в GitHub Release. Тег с суффиксом, например `v0.1.0-alpha.1`, создаёт предварительный выпуск. Для сборки без запуска и остановки процессов используйте `./publish-portable.ps1 -NoStop -NoLaunch -OutputDirectory <путь>`; каталог должен быть отдельным и пустым.
