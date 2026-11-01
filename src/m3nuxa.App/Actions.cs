@@ -57,13 +57,13 @@ internal static class ActionExecutor
             {
                 case ActionKind.OpenFolder:
                     var folder = ExpandSingle(action.Path, context);
-                    if (!Directory.Exists(folder)) throw new DirectoryNotFoundException($"Папка недоступна: {folder}");
+                    if (!Directory.Exists(folder)) throw new DirectoryNotFoundException(L.Format("ActionFolderUnavailable", folder));
                     Process.Start(new ProcessStartInfo("explorer.exe") { ArgumentList = { "/n", folder }, UseShellExecute = false });
                     return Ok();
                 case ActionKind.OpenItem:
                     var target = ExpandSingle(action.Path, context);
                     if (!(Uri.TryCreate(target, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https") && !File.Exists(target))
-                        throw new FileNotFoundException($"Файл недоступен: {target}");
+                        throw new FileNotFoundException(L.Format("ActionFileUnavailableTarget", target));
                     _ = Process.Start(new ProcessStartInfo(target) { UseShellExecute = true });
                     return Ok();
                 case ActionKind.RunProgram:
@@ -82,12 +82,12 @@ internal static class ActionExecutor
                 case ActionKind.MoveSelection:
                     return await ExecuteFileOperationAsync(action, context, owner, cancellationToken);
                 default:
-                    throw new InvalidOperationException("Неизвестный тип действия.");
+                    throw new InvalidOperationException(L.Get("ActionUnknown"));
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            MessageBox.Show( ex.Message, "Действие не выполнено", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show( ex.Message, L.Get("ActionFailed"), MessageBoxButtons.OK, MessageBoxIcon.Error);
             return new ActionResult(0, 0, [ex.Message], false);
         }
     }
@@ -97,7 +97,7 @@ internal static class ActionExecutor
     private static void StartProcess(MenuAction action, InvocationContext context, bool script)
     {
         var path = ExpandSingle(action.Path, context);
-        if (!File.Exists(path)) throw new FileNotFoundException($"Файл недоступен: {path}");
+        if (!File.Exists(path)) throw new FileNotFoundException(L.Format("ActionFileUnavailablePath", path));
         var extension = Path.GetExtension(path).ToLowerInvariant();
         var interpreter = script ? (action.Interpreter ?? "") : "";
         string executable;
@@ -113,13 +113,13 @@ internal static class ActionExecutor
             executable = string.IsNullOrWhiteSpace(interpreter) ? "powershell.exe" : interpreter;
             prefix.AddRange(["-NoProfile", "-File", path]);
         }
-        else throw new InvalidOperationException("Поддерживаются скрипты BAT, CMD и PS1.");
+        else throw new InvalidOperationException(L.Get("ActionScriptType"));
 
         var workingDirectory = string.IsNullOrWhiteSpace(action.WorkingDirectory)
             ? Path.GetDirectoryName(path)!
             : ExpandSingle(action.WorkingDirectory, context);
         if (!Directory.Exists(workingDirectory))
-            throw new DirectoryNotFoundException($"Рабочая папка недоступна: {workingDirectory}");
+            throw new DirectoryNotFoundException(L.Format("ActionWorkingFolderUnavailable", workingDirectory));
         var info = new ProcessStartInfo(executable)
         {
             WorkingDirectory = workingDirectory,
@@ -129,27 +129,27 @@ internal static class ActionExecutor
         };
         foreach (var arg in prefix) info.ArgumentList.Add(arg);
         foreach (var arg in ExpandArguments(action.Arguments, context)) info.ArgumentList.Add(arg);
-        _ = Process.Start(info) ?? throw new InvalidOperationException("Не удалось запустить процесс.");
+        _ = Process.Start(info) ?? throw new InvalidOperationException(L.Get("ActionStartFailed"));
     }
 
     private static void SendShortcut(string? shortcut, InvocationContext context)
     {
-        if (string.IsNullOrWhiteSpace(shortcut)) throw new InvalidOperationException("Сочетание не задано.");
+        if (string.IsNullOrWhiteSpace(shortcut)) throw new InvalidOperationException(L.Get("ActionShortcutMissing"));
         if (context.SourceWindow == IntPtr.Zero || !NativeMethods.IsWindow(context.SourceWindow))
-            throw new InvalidOperationException("Исходное окно уже закрыто.");
+            throw new InvalidOperationException(L.Get("ActionSourceWindowClosed"));
         if (!NativeMethods.SetForegroundWindow(context.SourceWindow) ||
             NativeMethods.GetForegroundWindow() != context.SourceWindow)
-            throw new InvalidOperationException("Не удалось вернуть фокус исходному окну. Сочетание не отправлено.");
+            throw new InvalidOperationException(L.Get("ActionShortcutFocusFailed"));
         KeyboardSender.Send(shortcut);
     }
 
     private static void InsertText(string text, InvocationContext context)
     {
-        if (string.IsNullOrEmpty(text)) throw new InvalidOperationException("Текст сниппета пуст.");
+        if (string.IsNullOrEmpty(text)) throw new InvalidOperationException(L.Get("ActionSnippetEmpty"));
         if (context.SourceWindow == IntPtr.Zero || !NativeMethods.IsWindow(context.SourceWindow))
-            throw new InvalidOperationException("Исходное окно уже закрыто.");
+            throw new InvalidOperationException(L.Get("ActionSourceWindowClosed"));
         if (!NativeMethods.SetForegroundWindow(context.SourceWindow) || NativeMethods.GetForegroundWindow() != context.SourceWindow)
-            throw new InvalidOperationException("Не удалось вернуть фокус исходному окну. Текст не отправлен.");
+            throw new InvalidOperationException(L.Get("ActionTextFocusFailed"));
         KeyboardSender.InsertText(text);
     }
 
@@ -157,9 +157,9 @@ internal static class ActionExecutor
         nint owner, CancellationToken cancellationToken)
     {
         if (context.SelectedPaths.Count == 0)
-            throw new InvalidOperationException("В исходном окне Проводника нет выделенных файлов или папок.");
+            throw new InvalidOperationException(L.Get("ActionNoSelection"));
         var destination = ExpandSingle(action.Path, context);
-        if (!Directory.Exists(destination)) throw new DirectoryNotFoundException($"Папка назначения недоступна: {destination}");
+        if (!Directory.Exists(destination)) throw new DirectoryNotFoundException(L.Format("ActionDestinationUnavailable", destination));
         var move = action.Kind == ActionKind.MoveSelection;
         using var dialog = new FileOperationProgressDialog(context.SelectedPaths.Count);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -177,10 +177,10 @@ internal static class ActionExecutor
                 return choice;
             }));
         dialog.Dispose();
-        var summary = $"Успешно: {result.Succeeded}; пропущено: {result.Skipped}; ошибок: {result.Failures.Count}." +
-            (result.Cancelled ? " Операция отменена; уже выполненные перемещения сохранены." : "") +
+        var summary = L.Format("ActionSummary", result.Succeeded, result.Skipped, result.Failures.Count) +
+            (result.Cancelled ? L.Get("ActionCancelled") : "") +
             (result.Failures.Count > 0 ? "\n\n" + string.Join("\n", result.Failures) : "");
-        MessageBox.Show( summary, "Результат файловой операции", MessageBoxButtons.OK,
+        MessageBox.Show( summary, L.Get("ActionFileResult"), MessageBoxButtons.OK,
             result.Failures.Count > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
         return result;
     }
@@ -212,13 +212,13 @@ internal static class ActionExecutor
                 }
                 if (Path.GetFullPath(source).TrimEnd(Path.DirectorySeparatorChar).Equals(
                     Path.GetFullPath(target).TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase))
-                    throw new IOException("Исходный объект и назначение совпадают.");
+                    throw new IOException(L.Get("ActionSamePath"));
                 if (Directory.Exists(source))
                 {
                     var sourceFull = Path.GetFullPath(source).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
                     var targetFull = Path.GetFullPath(target).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
                     if (targetFull.StartsWith(sourceFull, StringComparison.OrdinalIgnoreCase))
-                        throw new IOException("Нельзя копировать папку внутрь самой себя.");
+                        throw new IOException(L.Get("ActionNestedFolder"));
                     if (exists) ReplaceDirectory(source, target, cancellationToken);
                     else CopyDirectoryNew(source, target, cancellationToken);
                     if (move) Directory.Delete(source, true);
@@ -230,13 +230,13 @@ internal static class ActionExecutor
                     else File.Copy(source, target);
                     if (exists && move) File.Delete(source);
                 }
-                else throw new FileNotFoundException("Исходный объект недоступен.", source);
+                else throw new FileNotFoundException(L.Get("ActionSourceUnavailable"), source);
                 succeeded++;
             }
             catch (OperationCanceledException) { cancelled = true; break; }
             catch (Exception ex) { failures.Add($"{source}: {ex.Message}"); }
         }
-        progress(sources.Count, "Готово");
+        progress(sources.Count, L.Get("ActionDone"));
         return new ActionResult(succeeded, skipped, failures, cancelled);
     }
 
@@ -267,7 +267,7 @@ internal static class ActionExecutor
 
     private static void ReplaceFile(string source, string target, CancellationToken cancellationToken)
     {
-        if (Directory.Exists(target)) throw new IOException("Назначение является папкой, а источник файлом.");
+        if (Directory.Exists(target)) throw new IOException(L.Get("ActionTargetIsFolder"));
         var staged = target + ".m3nuxa-" + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
@@ -281,7 +281,7 @@ internal static class ActionExecutor
 
     private static void ReplaceDirectory(string source, string target, CancellationToken cancellationToken)
     {
-        if (File.Exists(target)) throw new IOException("Назначение является файлом, а источник папкой.");
+        if (File.Exists(target)) throw new IOException(L.Get("ActionTargetIsFile"));
         var suffix = ".m3nuxa-" + Guid.NewGuid().ToString("N");
         var staged = target + suffix + ".tmp";
         var backup = target + suffix + ".backup";
@@ -306,7 +306,7 @@ internal static class ActionExecutor
 
     private static string ExpandSingle(string? template, InvocationContext context)
     {
-        if (string.IsNullOrWhiteSpace(template)) throw new InvalidOperationException("Не указан обязательный путь.");
+        if (string.IsNullOrWhiteSpace(template)) throw new InvalidOperationException(L.Get("ActionPathRequired"));
         return TemplateExpander.Expand(template, context);
     }
 
@@ -318,7 +318,7 @@ internal static class ActionExecutor
         {
             if (token == "{selectedPaths}")
             {
-                if (context.SelectedPaths.Count == 0) throw new InvalidOperationException("Нет выбранных путей Проводника.");
+                if (context.SelectedPaths.Count == 0) throw new InvalidOperationException(L.Get("ActionPathsMissing"));
                 arguments.AddRange(context.SelectedPaths);
             }
             else arguments.Add(TemplateExpander.Expand(token, context));
@@ -336,18 +336,18 @@ internal static class TemplateExpander
         var first = context.SelectedPaths.FirstOrDefault();
         return match.Groups[1].Value switch
         {
-            "currentFolder" => context.CurrentFolder ?? throw Missing("текущая папка Проводника"),
-            "selectedPath" => first ?? throw Missing("выбранный путь"),
-            "fileName" => first is null ? throw Missing("выбранный путь") : Path.GetFileName(first),
-            "extension" => first is null ? throw Missing("выбранный путь") : Path.GetExtension(first),
-            "parentFolder" => first is null ? throw Missing("выбранный путь") : Path.GetDirectoryName(first) ?? "",
-            "urlEncodedText" or "selectedText" => throw Missing("выделенный текст: функция пока недоступна"),
-            "selectedPaths" => throw new InvalidOperationException("{selectedPaths} разрешён только как отдельный аргумент."),
-            _ => throw new InvalidOperationException($"Неизвестная переменная: {match.Value}")
+            "currentFolder" => context.CurrentFolder ?? throw Missing(L.Get("ContextCurrentFolder")),
+            "selectedPath" => first ?? throw Missing(L.Get("ContextSelectedPath")),
+            "fileName" => first is null ? throw Missing(L.Get("ContextSelectedPath")) : Path.GetFileName(first),
+            "extension" => first is null ? throw Missing(L.Get("ContextSelectedPath")) : Path.GetExtension(first),
+            "parentFolder" => first is null ? throw Missing(L.Get("ContextSelectedPath")) : Path.GetDirectoryName(first) ?? "",
+            "urlEncodedText" or "selectedText" => throw Missing(L.Get("ContextSelectedText")),
+            "selectedPaths" => throw new InvalidOperationException(L.Get("ActionSelectedPathsArgument")),
+            _ => throw new InvalidOperationException(L.Format("ActionUnknownVariable", match.Value))
         };
     });
 
-    private static InvalidOperationException Missing(string name) => new($"Недоступен контекст: {name}.");
+    private static InvalidOperationException Missing(string name) => new(L.Format("ActionMissingContext", name));
 }
 
 internal static class CommandLineTokenizer
@@ -367,7 +367,7 @@ internal static class CommandLineTokenizer
             }
             else { token.Append(c); started = true; }
         }
-        if (quoted) throw new InvalidOperationException("Не закрыта кавычка в аргументах.");
+        if (quoted) throw new InvalidOperationException(L.Get("ActionUnclosedQuote"));
         if (started) result.Add(token.ToString());
         return result;
     }

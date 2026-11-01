@@ -6,5 +6,11 @@
     <Nullable>enable</Nullable>
 
   </PropertyGroup>
-  <ItemGroup><Compile Include="../../src/m3nuxa.App/SettingsStore.cs" Link="SettingsStore.cs" /><Compile Include="../../src/m3nuxa.App/ConfigModels.cs" Link="ConfigModels.cs" /><Compile Include="../../src/m3nuxa.App/ConfigStore.cs" Link="ConfigStore.cs" /><Compile Include="../../src/m3nuxa.App/ItemIcon.cs" Link="ItemIcon.cs" /><Compile Include="../../src/m3nuxa.App/HotkeyParser.cs" Link="HotkeyParser.cs" /><PackageReference Include="System.Drawing.Common" Version="9.0.6" /></ItemGroup>
+  <ItemGroup><EmbeddedResource Include="../../src/m3nuxa.App/Strings/en-US/Resources.resw" LogicalName="Test.Resources.resw" /><EmbeddedResource Include="../../src/m3nuxa.App/Strings/en-US/Settings.resw" LogicalName="Test.Settings.resw" /><Compile Include="../../src/m3nuxa.App/SettingsStore.cs" Link="SettingsStore.cs" /><Compile Include="../../src/m3nuxa.App/ConfigModels.cs" Link="ConfigModels.cs" /><Compile Include="../../src/m3nuxa.App/ConfigStore.cs" Link="ConfigStore.cs" /><Compile Include="../../src/m3nuxa.App/ItemIcon.cs" Link="ItemIcon.cs" /><Compile Include="../../src/m3nuxa.App/HotkeyParser.cs" Link="HotkeyParser.cs" /><PackageReference Include="System.Drawing.Common" Version="9.0.6" /></ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="../../src/m3nuxa.App/Strings/ru-RU/Resources.resw" LogicalName="Localization.App.ru-RU.Resources.resw" />
+    <EmbeddedResource Include="../../src/m3nuxa.App/Strings/ru-RU/Settings.resw" LogicalName="Localization.App.ru-RU.Settings.resw" />
+    <EmbeddedResource Include="../../src/m3nuxa.Editor/Strings/en-US/Resources.resw" LogicalName="Localization.Editor.en-US.Resources.resw" />
+    <EmbeddedResource Include="../../src/m3nuxa.Editor/Strings/ru-RU/Resources.resw" LogicalName="Localization.Editor.ru-RU.Resources.resw" />
+  </ItemGroup>
 </Project>

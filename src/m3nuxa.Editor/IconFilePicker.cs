@@ -1,3 +1,4 @@
+using m3nuxa.App;
 using System.Runtime.InteropServices;
 
 namespace m3nuxa.Editor;
@@ -38,8 +39,8 @@ internal sealed class IconFilePicker(string baseDirectory)
         try
         {
             dialog.SetOptions(0x40 | 0x800 | 0x1000 | 0x8); // File system, existing path/file, preserve working directory.
-            dialog.SetFileTypes(1, [new Filter { Name = "Иконки и изображения", Pattern = "*.png;*.jpg;*.jpeg;*.bmp;*.ico;*.exe;*.dll" }]);
-            dialog.SetTitle("Выбор иконки");
+            dialog.SetFileTypes(1, [new Filter { Name = L.Get("Editor_IconsAndImages_84d278"), Pattern = "*.png;*.jpg;*.jpeg;*.bmp;*.ico;*.exe;*.dll" }]);
+            dialog.SetTitle(L.Get("Editor_ChooseAnIcon_85201d"));
             var iid = typeof(IShellItem).GUID;
             if (Directory.Exists(StartFolder))
             {

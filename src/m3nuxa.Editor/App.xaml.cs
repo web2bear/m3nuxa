@@ -13,6 +13,7 @@ public partial class App : Application
 
     public App()
     {
+        _ = L.Language;
         DevLog.Write("editor", "App constructor started");
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
             DevLog.Write("editor", "AppDomain unhandled exception", e.ExceptionObject as Exception);
@@ -26,7 +27,7 @@ public partial class App : Application
         DevLog.Write("editor", "OnLaunched started");
         try
         {
-        MainWindow = new Window { Title = "m3nuxa — редактор меню", SystemBackdrop = new MicaBackdrop() };
+        MainWindow = new Window { Title = L.Get("Editor_M3nuxaMenuEditor_652d6b"), SystemBackdrop = new MicaBackdrop() };
         DevLog.Write("editor", "Window created");
         MainWindow.AppWindow.Resize(new SizeInt32(1160, 780));
         MainWindow.AppWindow.TitleBar.PreferredTheme = TitleBarTheme.Dark;

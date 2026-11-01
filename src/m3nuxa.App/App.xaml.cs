@@ -4,7 +4,7 @@ public partial class App : Microsoft.UI.Xaml.Application
 {
     private TrayApplication? tray;
 
-    public App() { InitializeComponent(); UnhandledException += (_, e) => DevLog.Write("app", "XAML error", e.Exception); }
+    public App() { _ = L.Language; InitializeComponent(); UnhandledException += (_, e) => DevLog.Write("app", "XAML error", e.Exception); }
 
     protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
@@ -15,7 +15,7 @@ public partial class App : Microsoft.UI.Xaml.Application
         catch (Exception ex) when (ex is InvalidDataException or System.Text.Json.JsonException)
         {
             var path = Path.Combine(AppContext.BaseDirectory, "config.json");
-            var choice = MessageBox.Show($"Ошибка в файле {path}:\n{ex.Message}\n\nДа — открыть файл для исправления.\nНет — создать пустую конфигурацию с копией ошибочного файла.\nОтмена — выйти.",
+            var choice = MessageBox.Show(L.Format("AppInvalidConfig", path, ex.Message),
                 "m3nuxa", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Error);
             if (choice == DialogResult.Yes)
             {
@@ -32,7 +32,7 @@ public partial class App : Microsoft.UI.Xaml.Application
             var initial = store.Apply(store.CreateDraft());
             if (!initial.Success)
             {
-                MessageBox.Show(initial.Error ?? "Не удалось создать конфигурацию рядом с приложением.", "m3nuxa");
+                MessageBox.Show(initial.Error ?? L.Get("AppCreateConfigFailed"), "m3nuxa");
                 Exit(); return;
             }
         }

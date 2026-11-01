@@ -36,7 +36,7 @@ internal sealed class TrayApplication : IDisposable
     {
         DevLog.Write("app", "TrayApplication starting");
         _store = store;
-        _settings = new SettingsStore(Path.Combine(Path.GetDirectoryName(store.FilePath)!, "settings.json"), store.Current.MainHotkey);
+        _settings = new SettingsStore(Path.Combine(Path.GetDirectoryName(store.FilePath)!, "settings.json"), store.Current.MainHotkey, L.Get);
         _store.GlobalHotkey = () => _settings.Current.MainHotkey;
         _foreground = new ForegroundTracker();
         _window.Content = _root;
@@ -67,19 +67,19 @@ internal sealed class TrayApplication : IDisposable
     {
         var menu = LauncherMenu.Create();
         void Add(string text, Action action) { var item = new MenuFlyoutItem { Text = text }; item.Click += (_, _) => action(); menu.Items.Add(item); }
-        Add("Редактор конфигурации", OpenEditor);
-        Add("Настройки…", OpenSettings);
-        Add("Перезагрузить конфигурацию", Reload);
-        _mcpMenuItem = new ToggleMenuFlyoutItem { Text = "MCP HTTP-сервер", IsChecked = _mcpHttp.IsRunning };
+        Add(L.Get("TrayEditor"), OpenEditor);
+        Add(L.Get("TraySettings"), OpenSettings);
+        Add(L.Get("TrayReload"), Reload);
+        _mcpMenuItem = new ToggleMenuFlyoutItem { Text = L.Get("TrayMcp"), IsChecked = _mcpHttp.IsRunning };
         _mcpMenuItem.Click += (_, _) => _ = SetMcpEnabledAsync(!_mcpHttp.IsRunning, true);
         menu.Items.Add(_mcpMenuItem);
-        _copyMcpAddressItem = new ToggleMenuFlyoutItem { Text = "Копировать адрес MCP", IsEnabled = _mcpHttp.IsRunning };
+        _copyMcpAddressItem = new ToggleMenuFlyoutItem { Text = L.Get("TrayCopyMcp"), IsEnabled = _mcpHttp.IsRunning };
         _copyMcpAddressItem.Click += (_, _) => { var data = new DataPackage(); data.SetText(McpHttpServer.Endpoint); Clipboard.SetContent(data); };
         menu.Items.Add(_copyMcpAddressItem);
-        _startupMenuItem = new ToggleMenuFlyoutItem { Text = "Автозапуск", IsChecked = IsStartupEnabled() };
+        _startupMenuItem = new ToggleMenuFlyoutItem { Text = L.Get("TrayStartup"), IsChecked = IsStartupEnabled() };
         _startupMenuItem.Click += (_, _) => ToggleStartup(); menu.Items.Add(_startupMenuItem);
         menu.Items.Add(new MenuFlyoutSeparator());
-        Add("Выход", async () => { await _mcpHttp.StopAsync(); Dispose(); _window.Close(); Application.Current.Exit(); });
+        Add(L.Get("TrayExit"), async () => { await _mcpHttp.StopAsync(); Dispose(); _window.Close(); Application.Current.Exit(); });
         return menu;
     }
 
@@ -103,14 +103,14 @@ internal sealed class TrayApplication : IDisposable
         _mcpMenuItem.IsEnabled = false;
         try
         {
-            if (enabled) await _mcpHttp.StartAsync(_agentPipe ?? throw new InvalidOperationException("Редакторский канал ещё не готов."));
+            if (enabled) await _mcpHttp.StartAsync(_agentPipe ?? throw new InvalidOperationException(L.Get("TrayPipeNotReady")));
             else await _mcpHttp.StopAsync();
             if (save) File.WriteAllText(_mcpSettingsPath, JsonSerializer.Serialize(new { enabled }));
         }
         catch (Exception ex)
         {
             DevLog.Write("mcp-http", "Toggle failed", ex);
-            _tray.ShowBalloonTip(5000, "MCP HTTP-сервер", ex.Message, ToolTipIcon.Error);
+            _tray.ShowBalloonTip(5000, L.Get("TrayMcp"), ex.Message, ToolTipIcon.Error);
         }
         finally
         {
@@ -143,20 +143,20 @@ internal sealed class TrayApplication : IDisposable
     {
         try
         {
-            SettingsStore.Validate(candidate);
+            SettingsStore.Validate(candidate, L.Get);
             if (candidate.MainHotkey == _settings.Current.MainHotkey) { _settings.Save(candidate); return null; }
-            if (_hotkeysSuspended) return "Завершите запись сочетания в редакторе.";
+            if (_hotkeysSuspended) return L.Get("SettingsCaptureInEditor");
             var config = _store.Current;
             // Validate against the candidate without changing the running settings.
             string Key(string text) => HotkeyParser.TryParse(text, out var modifiers, out var key) ? $"{modifiers}:{key}" : text;
             bool Conflicts(IEnumerable<MenuNode> nodes) => nodes.Any(node =>
                 (node.Kind != MenuNodeKind.Separator && node.Hotkey.Length > 0 && Key(node.Hotkey) == Key(candidate.MainHotkey)) || Conflicts(node.Children));
-            if (candidate.MainHotkey.Length > 0 && Conflicts(config.Items)) return "Сочетание уже назначено пункту меню.";
+            if (candidate.MainHotkey.Length > 0 && Conflicts(config.Items)) return L.Get("SettingsHotkeyConflict");
             var unavailable = RegisterHotkeyBindings(candidate.MainHotkey);
             if (candidate.MainHotkey.Length > 0 && unavailable.Contains(candidate.MainHotkey))
             {
                 RegisterHotkeyBindings();
-                return "Сочетание занято другой программой или зарезервировано Windows. Прежнее назначение сохранено.";
+                return L.Get("SettingsHotkeyUnavailable");
             }
             _settings.Save(candidate);
             return null;
@@ -182,7 +182,7 @@ internal sealed class TrayApplication : IDisposable
         if (!File.Exists(path))
         {
             DevLog.Write("app", $"Editor not found: {path}");
-            MessageBox.Show($"Редактор WinUI 3 не найден: {path}", "m3nuxa", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(L.Format("TrayEditorMissing", path), "m3nuxa", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return;
         }
         try
@@ -206,7 +206,7 @@ internal sealed class TrayApplication : IDisposable
     private void Reload()
     {
         var result = _store.Reload();
-        if (!result.Success) MessageBox.Show(result.Error ?? "Не удалось загрузить конфигурацию.", "m3nuxa");
+        if (!result.Success) MessageBox.Show(result.Error ?? L.Get("TrayReloadFailed"), "m3nuxa");
         else RegisterHotkeys();
     }
 
@@ -215,7 +215,7 @@ internal sealed class TrayApplication : IDisposable
         var invocation = InvocationContext.Capture(_foreground.LastWindow);
         var menu = LauncherMenu.Create();
         LauncherMenu.Fill(menu.Items, nodes, node => _ = Execute(node, invocation), _settings.Current.MenuFontSize);
-        if (menu.Items.Count == 0) menu.Items.Add(new MenuFlyoutItem { Text = "Меню пусто", IsEnabled = false });
+        if (menu.Items.Count == 0) menu.Items.Add(new MenuFlyoutItem { Text = L.Get("TrayEmptyMenu"), IsEnabled = false });
         ShowFlyout(menu);
     }
 
@@ -280,7 +280,7 @@ internal sealed class TrayApplication : IDisposable
         Walk(_store.Current.Items);
         var unavailable = _tray.Register(bindings);
         _unavailableHotkeys = unavailable;
-        if (unavailable.Count > 0) _tray.ShowBalloonTip(5000, "Горячие клавиши недоступны", string.Join(", ", unavailable), ToolTipIcon.Warning);
+        if (unavailable.Count > 0) _tray.ShowBalloonTip(5000, L.Get("TrayHotkeysUnavailable"), string.Join(", ", unavailable), ToolTipIcon.Warning);
         return unavailable;
     }
 

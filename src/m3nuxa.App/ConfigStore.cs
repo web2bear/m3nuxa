@@ -53,7 +53,7 @@ public sealed class ConfigStore
     {
         var full = Path.GetFullPath(destinationPath);
         if (StringComparer.OrdinalIgnoreCase.Equals(full, Path.GetFullPath(path)))
-            throw new InvalidOperationException("Черновик нельзя записать поверх действующей конфигурации.");
+            throw new InvalidOperationException(L.Get("ConfigDraftOverwrite"));
         File.WriteAllText(full, JsonSerializer.Serialize(draft.Config, JsonOptions));
     }
 
@@ -82,14 +82,14 @@ public sealed class ConfigStore
             var check = Validate(draft.Config);
             if (!check.IsValid) return ApplyResult.Failed(string.Join("; ", check.Errors), check);
             if (draft.BaseVersion != version)
-                return ApplyResult.Failed("Черновик устарел. Сохраните его отдельно или загрузите актуальную конфигурацию.", check);
+                return ApplyResult.Failed(L.Get("ConfigDraftStale"), check);
 
             string? temporary = null;
             try
             {
                 var actualFingerprint = File.Exists(path) ? Fingerprint(path) : null;
                 if (actualFingerprint != diskFingerprint)
-                    return ApplyResult.Failed("Файл конфигурации был изменён извне. Явно перезагрузите его перед применением.", check);
+                    return ApplyResult.Failed(L.Get("ConfigChangedOutside"), check);
 
                 var directory = Path.GetDirectoryName(Path.GetFullPath(path))!;
                 Directory.CreateDirectory(directory);
@@ -150,7 +150,7 @@ public sealed class ConfigStore
 
     private static AppConfig ReadConfig(string file) =>
         JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(file), JsonOptions)
-        ?? throw new InvalidDataException("JSON не содержит конфигурацию.");
+        ?? throw new InvalidDataException(L.Get("ConfigJsonEmpty"));
 
     private static AppConfig Clone(AppConfig value) =>
         new() { SchemaVersion = value.SchemaVersion, MainHotkey = value.MainHotkey, Items = JsonSerializer.Deserialize<List<MenuNode>>(JsonSerializer.Serialize(value.Items, JsonOptions), JsonOptions)! };
@@ -172,66 +172,66 @@ public sealed class ConfigStore
     {
         var errors = new List<string>();
         var warnings = new List<string>();
-        if (config.SchemaVersion != 1) errors.Add("Неподдерживаемая версия схемы.");
-        if (config.Items is null) errors.Add("Отсутствует дерево меню.");
+        if (config.SchemaVersion != 1) errors.Add(L.Get("ConfigSchemaUnsupported"));
+        if (config.Items is null) errors.Add(L.Get("ConfigTreeMissing"));
         var hotkeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var mainHotkey = GlobalHotkey?.Invoke() ?? "";
         if (!string.IsNullOrWhiteSpace(mainHotkey))
         {
             if (TryNormalizeHotkey(mainHotkey, out var normalized)) hotkeys.Add(normalized);
-            else errors.Add("Основное меню: некорректное сочетание клавиш.");
+            else errors.Add(L.Get("ConfigInvalidMainShortcut"));
         }
         var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (config.Items is not null) Visit(config.Items, "Меню");
+        if (config.Items is not null) Visit(config.Items, L.Get("ConfigMenu"));
         return new(errors, warnings);
 
         void Visit(List<MenuNode> nodes, string parent)
         {
             foreach (var node in nodes)
             {
-                if (node is null) { errors.Add($"{parent}: пустой пункт."); continue; }
+                if (node is null) { errors.Add(L.Format("ConfigEmptyItem", parent)); continue; }
                 var label = string.IsNullOrWhiteSpace(node.Name) ? parent : $"{parent}/{node.Name}";
-                if (string.IsNullOrWhiteSpace(node.Id) || !ids.Add(node.Id)) errors.Add($"{label}: пустой или повторяющийся ID.");
-                if (!Enum.IsDefined(node.Kind)) errors.Add($"{label}: неизвестный тип пункта.");
-                if (node.Kind != MenuNodeKind.Separator && string.IsNullOrWhiteSpace(node.Name)) errors.Add($"{label}: требуется имя.");
-                if (node.Kind == MenuNodeKind.Separator && !string.IsNullOrWhiteSpace(node.Hotkey)) errors.Add($"{label}: разделителю нельзя назначить сочетание.");
+                if (string.IsNullOrWhiteSpace(node.Id) || !ids.Add(node.Id)) errors.Add(L.Format("ConfigDuplicateId", label));
+                if (!Enum.IsDefined(node.Kind)) errors.Add(L.Format("ConfigUnknownKind", label));
+                if (node.Kind != MenuNodeKind.Separator && string.IsNullOrWhiteSpace(node.Name)) errors.Add(L.Format("ConfigNameRequired", label));
+                if (node.Kind == MenuNodeKind.Separator && !string.IsNullOrWhiteSpace(node.Hotkey)) errors.Add(L.Format("ConfigSeparatorHotkey", label));
                 if (!string.IsNullOrWhiteSpace(node.Hotkey))
                 {
-                    if (!TryNormalizeHotkey(node.Hotkey, out var normalized)) errors.Add($"{label}: некорректное сочетание клавиш.");
-                    else if (!hotkeys.Add(normalized)) errors.Add($"{label}: повторяющееся сочетание.");
+                    if (!TryNormalizeHotkey(node.Hotkey, out var normalized)) errors.Add(L.Format("ConfigInvalidHotkey", label));
+                    else if (!hotkeys.Add(normalized)) errors.Add(L.Format("ConfigDuplicateHotkey", label));
                 }
                 if (node.Kind == MenuNodeKind.Action)
                 {
-                    if (node.Action is null) errors.Add($"{label}: отсутствует действие.");
+                    if (node.Action is null) errors.Add(L.Format("ConfigActionMissing", label));
                     else ValidateAction(node.Action, label);
                 }
-                else if (node.Action is not null) errors.Add($"{label}: действие допустимо только для пункта действия.");
-                if (node.Kind != MenuNodeKind.Group && node.Children?.Count > 0) errors.Add($"{label}: дочерние пункты допустимы только для группы.");
-                if (node.Children is null) errors.Add($"{label}: отсутствует список дочерних пунктов.");
+                else if (node.Action is not null) errors.Add(L.Format("ConfigActionOnNonAction", label));
+                if (node.Kind != MenuNodeKind.Group && node.Children?.Count > 0) errors.Add(L.Format("ConfigChildrenOnNonGroup", label));
+                if (node.Children is null) errors.Add(L.Format("ConfigChildrenMissing", label));
                 else if (node.Kind == MenuNodeKind.Group) Visit(node.Children, label);
             }
         }
 
         void ValidateAction(MenuAction action, string label)
         {
-            if (!Enum.IsDefined(action.Kind)) { errors.Add($"{label}: неизвестное действие."); return; }
+            if (!Enum.IsDefined(action.Kind)) { errors.Add(L.Format("ConfigUnknownAction", label)); return; }
             if (action.Kind == ActionKind.SendShortcut)
             {
-                if (string.IsNullOrWhiteSpace(action.Shortcut)) errors.Add($"{label}: требуется сочетание для отправки.");
-                else if (!HotkeyParser.TryParse(action.Shortcut, out _, out _)) errors.Add($"{label}: некорректное сочетание для отправки.");
+                if (string.IsNullOrWhiteSpace(action.Shortcut)) errors.Add(L.Format("ConfigShortcutRequired", label));
+                else if (!HotkeyParser.TryParse(action.Shortcut, out _, out _)) errors.Add(L.Format("ConfigShortcutInvalid", label));
                 return;
             }
             if (action.Kind == ActionKind.InsertText)
             {
-                if (string.IsNullOrEmpty(action.Text)) errors.Add($"{label}: требуется текст сниппета.");
+                if (string.IsNullOrEmpty(action.Text)) errors.Add(L.Format("ConfigSnippetRequired", label));
                 return;
             }
-            if (string.IsNullOrWhiteSpace(action.Path)) { errors.Add($"{label}: требуется путь."); return; }
+            if (string.IsNullOrWhiteSpace(action.Path)) { errors.Add(L.Format("ConfigPathRequired", label)); return; }
             if (action.Kind == ActionKind.OpenItem && Uri.TryCreate(action.Path, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https") return;
             if (action.Kind is ActionKind.OpenItem or ActionKind.OpenFolder or ActionKind.RunProgram or ActionKind.RunScript or ActionKind.CopySelection or ActionKind.MoveSelection)
             {
                 if (!action.Path.Contains('{') && !File.Exists(action.Path) && !Directory.Exists(action.Path))
-                    warnings.Add($"{label}: путь сейчас недоступен: {action.Path}");
+                    warnings.Add(L.Format("ConfigPathUnavailable", label, action.Path));
             }
         }
     }

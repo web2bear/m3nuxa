@@ -28,6 +28,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <Compile Include="..\m3nuxa.App\L.cs" Link="L.cs" />
         <Compile Include="..\m3nuxa.App\ConfigModels.cs" Link="ConfigModels.cs" />
         <Compile Include="..\m3nuxa.App\HotkeyParser.cs" Link="HotkeyParser.cs" />
         <Compile Include="..\m3nuxa.App\DevLog.cs" Link="DevLog.cs" />

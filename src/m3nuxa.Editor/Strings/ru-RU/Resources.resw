@@ -1,0 +1,415 @@
+<?xml version='1.0' encoding='utf-8'?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Editor_ALinkOrUnavailablePath_7308a5" xml:space="preserve">
+    <value>Ссылку или недоступный путь нельзя добавить как сниппет.</value>
+  </data>
+  <data name="Editor_ActionType_c83f7f" xml:space="preserve">
+    <value>Тип действия</value>
+  </data>
+  <data name="Editor_Action_4fe9c0" xml:space="preserve">
+    <value>Действие</value>
+  </data>
+  <data name="Editor_AddAFolderFileOr_029745" xml:space="preserve">
+    <value>Добавьте папку, файл или сниппет,
+либо выберите существующий пункт.</value>
+  </data>
+  <data name="Editor_AddToMenu_2887bc" xml:space="preserve">
+    <value>Добавить в меню</value>
+  </data>
+  <data name="Editor_AllSelectedPathsOnlyAs_795834" xml:space="preserve">
+    <value>Все выделенные пути; только отдельным аргументом.</value>
+  </data>
+  <data name="Editor_AlreadyAssignedToItem0_8f0792" xml:space="preserve">
+    <value>Уже назначено пункту «{0}».</value>
+  </data>
+  <data name="Editor_AlreadyAssignedToOpenThe_c893d7" xml:space="preserve">
+    <value>Уже назначено для вызова основного меню.</value>
+  </data>
+  <data name="Editor_AlwaysOnTop_1bee89" xml:space="preserve">
+    <value>Поверх окон</value>
+  </data>
+  <data name="Editor_AnItemCannotContainItself_756ab5" xml:space="preserve">
+    <value>Нельзя вложить пункт в самого себя или его дочернюю группу.</value>
+  </data>
+  <data name="Editor_ApplyChangesBeforeClosing_c969f8" xml:space="preserve">
+    <value>Применить изменения перед закрытием?</value>
+  </data>
+  <data name="Editor_Apply_768af6" xml:space="preserve">
+    <value>Применить</value>
+  </data>
+  <data name="Editor_Arguments_3c3a07" xml:space="preserve">
+    <value>Аргументы</value>
+  </data>
+  <data name="Editor_Assign_fe1285" xml:space="preserve">
+    <value>Назначить</value>
+  </data>
+  <data name="Editor_CancelRecording_bd0b25" xml:space="preserve">
+    <value>Отменить запись: </value>
+  </data>
+  <data name="Editor_Cancel_0ec753" xml:space="preserve">
+    <value>Отмена</value>
+  </data>
+  <data name="Editor_Change_9d809f" xml:space="preserve">
+    <value>Изменить</value>
+  </data>
+  <data name="Editor_Change_d06470" xml:space="preserve">
+    <value>Изменить: </value>
+  </data>
+  <data name="Editor_ChooseAnIcon_85201d" xml:space="preserve">
+    <value>Выбор иконки</value>
+  </data>
+  <data name="Editor_ChooseFile_2e31da" xml:space="preserve">
+    <value>Выбрать файл</value>
+  </data>
+  <data name="Editor_ChooseFolder_14a658" xml:space="preserve">
+    <value>Выбрать папку</value>
+  </data>
+  <data name="Editor_Choose_6279dd" xml:space="preserve">
+    <value>Выбрать…</value>
+  </data>
+  <data name="Editor_Clear_9c7449" xml:space="preserve">
+    <value>Убрать</value>
+  </data>
+  <data name="Editor_Clear_f61ac5" xml:space="preserve">
+    <value>Убрать: </value>
+  </data>
+  <data name="Editor_Console_5a214b" xml:space="preserve">
+    <value>Консоль</value>
+  </data>
+  <data name="Editor_ContextVariables_930107" xml:space="preserve">
+    <value>Переменные контекста</value>
+  </data>
+  <data name="Editor_CopySelectedItems_427b62" xml:space="preserve">
+    <value>Копировать выделенные объекты</value>
+  </data>
+  <data name="Editor_Copy_4a05d8" xml:space="preserve">
+    <value>Копировать</value>
+  </data>
+  <data name="Editor_Copy_7d4e5c" xml:space="preserve">
+    <value> (копия)</value>
+  </data>
+  <data name="Editor_CouldNotApplyTheConfiguration_9f63ee" xml:space="preserve">
+    <value>Не удалось применить конфигурацию.</value>
+  </data>
+  <data name="Editor_CouldNotConfirmHotkeysWere_c43cf6" xml:space="preserve">
+    <value>Не удалось подтвердить восстановление горячих клавиш: </value>
+  </data>
+  <data name="Editor_CouldNotOpenSettings_4fcb94" xml:space="preserve">
+    <value>Не удалось открыть настройки.</value>
+  </data>
+  <data name="Editor_CouldNotOpenTheDraft_64ddf1" xml:space="preserve">
+    <value>Не удалось открыть черновик в приложении.</value>
+  </data>
+  <data name="Editor_CouldNotPrepareTheConfiguration_896ac2" xml:space="preserve">
+    <value>Не удалось подготовить конфигурацию.</value>
+  </data>
+  <data name="Editor_CouldNotReadTheConfiguration_d3f938" xml:space="preserve">
+    <value>Не удалось прочитать конфигурацию.</value>
+  </data>
+  <data name="Editor_CouldNotReload_075f1d" xml:space="preserve">
+    <value>Не удалось перезагрузить.</value>
+  </data>
+  <data name="Editor_CouldNotStartM3nuxaApp_943810" xml:space="preserve">
+    <value>Не удалось запустить m3nuxa.App.exe.</value>
+  </data>
+  <data name="Editor_CouldNotStartM3nuxaApp_a59277" xml:space="preserve">
+    <value>Не удалось запустить m3nuxa.App.exe: {0}</value>
+  </data>
+  <data name="Editor_CouldNotSuspendHotkeysCheck_871b0b" xml:space="preserve">
+    <value>Не удалось приостановить горячие клавиши. Проверьте, что обновлённое приложение запущено в трее.</value>
+  </data>
+  <data name="Editor_CreateASnippetFromThe_f97cea" xml:space="preserve">
+    <value>Создать сниппет из буфера обмена</value>
+  </data>
+  <data name="Editor_CreateMenuItem_b78a7d" xml:space="preserve">
+    <value>Создать пункт меню</value>
+  </data>
+  <data name="Editor_Create_84370a" xml:space="preserve">
+    <value>Создать</value>
+  </data>
+  <data name="Editor_CurrentFolderInFileExplorer_428c9c" xml:space="preserve">
+    <value>Текущая папка окна Проводника.</value>
+  </data>
+  <data name="Editor_Cut_1b696e" xml:space="preserve">
+    <value>Вырезать</value>
+  </data>
+  <data name="Editor_Delete_86ea33" xml:space="preserve">
+    <value>Удалить</value>
+  </data>
+  <data name="Editor_DestinationFolder_40a307" xml:space="preserve">
+    <value>Папка назначения</value>
+  </data>
+  <data name="Editor_Discard_941d9e" xml:space="preserve">
+    <value>Отбросить</value>
+  </data>
+  <data name="Editor_DragFilesFoldersOrText_2e21d1" xml:space="preserve">
+    <value>Перетащите файлы, папки или текст сюда</value>
+  </data>
+  <data name="Editor_Duplicate_c9a345" xml:space="preserve">
+    <value>Дублировать</value>
+  </data>
+  <data name="Editor_Edit_1f62f0" xml:space="preserve">
+    <value>Правка</value>
+  </data>
+  <data name="Editor_ExtensionOfTheFirstSelected_b49b82" xml:space="preserve">
+    <value>Расширение первого выделенного объекта.</value>
+  </data>
+  <data name="Editor_FileExplorerAndTheEditor_36ca57" xml:space="preserve">
+    <value>Проводник и редактор должны работать с одинаковыми правами.</value>
+  </data>
+  <data name="Editor_FileExplorer_1fd2be" xml:space="preserve">
+    <value>Проводник</value>
+  </data>
+  <data name="Editor_File_94b8df" xml:space="preserve">
+    <value>Файл</value>
+  </data>
+  <data name="Editor_File_c1973e" xml:space="preserve">
+    <value>Файл…</value>
+  </data>
+  <data name="Editor_Folder_72cf46" xml:space="preserve">
+    <value>Папка…</value>
+  </data>
+  <data name="Editor_Group_ae8ad7" xml:space="preserve">
+    <value>Группа</value>
+  </data>
+  <data name="Editor_Hidden_b4def7" xml:space="preserve">
+    <value>Скрыта</value>
+  </data>
+  <data name="Editor_Icon_25b8ac" xml:space="preserve">
+    <value>Иконка</value>
+  </data>
+  <data name="Editor_IconsAndImages_84d278" xml:space="preserve">
+    <value>Иконки и изображения</value>
+  </data>
+  <data name="Editor_InsertContextVariable_65542b" xml:space="preserve">
+    <value>Вставить переменную контекста</value>
+  </data>
+  <data name="Editor_InsertContextVariable_cdf409" xml:space="preserve">
+    <value>Вставить переменную контекста: </value>
+  </data>
+  <data name="Editor_InsertText_9ebca7" xml:space="preserve">
+    <value>Вставить текст</value>
+  </data>
+  <data name="Editor_Insert_eeb8ca" xml:space="preserve">
+    <value>Вставить</value>
+  </data>
+  <data name="Editor_ItemHotkey_77566f" xml:space="preserve">
+    <value>Горячая клавиша пункта</value>
+  </data>
+  <data name="Editor_ItemOrderAndHierarchy_0718c3" xml:space="preserve">
+    <value>Порядок и вложенность пунктов</value>
+  </data>
+  <data name="Editor_JsonConfiguration_453120" xml:space="preserve">
+    <value>Конфигурация JSON</value>
+  </data>
+  <data name="Editor_KeepTheEditorAboveOther_eb06b1" xml:space="preserve">
+    <value>Закрепить редактор поверх других окон</value>
+  </data>
+  <data name="Editor_KeepTheEditorOnTop_3e7cbb" xml:space="preserve">
+    <value>Закрепить редактор поверх окон</value>
+  </data>
+  <data name="Editor_LoadAnotherFile_f18ee0" xml:space="preserve">
+    <value>Загрузить другой файл?</value>
+  </data>
+  <data name="Editor_LoadConfiguration_0439e7" xml:space="preserve">
+    <value>Загрузить конфигурацию…</value>
+  </data>
+  <data name="Editor_Load_f909c7" xml:space="preserve">
+    <value>Загрузить</value>
+  </data>
+  <data name="Editor_M3nuxaAppExeWasNot_0fc811" xml:space="preserve">
+    <value>m3nuxa.App.exe не найден рядом с редактором. Запустите приложение из общей папки публикации.</value>
+  </data>
+  <data name="Editor_M3nuxaIsNotRunningIn_b77de2" xml:space="preserve">
+    <value>m3nuxa в трее не запущен или не отвечает.</value>
+  </data>
+  <data name="Editor_M3nuxaMenuEditor_652d6b" xml:space="preserve">
+    <value>m3nuxa — редактор меню</value>
+  </data>
+  <data name="Editor_MenuGroup_30ae35" xml:space="preserve">
+    <value>Группа меню</value>
+  </data>
+  <data name="Editor_MoveSelectedItems_457829" xml:space="preserve">
+    <value>Переместить выделенные объекты</value>
+  </data>
+  <data name="Editor_NameOfTheFirstSelected_cae089" xml:space="preserve">
+    <value>Имя первого выделенного файла или папки.</value>
+  </data>
+  <data name="Editor_Name_aee78f" xml:space="preserve">
+    <value>Имя</value>
+  </data>
+  <data name="Editor_NewAction_991100" xml:space="preserve">
+    <value>Новое действие</value>
+  </data>
+  <data name="Editor_NewGroup_55c687" xml:space="preserve">
+    <value>Новая группа</value>
+  </data>
+  <data name="Editor_NewSnippet_7f18a1" xml:space="preserve">
+    <value>Новый сниппет</value>
+  </data>
+  <data name="Editor_NoChangesToApply_fefed9" xml:space="preserve">
+    <value>Нет изменений для применения</value>
+  </data>
+  <data name="Editor_NotAssigned_bd9326" xml:space="preserve">
+    <value>Не назначено</value>
+  </data>
+  <data name="Editor_OneShortcutIsRequired_8480d7" xml:space="preserve">
+    <value>Нужно одно сочетание</value>
+  </data>
+  <data name="Editor_OnlyAGroupCanContain_04ef69" xml:space="preserve">
+    <value>Вкладывать пункты можно только в группу.</value>
+  </data>
+  <data name="Editor_OpenAFileOrLink_5464f3" xml:space="preserve">
+    <value>Открыть файл или ссылку</value>
+  </data>
+  <data name="Editor_OpenFolder_54724f" xml:space="preserve">
+    <value>Открыть папку</value>
+  </data>
+  <data name="Editor_OpensThisGroupFromAny_904c25" xml:space="preserve">
+    <value>Открывает эту группу из любого приложения.</value>
+  </data>
+  <data name="Editor_ParentFolderOfTheFirst_f82d35" xml:space="preserve">
+    <value>Родительская папка первого выделенного объекта.</value>
+  </data>
+  <data name="Editor_PathOfTheFirstSelected_e68d42" xml:space="preserve">
+    <value>Путь первого выделенного объекта.</value>
+  </data>
+  <data name="Editor_Path_1b46c6" xml:space="preserve">
+    <value>Путь</value>
+  </data>
+  <data name="Editor_PowershellInterpreter_62e963" xml:space="preserve">
+    <value>Интерпретатор PowerShell</value>
+  </data>
+  <data name="Editor_Preparing_bd54fe" xml:space="preserve">
+    <value>Подготовка…</value>
+  </data>
+  <data name="Editor_PressANewShortcut_379ccc" xml:space="preserve">
+    <value>Нажмите новое сочетание…</value>
+  </data>
+  <data name="Editor_PressAShortcutWithOne_f1ed8c" xml:space="preserve">
+    <value>Нажмите сочетание с одной основной клавишей.</value>
+  </data>
+  <data name="Editor_PressedInTheWindowFrom_9e476c" xml:space="preserve">
+    <value>Нажимается в окне, из которого было вызвано действие.</value>
+  </data>
+  <data name="Editor_Redo_9e506a" xml:space="preserve">
+    <value>Повторить</value>
+  </data>
+  <data name="Editor_ReleaseTheKeysToRecord_3239a3" xml:space="preserve">
+    <value>Отпустите клавиши для записи. Esc — отмена.</value>
+  </data>
+  <data name="Editor_ReloadConfiguration_c5b160" xml:space="preserve">
+    <value>Перезагрузить конфигурацию?</value>
+  </data>
+  <data name="Editor_Reload_942438" xml:space="preserve">
+    <value>Перезагрузить</value>
+  </data>
+  <data name="Editor_Rename_715e8f" xml:space="preserve">
+    <value>Переименовать</value>
+  </data>
+  <data name="Editor_RunAProgram_079b79" xml:space="preserve">
+    <value>Запустить программу</value>
+  </data>
+  <data name="Editor_RunAScript_3fa155" xml:space="preserve">
+    <value>Запустить скрипт</value>
+  </data>
+  <data name="Editor_RunsThisActionFromAny_30cdee" xml:space="preserve">
+    <value>Выполняет это действие из любого приложения.</value>
+  </data>
+  <data name="Editor_SaveDraftSeparately_23cefc" xml:space="preserve">
+    <value>Сохранить черновик отдельно…</value>
+  </data>
+  <data name="Editor_SelectAnItemOnThe_2c92bb" xml:space="preserve">
+    <value>Выберите пункт слева</value>
+  </data>
+  <data name="Editor_SelectedItems_9bf8fd" xml:space="preserve">
+    <value>Выделенные объекты</value>
+  </data>
+  <data name="Editor_SendShortcut_9a9f31" xml:space="preserve">
+    <value>Отправить сочетание</value>
+  </data>
+  <data name="Editor_Separator_afb9a7" xml:space="preserve">
+    <value>Разделитель</value>
+  </data>
+  <data name="Editor_Settings_7f17c7" xml:space="preserve">
+    <value>Настройки</value>
+  </data>
+  <data name="Editor_ShortcutToSend_bc4001" xml:space="preserve">
+    <value>Отправляемое сочетание</value>
+  </data>
+  <data name="Editor_SnippetText_d7c024" xml:space="preserve">
+    <value>Текст сниппета</value>
+  </data>
+  <data name="Editor_Snippet_720dc5" xml:space="preserve">
+    <value>Сниппет</value>
+  </data>
+  <data name="Editor_TheActiveConfigurationChangedAfter_f05617" xml:space="preserve">
+    <value>Действующая конфигурация изменилась после открытия редактора. Сохраните правки отдельно и перезагрузите конфигурацию.</value>
+  </data>
+  <data name="Editor_TheConnectionToTheTray_0e8bf1" xml:space="preserve">
+    <value>Соединение с приложением в трее закрыто.</value>
+  </data>
+  <data name="Editor_TheFileDoesNotContain_2469d6" xml:space="preserve">
+    <value>Файл не содержит конфигурацию.</value>
+  </data>
+  <data name="Editor_TheFileIsUnavailable_a1d61d" xml:space="preserve">
+    <value>Файл недоступен.</value>
+  </data>
+  <data name="Editor_TheShortcutHasNoTarget_17c4cf" xml:space="preserve">
+    <value>У ярлыка нет цели.</value>
+  </data>
+  <data name="Editor_TheShortcutIsUnavailableAnother_920562" xml:space="preserve">
+    <value>Сочетание недоступно: занято другой программой или зарезервировано Windows.</value>
+  </data>
+  <data name="Editor_TheShortcutServiceIsUnavailable_c19487" xml:space="preserve">
+    <value>Служба ярлыков недоступна.</value>
+  </data>
+  <data name="Editor_TheTrayApplicationClosedThe_20a486" xml:space="preserve">
+    <value>Приложение в трее закрыло соединение.</value>
+  </data>
+  <data name="Editor_TheTrayApplicationDoesNot_3ebdc0" xml:space="preserve">
+    <value>Приложение в трее не поддерживает запись сочетаний. Перезапустите обновлённую версию.</value>
+  </data>
+  <data name="Editor_TheTreeNodeIsNot_a02a3d" xml:space="preserve">
+    <value>Узел дерева не связан с пунктом меню.</value>
+  </data>
+  <data name="Editor_ThereAreUnsavedChangesApply_226d2b" xml:space="preserve">
+    <value>Есть несохранённые изменения. Применить их.</value>
+  </data>
+  <data name="Editor_ThereIsNoTextOn_7811eb" xml:space="preserve">
+    <value>В буфере обмена нет текста.</value>
+  </data>
+  <data name="Editor_Undo_555ad1" xml:space="preserve">
+    <value>Отменить</value>
+  </data>
+  <data name="Editor_Unnamed_3f239e" xml:space="preserve">
+    <value>(без имени)</value>
+  </data>
+  <data name="Editor_UnsavedChangesWillBeDiscarded_0fca95" xml:space="preserve">
+    <value>Несохранённые правки будут отброшены.</value>
+  </data>
+  <data name="Editor_UnsavedChanges_70d744" xml:space="preserve">
+    <value>Несохранённые изменения</value>
+  </data>
+  <data name="Editor_UseExplorerIcon_838f6d" xml:space="preserve">
+    <value>Как в Explorer</value>
+  </data>
+  <data name="Editor_Visible_60a11e" xml:space="preserve">
+    <value>Видима</value>
+  </data>
+  <data name="Editor_WorkingDirectory_72e5f4" xml:space="preserve">
+    <value>Рабочая папка</value>
+  </data>
+</root>

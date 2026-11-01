@@ -12,6 +12,7 @@ namespace m3nuxa.Editor.Views;
 
 public sealed partial class MainPage : Page
 {
+    private string Localize(string key) => L.Get(key);
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true, PropertyNameCaseInsensitive = true, Converters = { new JsonStringEnumConverter() } };
     private readonly EditorPipeClient client = new();
     private readonly Stack<string> undo = new();
@@ -50,13 +51,13 @@ public sealed partial class MainPage : Page
             args.Cancel = true;
             if (activeShortcut is not null) await activeShortcut.StopAsync();
             if (!dirty) { allowClose = true; App.MainWindow.Close(); return; }
-            var answer = await ConfirmAsync("Несохранённые изменения", "Применить изменения перед закрытием?", "Применить", "Отбросить");
+            var answer = await ConfirmAsync(L.Get("Editor_UnsavedChanges_70d744"), L.Get("Editor_ApplyChangesBeforeClosing_c969f8"), L.Get("Editor_Apply_768af6"), L.Get("Editor_Discard_941d9e"));
             if (answer == ContentDialogResult.Primary && !await ApplyAsync()) return;
             if (answer == ContentDialogResult.None) return;
             allowClose = true;
             App.MainWindow.Close();
         };
-        ToolTipService.SetToolTip(DropHint, "Проводник и редактор должны работать с одинаковыми правами.");
+        ToolTipService.SetToolTip(DropHint, L.Get("Editor_FileExplorerAndTheEditor_36ca57"));
     }
 
     private void PinClicked(object sender, RoutedEventArgs args)
@@ -68,7 +69,7 @@ public sealed partial class MainPage : Page
     private async void SettingsClicked(object sender, RoutedEventArgs args)
     {
         var response = await client.SendAsync("openSettings");
-        if (!response.Success) ShowNotice(response.Message ?? "Не удалось открыть настройки.", InfoBarSeverity.Error);
+        if (!response.Success) ShowNotice(response.Message ?? L.Get("Editor_CouldNotOpenSettings_4fcb94"), InfoBarSeverity.Error);
     }
 
     private async void MainPageLoaded(object sender, RoutedEventArgs args) => await LoadCurrentAsync();
@@ -81,7 +82,7 @@ public sealed partial class MainPage : Page
         var response = await client.BeginAsync();
         DevLog.Write("editor", $"Begin response success={response.Success} message={response.Message}");
         var draft = EditorPipeClient.ReadDraft(response);
-        if (draft is null) { ShowNotice(response.Message ?? "Не удалось прочитать конфигурацию.", InfoBarSeverity.Error); return; }
+        if (draft is null) { ShowNotice(response.Message ?? L.Get("Editor_CouldNotReadTheConfiguration_d3f938"), InfoBarSeverity.Error); return; }
         config = draft.Config;
         baseSnapshot = Snapshot();
         draftReady = true;
@@ -102,7 +103,7 @@ public sealed partial class MainPage : Page
     {
         ApplyButton.IsEnabled = dirty;
         ApplyMenuItem.IsEnabled = dirty;
-        ToolTipService.SetToolTip(ApplyButton, dirty ? "Есть несохранённые изменения. Применить их." : "Нет изменений для применения");
+        ToolTipService.SetToolTip(ApplyButton, dirty ? L.Get("Editor_ThereAreUnsavedChangesApply_226d2b") : L.Get("Editor_NoChangesToApply_fefed9"));
     }
     private void ShowNotice(string message, InfoBarSeverity severity = InfoBarSeverity.Informational)
     {
@@ -134,7 +135,7 @@ public sealed partial class MainPage : Page
     }
 
     private static MenuNode Model(TreeViewNode node) => node.Content is NodeDisplay display
-        ? display.Model : throw new InvalidOperationException("Узел дерева не связан с пунктом меню.");
+        ? display.Model : throw new InvalidOperationException(L.Get("Editor_TheTreeNodeIsNot_a02a3d"));
     private static TreeViewNode? FindTreeNode(IEnumerable<TreeViewNode> nodes, string? id)
     {
         if (id is null) return null;
@@ -159,30 +160,30 @@ public sealed partial class MainPage : Page
             UpdateSelectionCommands();
             foreach (var field in globalShortcuts.Keys.ToArray()) globalShortcuts.Remove(field);
             PropertiesPanel.Children.Clear();
-            PropertiesHint.Text = selected is null ? "Выберите пункт слева" : selected.Kind == MenuNodeKind.Group ? "Группа меню" : selected.Kind == MenuNodeKind.Separator ? "Разделитель" : "Действие";
+            PropertiesHint.Text = selected is null ? L.Get("Editor_SelectAnItemOnThe_2c92bb") : selected.Kind == MenuNodeKind.Group ? L.Get("Editor_MenuGroup_30ae35") : selected.Kind == MenuNodeKind.Separator ? L.Get("Editor_Separator_afb9a7") : L.Get("Editor_Action_4fe9c0");
             if (selected is null)
             {
-                PropertiesPanel.Children.Add(new TextBlock { Text = "Добавьте папку, файл или сниппет,\nлибо выберите существующий пункт.", TextWrapping = TextWrapping.Wrap, Opacity = .65, Margin = new Thickness(0, 20, 0, 0) });
+                PropertiesPanel.Children.Add(new TextBlock { Text = L.Get("Editor_AddAFolderFileOr_029745"), TextWrapping = TextWrapping.Wrap, Opacity = .65, Margin = new Thickness(0, 20, 0, 0) });
                 return;
             }
             if (selected.Kind == MenuNodeKind.Separator) return;
             var item = selected;
-            AddText("Имя", item.Name, value =>
+            AddText(L.Get("Editor_Name_aee78f"), item.Name, value =>
             {
                 item.Name = value;
                 // Selection can change while a TextChanged callback is still pending.
                 if (FindTreeNode(MenuTree.RootNodes, item.Id) is { } itemNode)
                     itemNode.Content = new NodeDisplay(item);
             });
-            PropertiesPanel.Children.Add(CreateShortcutEditor("ItemHotkey", "Горячая клавиша пункта",
-                item.Kind == MenuNodeKind.Group ? "Открывает эту группу из любого приложения." : "Выполняет это действие из любого приложения.",
+            PropertiesPanel.Children.Add(CreateShortcutEditor("ItemHotkey", L.Get("Editor_ItemHotkey_77566f"),
+                item.Kind == MenuNodeKind.Group ? L.Get("Editor_OpensThisGroupFromAny_904c25") : L.Get("Editor_RunsThisActionFromAny_30cdee"),
                 () => item.Hotkey, value => item.Hotkey = value, item.Id));
             AddIconPicker(item);
             if (item.Kind != MenuNodeKind.Action) return;
             item.Action ??= new MenuAction();
             var action = item.Action;
             var choices = ActionChoices();
-            var combo = new ComboBox { Header = "Тип действия", HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = choices, DisplayMemberPath = "Label", SelectedItem = choices.First(choice => choice.Kind == action.Kind) };
+            var combo = new ComboBox { Header = L.Get("Editor_ActionType_c83f7f"), HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = choices, DisplayMemberPath = "Label", SelectedItem = choices.First(choice => choice.Kind == action.Kind) };
             combo.SelectionChanged += (_, _) =>
             {
                 if (rendering || combo.SelectedItem is not ActionChoice choice || choice.Kind == action.Kind) return;
@@ -190,23 +191,23 @@ public sealed partial class MainPage : Page
             };
             PropertiesPanel.Children.Add(combo);
             if (action.Kind is ActionKind.OpenItem or ActionKind.OpenFolder or ActionKind.RunProgram or ActionKind.RunScript or ActionKind.CopySelection or ActionKind.MoveSelection)
-                AddText(action.Kind is ActionKind.CopySelection or ActionKind.MoveSelection ? "Папка назначения" : "Путь", action.Path, value => action.Path = value, variables: true, browse: action.Kind is ActionKind.OpenFolder or ActionKind.CopySelection or ActionKind.MoveSelection ? "folder" : "file");
+                AddText(action.Kind is ActionKind.CopySelection or ActionKind.MoveSelection ? L.Get("Editor_DestinationFolder_40a307") : L.Get("Editor_Path_1b46c6"), action.Path, value => action.Path = value, variables: true, browse: action.Kind is ActionKind.OpenFolder or ActionKind.CopySelection or ActionKind.MoveSelection ? "folder" : "file");
             if (action.Kind is ActionKind.RunProgram or ActionKind.RunScript)
             {
-                AddText("Аргументы", action.Arguments, value => action.Arguments = value, variables: true);
-                AddText("Рабочая папка", action.WorkingDirectory, value => action.WorkingDirectory = value, variables: true, browse: "folder");
+                AddText(L.Get("Editor_Arguments_3c3a07"), action.Arguments, value => action.Arguments = value, variables: true);
+                AddText(L.Get("Editor_WorkingDirectory_72e5f4"), action.WorkingDirectory, value => action.WorkingDirectory = value, variables: true, browse: "folder");
             }
             if (action.Kind == ActionKind.RunScript)
             {
-                AddText("Интерпретатор PowerShell", action.Interpreter, value => action.Interpreter = value, browse: "file");
-                var hidden = new ToggleSwitch { Header = "Консоль", OnContent = "Скрыта", OffContent = "Видима", IsOn = action.HideConsole };
+                AddText(L.Get("Editor_PowershellInterpreter_62e963"), action.Interpreter, value => action.Interpreter = value, browse: "file");
+                var hidden = new ToggleSwitch { Header = L.Get("Editor_Console_5a214b"), OnContent = L.Get("Editor_Hidden_b4def7"), OffContent = L.Get("Editor_Visible_60a11e"), IsOn = action.HideConsole };
                 hidden.Toggled += (_, _) => { if (rendering) return; Remember(); action.HideConsole = hidden.IsOn; MarkDirty(); };
                 PropertiesPanel.Children.Add(hidden);
             }
             if (action.Kind == ActionKind.SendShortcut)
-                PropertiesPanel.Children.Add(CreateShortcutEditor("SentShortcut", "Отправляемое сочетание",
-                    "Нажимается в окне, из которого было вызвано действие.", () => action.Shortcut, value => action.Shortcut = value, item.Id, sent: true));
-            if (action.Kind == ActionKind.InsertText) AddText("Текст сниппета", action.Text, value => action.Text = value, multiline: true);
+                PropertiesPanel.Children.Add(CreateShortcutEditor("SentShortcut", L.Get("Editor_ShortcutToSend_bc4001"),
+                    L.Get("Editor_PressedInTheWindowFrom_9e476c"), () => action.Shortcut, value => action.Shortcut = value, item.Id, sent: true));
+            if (action.Kind == ActionKind.InsertText) AddText(L.Get("Editor_SnippetText_d7c024"), action.Text, value => action.Text = value, multiline: true);
         }
         finally { rendering = false; }
     }
@@ -232,7 +233,7 @@ public sealed partial class MainPage : Page
         if (!sent)
         {
             globalShortcuts[field] = getter;
-            if (unavailableHotkeys.Contains(CanonicalHotkey(getter()))) field.SetError("Сочетание недоступно: занято другой программой или зарезервировано Windows.");
+            if (unavailableHotkeys.Contains(CanonicalHotkey(getter()))) field.SetError(L.Get("Editor_TheShortcutIsUnavailableAnother_920562"));
         }
         return field;
     }
@@ -242,7 +243,7 @@ public sealed partial class MainPage : Page
     private string? FindHotkeyConflict(string value, string? itemId, bool main)
     {
         var key = CanonicalHotkey(value);
-        if (!main && currentMainHotkey.Length > 0 && key == CanonicalHotkey(currentMainHotkey)) return "Уже назначено для вызова основного меню.";
+        if (!main && currentMainHotkey.Length > 0 && key == CanonicalHotkey(currentMainHotkey)) return L.Get("Editor_AlreadyAssignedToOpenThe_c893d7");
         return Visit(config.Items, "");
         string? Visit(IEnumerable<MenuNode> nodes, string parent)
         {
@@ -250,7 +251,7 @@ public sealed partial class MainPage : Page
             {
                 var path = parent + node.Name;
                 if (node.Id != itemId && node.Kind != MenuNodeKind.Separator && !string.IsNullOrWhiteSpace(node.Hotkey) && key == CanonicalHotkey(node.Hotkey))
-                    return $"Уже назначено пункту «{path}».";
+                    return L.Format("Editor_AlreadyAssignedToItem0_8f0792", path);
                 if (Visit(node.Children, path + " / ") is { } conflict) return conflict;
             }
             return null;
@@ -263,7 +264,7 @@ public sealed partial class MainPage : Page
         unavailableHotkeys.Clear();
         foreach (var value in unavailable) if (value?.GetValue<string>() is { } text) unavailableHotkeys.Add(CanonicalHotkey(text));
         foreach (var (field, getter) in globalShortcuts)
-            field.SetError(unavailableHotkeys.Contains(CanonicalHotkey(getter())) ? "Сочетание недоступно: занято другой программой или зарезервировано Windows." : null);
+            field.SetError(unavailableHotkeys.Contains(CanonicalHotkey(getter())) ? L.Get("Editor_TheShortcutIsUnavailableAnother_920562") : null);
     }
 
     private void AddText(string label, string value, Action<string> setter, bool variables = false, bool multiline = false, string placeholder = "", string? browse = null)
@@ -279,7 +280,7 @@ public sealed partial class MainPage : Page
         {
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             var browseButton = new Button { Content = "…", VerticalAlignment = VerticalAlignment.Bottom, Width = 36, Height = 32 };
-            var browseLabel = browse == "folder" ? "Выбрать папку" : "Выбрать файл";
+            var browseLabel = browse == "folder" ? L.Get("Editor_ChooseFolder_14a658") : L.Get("Editor_ChooseFile_2e31da");
             ToolTipService.SetToolTip(browseButton, browseLabel);
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(browseButton, browseLabel + ": " + label);
             browseButton.Click += async (_, _) =>
@@ -308,8 +309,8 @@ public sealed partial class MainPage : Page
         }
         if (!variables) { PropertiesPanel.Children.Add(row); return; }
         var picker = new Button { Content = new FontIcon { Glyph = "\uE8EF", FontSize = 14 }, VerticalAlignment = VerticalAlignment.Bottom, Width = 36, Height = 32, Padding = new Thickness(0) };
-        ToolTipService.SetToolTip(picker, "Вставить переменную контекста");
-        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(picker, "Вставить переменную контекста: " + label);
+        ToolTipService.SetToolTip(picker, L.Get("Editor_InsertContextVariable_65542b"));
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(picker, L.Get("Editor_InsertContextVariable_cdf409") + label);
         picker.Click += async (_, _) =>
         {
             var position = text.SelectionStart;
@@ -340,9 +341,9 @@ public sealed partial class MainPage : Page
                 list.Items.Add(new ListViewItem { Tag = name, Content = columns, HorizontalContentAlignment = HorizontalAlignment.Stretch });
             }
         }
-        Group("Выделенные объекты", ("{selectedPaths}", "Все выделенные пути; только отдельным аргументом."), ("{selectedPath}", "Путь первого выделенного объекта."), ("{fileName}", "Имя первого выделенного файла или папки."), ("{extension}", "Расширение первого выделенного объекта."), ("{parentFolder}", "Родительская папка первого выделенного объекта."));
-        Group("Проводник", ("{currentFolder}", "Текущая папка окна Проводника."));
-        var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = "Переменные контекста", Content = list, PrimaryButtonText = "Вставить", CloseButtonText = "Отмена", IsPrimaryButtonEnabled = false, DefaultButton = ContentDialogButton.Primary };
+        Group(L.Get("Editor_SelectedItems_9bf8fd"), ("{selectedPaths}", L.Get("Editor_AllSelectedPathsOnlyAs_795834")), ("{selectedPath}", L.Get("Editor_PathOfTheFirstSelected_e68d42")), ("{fileName}", L.Get("Editor_NameOfTheFirstSelected_cae089")), ("{extension}", L.Get("Editor_ExtensionOfTheFirstSelected_b49b82")), ("{parentFolder}", L.Get("Editor_ParentFolderOfTheFirst_f82d35")));
+        Group(L.Get("Editor_FileExplorer_1fd2be"), ("{currentFolder}", L.Get("Editor_CurrentFolderInFileExplorer_428c9c")));
+        var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = L.Get("Editor_ContextVariables_930107"), Content = list, PrimaryButtonText = L.Get("Editor_Insert_eeb8ca"), CloseButtonText = L.Get("Editor_Cancel_0ec753"), IsPrimaryButtonEnabled = false, DefaultButton = ContentDialogButton.Primary };
         list.SelectionChanged += (_, _) => dialog.IsPrimaryButtonEnabled = list.SelectedItem is ListViewItem { Tag: string };
         return (dialog, list);
     }
@@ -350,10 +351,10 @@ public sealed partial class MainPage : Page
     private void AddIconPicker(MenuNode item)
     {
         var row = new StackPanel { Spacing = 8 };
-        row.Children.Add(new TextBlock { Text = "Иконка" });
+        row.Children.Add(new TextBlock { Text = L.Get("Editor_Icon_25b8ac") });
         var controls = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
         controls.Children.Add(CreateItemIcon(item, 32));
-        var button = new Button { Content = "Выбрать…" };
+        var button = new Button { Content = L.Get("Editor_Choose_6279dd") };
         button.Click += (_, _) =>
         {
             try
@@ -371,7 +372,7 @@ public sealed partial class MainPage : Page
             catch (Exception ex) { ShowNotice(ex.Message, InfoBarSeverity.Error); }
         };
         controls.Children.Add(button);
-        var reset = new Button { Content = "Как в Explorer" };
+        var reset = new Button { Content = L.Get("Editor_UseExplorerIcon_838f6d") };
         reset.Click += (_, _) => { Remember(); item.IconPath = ""; MarkDirty(); RefreshTree(item.Id); };
         controls.Children.Add(reset);
         row.Children.Add(controls);
@@ -423,9 +424,9 @@ public sealed partial class MainPage : Page
         try
         {
             var data = Clipboard.GetContent();
-            if (!data.Contains(StandardDataFormats.Text)) { ShowNotice("В буфере обмена нет текста.", InfoBarSeverity.Warning); return; }
+            if (!data.Contains(StandardDataFormats.Text)) { ShowNotice(L.Get("Editor_ThereIsNoTextOn_7811eb"), InfoBarSeverity.Warning); return; }
             var text = await data.GetTextAsync();
-            if (string.IsNullOrWhiteSpace(text)) { ShowNotice("В буфере обмена нет текста.", InfoBarSeverity.Warning); return; }
+            if (string.IsNullOrWhiteSpace(text)) { ShowNotice(L.Get("Editor_ThereIsNoTextOn_7811eb"), InfoBarSeverity.Warning); return; }
             var destination = AddDestination();
             AddDroppedText(text, destination, destination.Count);
         }
@@ -441,7 +442,7 @@ public sealed partial class MainPage : Page
             var destination = AddDestination();
             if (ReferenceEquals(destination, source.Children) || ContainsChild(source, selected))
             {
-                ShowNotice("Нельзя вложить пункт в самого себя или его дочернюю группу.", InfoBarSeverity.Warning);
+                ShowNotice(L.Get("Editor_AnItemCannotContainItself_756ab5"), InfoBarSeverity.Warning);
                 return;
             }
             Remember();
@@ -454,7 +455,7 @@ public sealed partial class MainPage : Page
         if (copiedNode is null) return;
         var clone = JsonSerializer.Deserialize<MenuNode>(copiedNode, JsonOptions)!;
         AssignNewIds(clone);
-        clone.Name += " (копия)";
+        clone.Name += L.Get("Editor_Copy_7d4e5c");
         Add(clone);
     }
 
@@ -487,10 +488,10 @@ public sealed partial class MainPage : Page
     private List<MenuNode> AddDestination() => selected?.Kind == MenuNodeKind.Group ? selected.Children : SelectedSiblings();
     private void Add(MenuNode node)
     { Remember(); AddDestination().Add(node); MarkDirty(); RefreshTree(node.Id); }
-    private void AddGroupClicked(object sender, RoutedEventArgs args) => Add(new MenuNode { Name = "Новая группа", Kind = MenuNodeKind.Group });
+    private void AddGroupClicked(object sender, RoutedEventArgs args) => Add(new MenuNode { Name = L.Get("Editor_NewGroup_55c687"), Kind = MenuNodeKind.Group });
     private void AddSeparatorClicked(object sender, RoutedEventArgs args) => Add(new MenuNode { Kind = MenuNodeKind.Separator });
-    private void AddSnippetClicked(object sender, RoutedEventArgs args) => Add(new MenuNode { Name = "Новый сниппет", Kind = MenuNodeKind.Action, Action = new MenuAction { Kind = ActionKind.InsertText } });
-    private void AddActionClicked(object sender, RoutedEventArgs args) => Add(new MenuNode { Name = "Новое действие", Kind = MenuNodeKind.Action, Action = new MenuAction() });
+    private void AddSnippetClicked(object sender, RoutedEventArgs args) => Add(new MenuNode { Name = L.Get("Editor_NewSnippet_7f18a1"), Kind = MenuNodeKind.Action, Action = new MenuAction { Kind = ActionKind.InsertText } });
+    private void AddActionClicked(object sender, RoutedEventArgs args) => Add(new MenuNode { Name = L.Get("Editor_NewAction_991100"), Kind = MenuNodeKind.Action, Action = new MenuAction() });
 
     private async void AddFolderClicked(object sender, RoutedEventArgs args)
     {
@@ -566,14 +567,14 @@ public sealed partial class MainPage : Page
     private static MenuNode Import(string path)
     {
         var directory = Directory.Exists(path); var extension = Path.GetExtension(path).ToLowerInvariant();
-        if (!directory && !File.Exists(path)) throw new FileNotFoundException("Файл недоступен.", path);
+        if (!directory && !File.Exists(path)) throw new FileNotFoundException(L.Get("Editor_TheFileIsUnavailable_a1d61d"), path);
         var action = new MenuAction { Path = path, Kind = directory ? ActionKind.OpenFolder : extension is ".bat" or ".cmd" or ".ps1" ? ActionKind.RunScript : extension is ".exe" or ".lnk" ? ActionKind.RunProgram : ActionKind.OpenItem };
         if (extension == ".lnk")
         {
-            var type = Type.GetTypeFromProgID("WScript.Shell") ?? throw new InvalidOperationException("Служба ярлыков недоступна.");
+            var type = Type.GetTypeFromProgID("WScript.Shell") ?? throw new InvalidOperationException(L.Get("Editor_TheShortcutServiceIsUnavailable_c19487"));
             dynamic shell = Activator.CreateInstance(type)!; dynamic link = shell.CreateShortcut(path);
             action.Path = (string)link.TargetPath; action.Arguments = (string)link.Arguments; action.WorkingDirectory = (string)link.WorkingDirectory;
-            if (string.IsNullOrWhiteSpace(action.Path)) throw new InvalidOperationException("У ярлыка нет цели.");
+            if (string.IsNullOrWhiteSpace(action.Path)) throw new InvalidOperationException(L.Get("Editor_TheShortcutHasNoTarget_17c4cf"));
             extension = Path.GetExtension(action.Path).ToLowerInvariant();
             action.Kind = Directory.Exists(action.Path) ? ActionKind.OpenFolder : extension is ".bat" or ".cmd" or ".ps1" ? ActionKind.RunScript : ActionKind.RunProgram;
         }
@@ -585,7 +586,7 @@ public sealed partial class MainPage : Page
     {
         if (selected is null) return;
         var clone = JsonSerializer.Deserialize<MenuNode>(JsonSerializer.Serialize(selected, JsonOptions), JsonOptions)!;
-        AssignNewIds(clone); clone.Name += " (копия)"; Remember(); var siblings = SelectedSiblings(); siblings.Insert(siblings.IndexOf(selected) + 1, clone); MarkDirty(); RefreshTree(clone.Id);
+        AssignNewIds(clone); clone.Name += L.Get("Editor_Copy_7d4e5c"); Remember(); var siblings = SelectedSiblings(); siblings.Insert(siblings.IndexOf(selected) + 1, clone); MarkDirty(); RefreshTree(clone.Id);
     }
     private void DeleteClicked(object sender, RoutedEventArgs args)
     { if (selected is null) return; Remember(); SelectedSiblings().Remove(selected); MarkDirty(); RefreshTree(); }
@@ -606,10 +607,10 @@ public sealed partial class MainPage : Page
             if (!await RestoreDraftAsync()) return false;
             staged = await client.ReplaceDraftAsync(config);
         }
-        if (!staged.Success) { ShowNotice(staged.Message ?? "Не удалось подготовить конфигурацию.", InfoBarSeverity.Error); return false; }
+        if (!staged.Success) { ShowNotice(staged.Message ?? L.Get("Editor_CouldNotPrepareTheConfiguration_896ac2"), InfoBarSeverity.Error); return false; }
         var response = await client.ApplyAsync();
         ShowHotkeyAvailability(response);
-        if (!response.Success) { ShowNotice(response.Message ?? "Не удалось применить конфигурацию.", InfoBarSeverity.Error); return false; }
+        if (!response.Success) { ShowNotice(response.Message ?? L.Get("Editor_CouldNotApplyTheConfiguration_9f63ee"), InfoBarSeverity.Error); return false; }
         draftReady = false;
         var draft = EditorPipeClient.ReadDraft(await client.BeginAsync());
         if (draft is not null) { config = draft.Config; baseSnapshot = Snapshot(); draftReady = true; RefreshTree(selected?.Id); }
@@ -625,12 +626,12 @@ public sealed partial class MainPage : Page
         var draft = EditorPipeClient.ReadDraft(response);
         if (draft is null)
         {
-            ShowNotice(response.Message ?? "Не удалось открыть черновик в приложении.", InfoBarSeverity.Error);
+            ShowNotice(response.Message ?? L.Get("Editor_CouldNotOpenTheDraft_64ddf1"), InfoBarSeverity.Error);
             return false;
         }
         if (JsonSerializer.Serialize(draft.Config, JsonOptions) != baseSnapshot)
         {
-            ShowNotice("Действующая конфигурация изменилась после открытия редактора. Сохраните правки отдельно и перезагрузите конфигурацию.", InfoBarSeverity.Warning);
+            ShowNotice(L.Get("Editor_TheActiveConfigurationChangedAfter_f05617"), InfoBarSeverity.Warning);
             return false;
         }
         draftReady = true;
@@ -638,32 +639,32 @@ public sealed partial class MainPage : Page
     }
     private async void ReloadClicked(object sender, RoutedEventArgs args)
     {
-        if (dirty && await ConfirmAsync("Перезагрузить конфигурацию?", "Несохранённые правки будут отброшены.", "Перезагрузить") != ContentDialogResult.Primary) return;
+        if (dirty && await ConfirmAsync(L.Get("Editor_ReloadConfiguration_c5b160"), L.Get("Editor_UnsavedChangesWillBeDiscarded_0fca95"), L.Get("Editor_Reload_942438")) != ContentDialogResult.Primary) return;
         var response = await client.ReloadAsync();
-        if (!response.Success) { ShowNotice(response.Message ?? "Не удалось перезагрузить.", InfoBarSeverity.Error); return; }
+        if (!response.Success) { ShowNotice(response.Message ?? L.Get("Editor_CouldNotReload_075f1d"), InfoBarSeverity.Error); return; }
         await LoadCurrentAsync();
     }
     private async void LoadClicked(object sender, RoutedEventArgs args)
     {
-        if (dirty && await ConfirmAsync("Загрузить другой файл?", "Несохранённые правки будут отброшены.", "Загрузить") != ContentDialogResult.Primary) return;
+        if (dirty && await ConfirmAsync(L.Get("Editor_LoadAnotherFile_f18ee0"), L.Get("Editor_UnsavedChangesWillBeDiscarded_0fca95"), L.Get("Editor_Load_f909c7")) != ContentDialogResult.Primary) return;
         var picker = new FileOpenPicker(); picker.FileTypeFilter.Add(".json"); InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindow));
         try
         {
             var file = await picker.PickSingleFileAsync(); if (file is null) return;
-            var loaded = JsonSerializer.Deserialize<AppConfig>(await File.ReadAllTextAsync(file.Path), JsonOptions) ?? throw new InvalidDataException("Файл не содержит конфигурацию.");
+            var loaded = JsonSerializer.Deserialize<AppConfig>(await File.ReadAllTextAsync(file.Path), JsonOptions) ?? throw new InvalidDataException(L.Get("Editor_TheFileDoesNotContain_2469d6"));
             Remember(); config = loaded; MarkDirty(); RefreshTree();
         }
         catch (Exception ex) { ShowNotice(ex.Message, InfoBarSeverity.Error); }
     }
     private async void SaveClicked(object sender, RoutedEventArgs args)
     {
-        var picker = new FileSavePicker { SuggestedFileName = "m3nuxa-draft" }; picker.FileTypeChoices.Add("Конфигурация JSON", [".json"]); InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindow));
+        var picker = new FileSavePicker { SuggestedFileName = "m3nuxa-draft" }; picker.FileTypeChoices.Add(L.Get("Editor_JsonConfiguration_453120"), [".json"]); InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindow));
         try { var file = await picker.PickSaveFileAsync(); if (file is not null) await File.WriteAllTextAsync(file.Path, Snapshot()); }
         catch (Exception ex) { ShowNotice(ex.Message, InfoBarSeverity.Error); }
     }
     private async Task<ContentDialogResult> ConfirmAsync(string title, string message, string primary, string secondary = "")
     {
-        var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = title, Content = message, PrimaryButtonText = primary, CloseButtonText = "Отмена", SecondaryButtonText = secondary, DefaultButton = ContentDialogButton.Primary };
+        var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = title, Content = message, PrimaryButtonText = primary, CloseButtonText = L.Get("Editor_Cancel_0ec753"), SecondaryButtonText = secondary, DefaultButton = ContentDialogButton.Primary };
         return await dialog.ShowAsync();
     }
 
@@ -676,7 +677,7 @@ public sealed partial class MainPage : Page
             List<MenuNode> Read(IEnumerable<TreeViewNode> nodes) => nodes.Select(node =>
             {
                 var model = Model(node);
-                if (model.Kind != MenuNodeKind.Group && node.Children.Count > 0) throw new InvalidOperationException("Вкладывать пункты можно только в группу.");
+                if (model.Kind != MenuNodeKind.Group && node.Children.Count > 0) throw new InvalidOperationException(L.Get("Editor_OnlyAGroupCanContain_04ef69"));
                 model.Children = Read(node.Children); return model;
             }).ToList();
             config.Items = Read(MenuTree.RootNodes);
@@ -697,7 +698,7 @@ public sealed partial class MainPage : Page
         }
         if (dragSnapshot is not null || (!args.DataView.Contains(StandardDataFormats.StorageItems) && !args.DataView.Contains(StandardDataFormats.Text))) return;
         args.AcceptedOperation = DataPackageOperation.Copy;
-        args.DragUIOverride.Caption = "Добавить в меню";
+        args.DragUIOverride.Caption = L.Get("Editor_AddToMenu_2887bc");
         args.Handled = true;
     }
     private async void MenuTreeDrop(object sender, DragEventArgs args)
@@ -721,7 +722,7 @@ public sealed partial class MainPage : Page
                 var candidate = text.Trim().Trim('"');
                 if (File.Exists(candidate) || Directory.Exists(candidate)) ImportPaths([candidate], destination, index);
                 else if (Path.IsPathFullyQualified(candidate) || (Uri.TryCreate(candidate, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https"))
-                    ShowNotice("Ссылку или недоступный путь нельзя добавить как сниппет.", InfoBarSeverity.Warning);
+                    ShowNotice(L.Get("Editor_ALinkOrUnavailablePath_7308a5"), InfoBarSeverity.Warning);
                 else AddDroppedText(text, destination, index);
             }
         }
@@ -730,7 +731,7 @@ public sealed partial class MainPage : Page
     }
     private void AddDroppedText(string text, List<MenuNode> destination, int index)
     {
-        var title = text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim() ?? "Сниппет";
+        var title = text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim() ?? L.Get("Editor_Snippet_720dc5");
         if (title.Length > 60) title = title[..60] + "…";
         var node = new MenuNode { Name = title, Kind = MenuNodeKind.Action, Action = new MenuAction { Kind = ActionKind.InsertText, Text = text } };
         Remember(); destination.Insert(Math.Clamp(index, 0, destination.Count), node); MarkDirty(); RefreshTree(node.Id);
@@ -749,7 +750,7 @@ public sealed partial class MainPage : Page
     }
 
     private static ActionChoice[] ActionChoices() =>
-    [new(ActionKind.OpenItem, "Открыть файл или ссылку"), new(ActionKind.OpenFolder, "Открыть папку"), new(ActionKind.RunProgram, "Запустить программу"), new(ActionKind.RunScript, "Запустить скрипт"), new(ActionKind.SendShortcut, "Отправить сочетание"), new(ActionKind.CopySelection, "Копировать выделенные объекты"), new(ActionKind.MoveSelection, "Переместить выделенные объекты"), new(ActionKind.InsertText, "Вставить текст")];
+    [new(ActionKind.OpenItem, L.Get("Editor_OpenAFileOrLink_5464f3")), new(ActionKind.OpenFolder, L.Get("Editor_OpenFolder_54724f")), new(ActionKind.RunProgram, L.Get("Editor_RunAProgram_079b79")), new(ActionKind.RunScript, L.Get("Editor_RunAScript_3fa155")), new(ActionKind.SendShortcut, L.Get("Editor_SendShortcut_9a9f31")), new(ActionKind.CopySelection, L.Get("Editor_CopySelectedItems_427b62")), new(ActionKind.MoveSelection, L.Get("Editor_MoveSelectedItems_457829")), new(ActionKind.InsertText, L.Get("Editor_InsertText_9ebca7"))];
     private sealed record ActionChoice(ActionKind Kind, string Label);
     private static FrameworkElement CreateItemIcon(MenuNode node, int size)
     {
@@ -786,10 +787,10 @@ public sealed partial class MainPage : Page
             Children.Add(CreateItemIcon(model, 18));
             label = new TextBlock { VerticalAlignment = VerticalAlignment.Center }; Children.Add(label); Update();
         }
-        public void Update() => label.Text = Model.Kind == MenuNodeKind.Separator ? "──────────" : string.IsNullOrWhiteSpace(Model.Name) ? "(без имени)" : Model.Name;
+        public void Update() => label.Text = Model.Kind == MenuNodeKind.Separator ? "──────────" : string.IsNullOrWhiteSpace(Model.Name) ? L.Get("Editor_Unnamed_3f239e") : Model.Name;
         public override string ToString() => Model.Kind == MenuNodeKind.Separator ? "──────────" :
             (Model.Kind == MenuNodeKind.Group ? "📁 " : Model.Action?.Kind == ActionKind.InsertText ? "📋 " : "📄 ") +
-            (string.IsNullOrWhiteSpace(Model.Name) ? "(без имени)" : Model.Name);
+            (string.IsNullOrWhiteSpace(Model.Name) ? L.Get("Editor_Unnamed_3f239e") : Model.Name);
     }
 }
 

@@ -12,20 +12,22 @@ internal sealed class SettingsWindow : Window
 {
     private readonly TextBlock shortcut = new() { VerticalAlignment = VerticalAlignment.Center };
     private readonly TextBlock status = new() { TextWrapping = TextWrapping.Wrap, FontSize = 12, Visibility = Visibility.Collapsed };
-    private readonly Button record = new() { Content = "Изменить" };
-    private readonly Button cancel = new() { Content = "Отмена", Visibility = Visibility.Collapsed };
+    private readonly Button record = new() { Content = L.Get("Settings/Edit") };
+    private readonly Button cancel = new() { Content = L.Get("Settings/Cancel"), Visibility = Visibility.Collapsed };
     private readonly NumberBox font;
-    private readonly TextBlock sample = new() { Text = "Пример пункта меню", Margin = new Thickness(10) };
+    private readonly TextBlock sample = new() { Text = L.Get("Settings/Sample"), Margin = new Thickness(10) };
+    private readonly ComboBox language = new() { Header = L.Get("Settings/Language"), HorizontalAlignment = HorizontalAlignment.Stretch };
     private readonly SettingsStore store;
     private readonly Func<AppSettings, string?> save;
     private readonly Action<bool> suspend;
     private KeyboardCapture? capture;
     private bool recording;
     private bool updating;
+    private Action relocalize = () => { };
     public SettingsWindow(SettingsStore store, Func<AppSettings, string?> save, Action<bool> suspend, Action preview)
     {
         this.store = store; this.save = save; this.suspend = suspend;
-        Title = "m3nuxa — настройки";
+        Title = L.Get("Settings/WindowTitle");
         SystemBackdrop = new MicaBackdrop();
         AppWindow.Resize(new SizeInt32(580, 620));
         var panel = new StackPanel { Padding = new Thickness(20), Spacing = 14 };
@@ -33,19 +35,26 @@ internal sealed class SettingsWindow : Window
             panel.ActualTheme == ElementTheme.Dark ? TitleBarTheme.Dark : TitleBarTheme.Light;
         panel.Loaded += (_, _) => UpdateTitleBarTheme();
         panel.ActualThemeChanged += (_, _) => UpdateTitleBarTheme();
-        panel.Children.Add(new TextBlock { Text = "Настройки", FontSize = 22, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-        panel.Children.Add(new TextBlock { Text = "Изменения сохраняются автоматически", FontSize = 12, Opacity = .65 });
-        panel.Children.Add(new TextBlock { Text = "Сочетание вызова меню" });
+        var heading = new TextBlock { Text = L.Get("Settings/Title"), FontSize = 22, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold };
+        var autosave = new TextBlock { Text = L.Get("Settings/AutomaticSave"), FontSize = 12, Opacity = .65 };
+        panel.Children.Add(heading); panel.Children.Add(autosave);
+        language.Items.Add("English"); language.Items.Add("Русский");
+        language.SelectedIndex = store.Current.Language == "ru-RU" ? 1 : 0;
+        AutomationProperties.SetAutomationId(language, "SettingsLanguage");
+        language.SelectionChanged += (_, _) => { if (!updating && language.SelectedIndex >= 0) Save(store.Current with { Language = language.SelectedIndex == 1 ? "ru-RU" : "en-US" }); };
+        panel.Children.Add(language);
+        var shortcutLabel = new TextBlock { Text = L.Get("Settings/Shortcut") };
+        panel.Children.Add(shortcutLabel);
         var row = new Grid { ColumnSpacing = 8 };
         row.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) });
         row.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
         row.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
         row.Children.Add(shortcut); row.Children.Add(record); Grid.SetColumn(record, 1);
         row.Children.Add(cancel); Grid.SetColumn(cancel, 2); panel.Children.Add(row);
-        var clear = new Button { Content = "Убрать сочетание" };
+        var clear = new Button { Content = L.Get("Settings/Clear") };
         clear.Click += (_, _) => Save(store.Current with { MainHotkey = "" }); panel.Children.Add(clear);
         panel.Children.Add(status);
-        font = new NumberBox { Header = "Размер шрифта меню", Minimum = 10, Maximum = 24, SmallChange = 1,
+        font = new NumberBox { Header = L.Get("Settings/FontSize"), Minimum = 10, Maximum = 24, SmallChange = 1,
             SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact, Value = store.Current.MenuFontSize };
         AutomationProperties.SetAutomationId(record, "SettingsHotkeyEdit");
         AutomationProperties.SetAutomationId(shortcut, "SettingsHotkeyValue");
@@ -53,9 +62,18 @@ internal sealed class SettingsWindow : Window
         font.ValueChanged += (_, _) => { if (!updating) Save(store.Current with { MenuFontSize = font.Value }); };
         panel.Children.Add(font); panel.Children.Add(sample);
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        var show = new Button { Content = "Показать меню" }; show.Click += (_, _) => { Stop(); preview(); };
-        var close = new Button { Content = "Закрыть" }; close.Click += (_, _) => Close();
+        var show = new Button { Content = L.Get("Settings/ShowMenu") }; show.Click += (_, _) => { Stop(); preview(); };
+        var close = new Button { Content = L.Get("Settings/Close") }; close.Click += (_, _) => Close();
         buttons.Children.Add(show); buttons.Children.Add(close); panel.Children.Add(buttons);
+        relocalize = () =>
+        {
+            Title = L.Get("Settings/WindowTitle"); heading.Text = L.Get("Settings/Title");
+            autosave.Text = L.Get("Settings/AutomaticSave"); language.Header = L.Get("Settings/Language");
+            shortcutLabel.Text = L.Get("Settings/Shortcut"); record.Content = L.Get("Settings/Edit");
+            cancel.Content = L.Get("Settings/Cancel"); clear.Content = L.Get("Settings/Clear");
+            font.Header = L.Get("Settings/FontSize"); sample.Text = L.Get("Settings/Sample");
+            show.Content = L.Get("Settings/ShowMenu"); close.Content = L.Get("Settings/Close");
+        };
         Content = new ScrollViewer { Content = panel };
         record.Click += (_, _) => Start(); cancel.Click += (_, _) => Stop();
         Activated += (_, args) => { if (args.WindowActivationState == WindowActivationState.Deactivated) Stop(); };
@@ -64,7 +82,8 @@ internal sealed class SettingsWindow : Window
     private void Refresh()
     {
         updating = true;
-        shortcut.Text = store.Current.MainHotkey.Length == 0 ? "Не назначено" : store.Current.MainHotkey.Replace("+", " + ");
+        shortcut.Text = store.Current.MainHotkey.Length == 0 ? L.Get("Settings/NotAssigned") : store.Current.MainHotkey.Replace("+", " + ");
+        language.SelectedIndex = store.Current.Language == "ru-RU" ? 1 : 0;
         font.Value = store.Current.MenuFontSize; sample.FontSize = store.Current.MenuFontSize;
         updating = false;
     }
@@ -72,7 +91,9 @@ internal sealed class SettingsWindow : Window
     {
         Stop();
         var error = save(candidate);
-        status.Text = error ?? "Сохранено";
+        var languageChanged = error is null && store.Current.Language != L.Language;
+        if (languageChanged) { L.SetLanguage(store.Current.Language); relocalize(); }
+        status.Text = error ?? L.Get(languageChanged ? "Settings/EditorRestartRequired" : "Settings/Saved");
         status.Foreground = (Brush)Application.Current.Resources[error is null ? "TextFillColorSecondaryBrush" : "SystemFillColorCriticalBrush"];
         status.Visibility = Visibility.Visible;
         Refresh();
@@ -84,7 +105,7 @@ internal sealed class SettingsWindow : Window
         {
             suspend(true); recording = true; record.Visibility = Visibility.Collapsed; cancel.Visibility = Visibility.Visible;
             cancel.Focus(FocusState.Programmatic);
-            status.Visibility = Visibility.Visible; shortcut.Text = "Нажмите сочетание…"; status.Text = "Отпустите клавиши для записи. Esc — отмена.";
+            status.Visibility = Visibility.Visible; shortcut.Text = L.Get("Settings/PressShortcut"); status.Text = L.Get("Settings/ReleaseKeys");
             capture = new KeyboardCapture(this, (value, complete) => DispatcherQueue.TryEnqueue(() =>
             {
                 if (!recording) return;

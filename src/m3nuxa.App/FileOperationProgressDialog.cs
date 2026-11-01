@@ -9,10 +9,10 @@ internal sealed class FileOperationProgressDialog : Window, IDisposable
     public event EventHandler? CancelRequested;
     public FileOperationProgressDialog(int count)
     {
-        Title = "Файловая операция";
+        Title = L.Get("FileOperationTitle");
         AppWindow.Resize(new Windows.Graphics.SizeInt32(520, 220));
         progress = new() { Maximum = count };
-        var cancel = new Button { Content = "Отмена" };
+        var cancel = new Button { Content = L.Get("FileOperationCancel") };
         cancel.Click += (_, _) => { cancel.IsEnabled = false; CancelRequested?.Invoke(this, EventArgs.Empty); };
         var panel = new StackPanel { Padding = new Thickness(20), Spacing = 12 };
         panel.Children.Add(progress); panel.Children.Add(label); panel.Children.Add(cancel); Content = panel;
@@ -23,7 +23,7 @@ internal sealed class FileOperationProgressDialog : Window, IDisposable
     {
         if (closed) return FileConflictChoice.Cancel;
         var dialog = new ContentDialog { XamlRoot = ((FrameworkElement)Content).XamlRoot,
-            Title = "Конфликт имён", Content = $"Объект уже существует:\n{path}", PrimaryButtonText = "Заменить", SecondaryButtonText = "Пропустить", CloseButtonText = "Отмена" };
+            Title = L.Get("FileConflictTitle"), Content = L.Format("FileConflictExists", path), PrimaryButtonText = L.Get("FileConflictReplace"), SecondaryButtonText = L.Get("FileConflictSkip"), CloseButtonText = L.Get("FileOperationCancel") };
         return await dialog.ShowAsync() switch { ContentDialogResult.Primary => FileConflictChoice.Replace,
             ContentDialogResult.Secondary => FileConflictChoice.Skip, _ => FileConflictChoice.Cancel };
     }

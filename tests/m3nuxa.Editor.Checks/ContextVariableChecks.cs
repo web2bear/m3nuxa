@@ -15,11 +15,12 @@ public sealed partial class MainPage
         RefreshTree(node.Id);
         await Task.Delay(100);
         var expected = new[] { "{selectedPaths}", "{selectedPath}", "{fileName}", "{extension}", "{parentFolder}", "{currentFolder}" };
-        foreach (var label in new[] { "Путь", "Аргументы", "Рабочая папка" })
+        var argumentsLabel = L.Get("Editor_Arguments_3c3a07");
+        foreach (var label in new[] { L.Get("Editor_Path_1b46c6"), argumentsLabel, L.Get("Editor_WorkingDirectory_72e5f4") })
         {
             var row = PropertiesPanel.Children.OfType<Grid>().Single(grid => grid.Children.OfType<TextBox>().Any(t => (string)t.Header == label));
-            var variableButton = row.Children.OfType<Button>().Single(b => Microsoft.UI.Xaml.Automation.AutomationProperties.GetName(b).StartsWith("Вставить переменную контекста"));
-            if (label != "Аргументы")
+            var variableButton = row.Children.OfType<Button>().Single(b => Microsoft.UI.Xaml.Automation.AutomationProperties.GetName(b).StartsWith(L.Get("Editor_InsertContextVariable_cdf409"), StringComparison.Ordinal));
+            if (label != argumentsLabel)
             {
                 var browse = row.Children.OfType<Button>().Single(b => b != variableButton);
                 if (Grid.GetColumn(browse) >= Grid.GetColumn(variableButton)) throw new Exception(label + ": browse button must precede variables.");

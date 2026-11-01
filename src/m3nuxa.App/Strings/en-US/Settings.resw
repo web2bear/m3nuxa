@@ -1,0 +1,78 @@
+<?xml version='1.0' encoding='utf-8'?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms</value>
+  </resheader>
+  <data name="Edit" xml:space="preserve">
+    <value>Change</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="Sample" xml:space="preserve">
+    <value>Example menu item</value>
+  </data>
+  <data name="Language" xml:space="preserve">
+    <value>Language</value>
+  </data>
+  <data name="WindowTitle" xml:space="preserve">
+    <value>m3nuxa — Settings</value>
+  </data>
+  <data name="Title" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="AutomaticSave" xml:space="preserve">
+    <value>Changes are saved automatically</value>
+  </data>
+  <data name="Shortcut" xml:space="preserve">
+    <value>Menu shortcut</value>
+  </data>
+  <data name="Clear" xml:space="preserve">
+    <value>Clear shortcut</value>
+  </data>
+  <data name="FontSize" xml:space="preserve">
+    <value>Menu font size</value>
+  </data>
+  <data name="ShowMenu" xml:space="preserve">
+    <value>Show menu</value>
+  </data>
+  <data name="Close" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="NotAssigned" xml:space="preserve">
+    <value>Not assigned</value>
+  </data>
+  <data name="Saved" xml:space="preserve">
+    <value>Saved</value>
+  </data>
+  <data name="RestartRequired" xml:space="preserve">
+    <value>Saved. Restart m3nuxa and the editor to change the language.</value>
+  </data>
+  <data name="PressShortcut" xml:space="preserve">
+    <value>Press a shortcut…</value>
+  </data>
+  <data name="ReleaseKeys" xml:space="preserve">
+    <value>Release the keys to record. Esc cancels.</value>
+  </data>
+  <data name="EmptyFile" xml:space="preserve">
+    <value>The settings file is empty.</value>
+  </data>
+  <data name="InvalidShortcut" xml:space="preserve">
+    <value>The menu shortcut is invalid.</value>
+  </data>
+  <data name="InvalidFontSize" xml:space="preserve">
+    <value>The font size must be between 10 and 24.</value>
+  </data>
+  <data name="EditorRestartRequired" xml:space="preserve">
+    <value>Language changed. Reopen the editor to update its language.</value>
+  </data>
+</root>

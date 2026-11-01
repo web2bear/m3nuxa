@@ -21,7 +21,7 @@ public sealed partial class MainPage
 
         var mainShortcut = PropertiesPanel.Children.OfType<ShortcutEditor>().First();
         await mainShortcut.StartAsync();
-        Assert(Descendants(mainShortcut).OfType<TextBlock>().Any(text => text.Text.Contains("Нажмите новое")), "recording did not start: " + string.Join(" | ", Descendants(mainShortcut).OfType<TextBlock>().Select(text => text.Text)));
+        Assert(Descendants(mainShortcut).OfType<TextBlock>().Any(text => text.Text == L.Get("Editor_PressANewShortcut_379ccc")), "recording did not start: " + string.Join(" | ", Descendants(mainShortcut).OfType<TextBlock>().Select(text => text.Text)));
         Send((0x11, false), (0x12, false), (0x78, false));
         await Task.Delay(80);
         Assert(config.Items[0].Hotkey == "Ctrl+Alt+Space" && !dirty, "key-down changed the draft");
@@ -52,7 +52,7 @@ public sealed partial class MainPage
         await mainShortcut.StartAsync();
         ((TextBox)PropertiesPanel.Children[0]).Focus(FocusState.Programmatic);
         await Task.Delay(180);
-        Assert(Snapshot() == before && Descendants(mainShortcut).OfType<Button>().Single(button => button.Content as string == "Отмена").Visibility == Visibility.Collapsed,
+        Assert(Snapshot() == before && Descendants(mainShortcut).OfType<Button>().Single(button => button.Content as string == L.Get("Editor_Cancel_0ec753")).Visibility == Visibility.Collapsed,
             "moving focus out did not cancel recording");
 
         MenuTree.SelectedNode = FindTreeNode(MenuTree.RootNodes, send.Id); await Task.Delay(80);
@@ -69,7 +69,7 @@ public sealed partial class MainPage
 
         MenuTree.SelectedNode = FindTreeNode(MenuTree.RootNodes, group.Id); await Task.Delay(80);
         mainShortcut = PropertiesPanel.Children.OfType<ShortcutEditor>().First();
-        var clear = Descendants(mainShortcut).OfType<Button>().Single(button => button.Content as string == "Убрать");
+        var clear = Descendants(mainShortcut).OfType<Button>().Single(button => button.Content as string == L.Get("Editor_Clear_9c7449"));
         ((IInvokeProvider)new ButtonAutomationPeer(clear).GetPattern(PatternInterface.Invoke)).Invoke();
         await Task.Delay(50);
         Assert(config.Items[0].Hotkey == "", "clear failed");
@@ -79,9 +79,9 @@ public sealed partial class MainPage
         mainShortcut = PropertiesPanel.Children.OfType<ShortcutEditor>().First();
 
         ShowHotkeyAvailability(new EditorResponse(true, null, System.Text.Json.Nodes.JsonNode.Parse("{\"unavailableHotkeys\":[\"Control+Alt+F9\"]}")!));
-        Assert(Descendants(mainShortcut).OfType<TextBlock>().Any(text => text.Text.Contains("Сочетание недоступно")), "registration failure missing next to field");
+        Assert(Descendants(mainShortcut).OfType<TextBlock>().Any(text => text.Text == L.Get("Editor_TheShortcutIsUnavailableAnother_920562")), "registration failure missing next to field");
         ShowHotkeyAvailability(new EditorResponse(true, null, System.Text.Json.Nodes.JsonNode.Parse("{\"unavailableHotkeys\":[]}")!));
-        Assert(!Descendants(mainShortcut).OfType<TextBlock>().Any(text => text.Text.Contains("Сочетание недоступно")), "stale registration failure retained");
+        Assert(!Descendants(mainShortcut).OfType<TextBlock>().Any(text => text.Text == L.Get("Editor_TheShortcutIsUnavailableAnother_920562")), "stale registration failure retained");
 
         Assert(FindHotkeyConflict("Ctrl+Shift+K", null, true)?.Contains("Конфликт") == true, "modifier aliases not normalized");
         void Assert(bool condition, string message) { if (!condition) throw new Exception("Shortcut UX: " + message); }
