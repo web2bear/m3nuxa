@@ -15,10 +15,12 @@ public partial class App : Application
             MainWindow = new Window { Title = "m3nuxa — проверка дерева" };
             MainWindow.AppWindow.Resize(new Windows.Graphics.SizeInt32(1160, 780));
             var displays = Microsoft.UI.Windowing.DisplayArea.FindAll();
+            Microsoft.UI.Windowing.DisplayArea? additionalDisplay = null;
             for (var index = 0; index < displays.Count; index++)
             {
                 var display = displays[index];
                 if (display.IsPrimary) continue;
+                additionalDisplay = display;
                 MainWindow.AppWindow.Move(new Windows.Graphics.PointInt32(display.WorkArea.X + 40, display.WorkArea.Y + 40));
                 break;
             }
@@ -27,6 +29,15 @@ public partial class App : Application
             MainWindow.Content = page;
             MainWindow.Activate();
             await Task.Delay(100);
+            if (additionalDisplay is not null)
+            {
+                var work = additionalDisplay.WorkArea;
+                var position = MainWindow.AppWindow.Position;
+                var size = MainWindow.AppWindow.Size;
+                if (position.X < work.X || position.Y < work.Y || position.X + size.Width > work.X + work.Width || position.Y + size.Height > work.Y + work.Height)
+                    throw new Exception($"Check window is outside the additional screen work area: {position.X},{position.Y}, {size.Width}x{size.Height}.");
+            }
+            page.CheckLocalization();
             if (Environment.GetEnvironmentVariable("m3nuxa_DROP_CHECK") is { } snapshotPath)
             {
                 page.SetupDropChecks();

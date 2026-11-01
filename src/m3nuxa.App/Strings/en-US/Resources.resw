@@ -1,0 +1,273 @@
+<?xml version='1.0' encoding='utf-8'?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="ActionCancelled" xml:space="preserve">
+    <value> The operation was cancelled; completed moves were kept.</value>
+  </data>
+  <data name="ActionDestinationUnavailable" xml:space="preserve">
+    <value>Destination folder is unavailable: {0}</value>
+  </data>
+  <data name="ActionDone" xml:space="preserve">
+    <value>Done</value>
+  </data>
+  <data name="ActionFailed" xml:space="preserve">
+    <value>Action failed</value>
+  </data>
+  <data name="ActionFileResult" xml:space="preserve">
+    <value>File operation result</value>
+  </data>
+  <data name="ActionFileUnavailablePath" xml:space="preserve">
+    <value>File is unavailable: {0}</value>
+  </data>
+  <data name="ActionFileUnavailableTarget" xml:space="preserve">
+    <value>File is unavailable: {0}</value>
+  </data>
+  <data name="ActionFolderUnavailable" xml:space="preserve">
+    <value>Folder is unavailable: {0}</value>
+  </data>
+  <data name="ActionMissingContext" xml:space="preserve">
+    <value>Context is unavailable: {0}.</value>
+  </data>
+  <data name="ActionNestedFolder" xml:space="preserve">
+    <value>A folder cannot be copied into itself.</value>
+  </data>
+  <data name="ActionNoSelection" xml:space="preserve">
+    <value>No files or folders are selected in the source Explorer window.</value>
+  </data>
+  <data name="ActionPathRequired" xml:space="preserve">
+    <value>A required path was not specified.</value>
+  </data>
+  <data name="ActionPathsMissing" xml:space="preserve">
+    <value>There are no selected Explorer paths.</value>
+  </data>
+  <data name="ActionSamePath" xml:space="preserve">
+    <value>The source and destination are the same.</value>
+  </data>
+  <data name="ActionScriptType" xml:space="preserve">
+    <value>Only BAT, CMD and PS1 scripts are supported.</value>
+  </data>
+  <data name="ActionSelectedPathsArgument" xml:space="preserve">
+    <value>{selectedPaths} is allowed only as a separate argument.</value>
+  </data>
+  <data name="ActionShortcutFocusFailed" xml:space="preserve">
+    <value>Could not focus the source window. The shortcut was not sent.</value>
+  </data>
+  <data name="ActionShortcutMissing" xml:space="preserve">
+    <value>No shortcut was specified.</value>
+  </data>
+  <data name="ActionSnippetEmpty" xml:space="preserve">
+    <value>The snippet text is empty.</value>
+  </data>
+  <data name="ActionSourceUnavailable" xml:space="preserve">
+    <value>The source item is unavailable.</value>
+  </data>
+  <data name="ActionSourceWindowClosed" xml:space="preserve">
+    <value>The source window has already closed.</value>
+  </data>
+  <data name="ActionStartFailed" xml:space="preserve">
+    <value>Could not start the process.</value>
+  </data>
+  <data name="ActionSummary" xml:space="preserve">
+    <value>Succeeded: {0}; skipped: {1}; errors: {2}.</value>
+  </data>
+  <data name="ActionTargetIsFile" xml:space="preserve">
+    <value>The destination is a file but the source is a folder.</value>
+  </data>
+  <data name="ActionTargetIsFolder" xml:space="preserve">
+    <value>The destination is a folder but the source is a file.</value>
+  </data>
+  <data name="ActionTextFocusFailed" xml:space="preserve">
+    <value>Could not focus the source window. The text was not sent.</value>
+  </data>
+  <data name="ActionUnclosedQuote" xml:space="preserve">
+    <value>An argument has an unclosed quotation mark.</value>
+  </data>
+  <data name="ActionUnknown" xml:space="preserve">
+    <value>Unknown action type.</value>
+  </data>
+  <data name="ActionUnknownVariable" xml:space="preserve">
+    <value>Unknown variable: {0}</value>
+  </data>
+  <data name="ActionWorkingFolderUnavailable" xml:space="preserve">
+    <value>Working folder is unavailable: {0}</value>
+  </data>
+  <data name="AppCreateConfigFailed" xml:space="preserve">
+    <value>Could not create the configuration next to the application.</value>
+  </data>
+  <data name="AppInvalidConfig" xml:space="preserve">
+    <value>Error in file {0}:
+{1}
+
+Yes — open the file for editing.
+No — create an empty configuration and save a copy of the invalid file.
+Cancel — exit.</value>
+  </data>
+  <data name="ContextCurrentFolder" xml:space="preserve">
+    <value>current Explorer folder</value>
+  </data>
+  <data name="ContextSelectedPath" xml:space="preserve">
+    <value>selected path</value>
+  </data>
+  <data name="ContextSelectedText" xml:space="preserve">
+    <value>selected text: this feature is not available yet</value>
+  </data>
+  <data name="FileConflictExists" xml:space="preserve">
+    <value>An item already exists:
+{0}</value>
+  </data>
+  <data name="FileConflictReplace" xml:space="preserve">
+    <value>Replace</value>
+  </data>
+  <data name="FileConflictSkip" xml:space="preserve">
+    <value>Skip</value>
+  </data>
+  <data name="FileConflictTitle" xml:space="preserve">
+    <value>Name conflict</value>
+  </data>
+  <data name="FileOperationCancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="FileOperationTitle" xml:space="preserve">
+    <value>File operation</value>
+  </data>
+  <data name="KeyboardInsertFailed" xml:space="preserve">
+    <value>Could not insert all of the text.</value>
+  </data>
+  <data name="KeyboardInvalidShortcut" xml:space="preserve">
+    <value>Invalid shortcut.</value>
+  </data>
+  <data name="KeyboardSendFailed" xml:space="preserve">
+    <value>Could not send the shortcut.</value>
+  </data>
+  <data name="SettingsCaptureInEditor" xml:space="preserve">
+    <value>Finish recording the shortcut in the editor.</value>
+  </data>
+  <data name="SettingsHotkeyConflict" xml:space="preserve">
+    <value>This shortcut is already assigned to a menu item.</value>
+  </data>
+  <data name="SettingsHotkeyUnavailable" xml:space="preserve">
+    <value>This shortcut is in use by another application or reserved by Windows. The previous shortcut was retained.</value>
+  </data>
+  <data name="TrayCopyMcp" xml:space="preserve">
+    <value>Copy MCP address</value>
+  </data>
+  <data name="TrayEditor" xml:space="preserve">
+    <value>Edit configuration</value>
+  </data>
+  <data name="TrayEditorMissing" xml:space="preserve">
+    <value>The WinUI 3 editor was not found: {0}</value>
+  </data>
+  <data name="TrayEmptyMenu" xml:space="preserve">
+    <value>The menu is empty</value>
+  </data>
+  <data name="TrayExit" xml:space="preserve">
+    <value>Exit</value>
+  </data>
+  <data name="TrayHotkeysUnavailable" xml:space="preserve">
+    <value>Shortcuts are unavailable</value>
+  </data>
+  <data name="TrayMcp" xml:space="preserve">
+    <value>MCP HTTP server</value>
+  </data>
+  <data name="TrayPipeNotReady" xml:space="preserve">
+    <value>The editor connection is not ready.</value>
+  </data>
+  <data name="TrayReload" xml:space="preserve">
+    <value>Reload configuration</value>
+  </data>
+  <data name="TrayReloadFailed" xml:space="preserve">
+    <value>Could not load the configuration.</value>
+  </data>
+  <data name="TraySettings" xml:space="preserve">
+    <value>Settings…</value>
+  </data>
+  <data name="TrayStartup" xml:space="preserve">
+    <value>Start with Windows</value>
+  </data>
+  <data name="ConfigDraftOverwrite" xml:space="preserve">
+    <value>A draft cannot overwrite the active configuration.</value>
+  </data>
+  <data name="ConfigDraftStale" xml:space="preserve">
+    <value>The draft is out of date. Save it separately or load the current configuration.</value>
+  </data>
+  <data name="ConfigChangedOutside" xml:space="preserve">
+    <value>The configuration file has changed externally. Reload it before applying changes.</value>
+  </data>
+  <data name="ConfigJsonEmpty" xml:space="preserve">
+    <value>The JSON does not contain a configuration.</value>
+  </data>
+  <data name="ConfigSchemaUnsupported" xml:space="preserve">
+    <value>Unsupported schema version.</value>
+  </data>
+  <data name="ConfigTreeMissing" xml:space="preserve">
+    <value>The menu tree is missing.</value>
+  </data>
+  <data name="ConfigInvalidMainShortcut" xml:space="preserve">
+    <value>Main menu: invalid shortcut.</value>
+  </data>
+  <data name="ConfigMenu" xml:space="preserve">
+    <value>Menu</value>
+  </data>
+  <data name="ConfigEmptyItem" xml:space="preserve">
+    <value>{0}: empty item.</value>
+  </data>
+  <data name="ConfigDuplicateId" xml:space="preserve">
+    <value>{0}: empty or duplicate ID.</value>
+  </data>
+  <data name="ConfigUnknownKind" xml:space="preserve">
+    <value>{0}: unknown item type.</value>
+  </data>
+  <data name="ConfigNameRequired" xml:space="preserve">
+    <value>{0}: a name is required.</value>
+  </data>
+  <data name="ConfigSeparatorHotkey" xml:space="preserve">
+    <value>{0}: a separator cannot have a shortcut.</value>
+  </data>
+  <data name="ConfigInvalidHotkey" xml:space="preserve">
+    <value>{0}: invalid shortcut.</value>
+  </data>
+  <data name="ConfigDuplicateHotkey" xml:space="preserve">
+    <value>{0}: duplicate shortcut.</value>
+  </data>
+  <data name="ConfigActionMissing" xml:space="preserve">
+    <value>{0}: the action is missing.</value>
+  </data>
+  <data name="ConfigActionOnNonAction" xml:space="preserve">
+    <value>{0}: only action items can contain an action.</value>
+  </data>
+  <data name="ConfigChildrenOnNonGroup" xml:space="preserve">
+    <value>{0}: only groups can contain child items.</value>
+  </data>
+  <data name="ConfigChildrenMissing" xml:space="preserve">
+    <value>{0}: the child item list is missing.</value>
+  </data>
+  <data name="ConfigUnknownAction" xml:space="preserve">
+    <value>{0}: unknown action.</value>
+  </data>
+  <data name="ConfigShortcutRequired" xml:space="preserve">
+    <value>{0}: a shortcut to send is required.</value>
+  </data>
+  <data name="ConfigShortcutInvalid" xml:space="preserve">
+    <value>{0}: invalid shortcut to send.</value>
+  </data>
+  <data name="ConfigSnippetRequired" xml:space="preserve">
+    <value>{0}: snippet text is required.</value>
+  </data>
+  <data name="ConfigPathRequired" xml:space="preserve">
+    <value>{0}: a path is required.</value>
+  </data>
+  <data name="ConfigPathUnavailable" xml:space="preserve">
+    <value>{0}: path is currently unavailable: {1}</value>
+  </data>
+</root>

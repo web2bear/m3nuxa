@@ -5,6 +5,18 @@ namespace m3nuxa.Editor.Views;
 
 public sealed partial class MainPage
 {
+    internal void CheckLocalization()
+    {
+        var expectedLanguage = Environment.GetEnvironmentVariable("m3nuxa_CHECK_LANGUAGE") ?? "en-US";
+        if (L.Language != expectedLanguage) throw new Exception($"Expected language {expectedLanguage}, got {L.Language}.");
+        var expectedApply = expectedLanguage == "ru-RU" ? "Применить" : "Apply";
+        var expectedPath = expectedLanguage == "ru-RU" ? "Путь" : "Path";
+        if (L.Get("Editor_Apply_768af6") != expectedApply || ApplyButton.Label != expectedApply)
+            throw new Exception("The localized Apply resource was not loaded into XAML.");
+        if (L.Get("Editor_Path_1b46c6") != expectedPath)
+            throw new Exception("The localized Path resource was not loaded from the editor PRI.");
+    }
+
     internal void SetupDropChecks()
     {
         config = new AppConfig { Items = [new MenuNode { Name = "Drop group", Kind = MenuNodeKind.Group }] };
@@ -103,7 +115,7 @@ public sealed partial class MainPage
             if (dirty != expected || ApplyButton.IsEnabled != expected || ApplyMenuItem.IsEnabled != expected)
                 throw new Exception($"Apply availability is wrong {stage}.");
             var tooltip = ToolTipService.GetToolTip(ApplyButton) as string;
-            if (tooltip != (expected ? "Есть несохранённые изменения. Применить их." : "Нет изменений для применения"))
+            if (tooltip != L.Get(expected ? "Editor_ThereAreUnsavedChangesApply_226d2b" : "Editor_NoChangesToApply_fefed9"))
                 throw new Exception($"Apply tooltip is wrong {stage}: {tooltip}.");
         }
     }

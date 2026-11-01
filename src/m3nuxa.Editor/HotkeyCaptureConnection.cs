@@ -1,3 +1,4 @@
+using m3nuxa.App;
 using System.Diagnostics;
 using System.IO.Pipes;
 
@@ -31,20 +32,20 @@ internal sealed class HotkeyCaptureConnection : IDisposable
                     connection = new HotkeyCaptureConnection(pipe);
                     await connection.writer.WriteLineAsync("{\"operation\":\"captureHotkeys\"}");
                     var response = await connection.reader.ReadLineAsync(timeout.Token);
-                    if (response != "{}") throw new IOException("Приложение в трее не поддерживает запись сочетаний. Перезапустите обновлённую версию.");
+                    if (response != "{}") throw new IOException(L.Get("Editor_TheTrayApplicationDoesNot_3ebdc0"));
                     return connection;
                 }
                 catch (Exception ex) when (ex is IOException or OperationCanceledException)
                 { connection?.Dispose(); pipe.Dispose(); }
             }
         }
-        throw new IOException("Не удалось приостановить горячие клавиши. Проверьте, что обновлённое приложение запущено в трее.");
+        throw new IOException(L.Get("Editor_CouldNotSuspendHotkeysCheck_871b0b"));
     }
     public async Task CompleteAsync()
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
         await writer.WriteLineAsync("stop");
-        if (await reader.ReadLineAsync(timeout.Token) is null) throw new IOException("Соединение с приложением в трее закрыто.");
+        if (await reader.ReadLineAsync(timeout.Token) is null) throw new IOException(L.Get("Editor_TheConnectionToTheTray_0e8bf1"));
     }
     public void Dispose()
     {

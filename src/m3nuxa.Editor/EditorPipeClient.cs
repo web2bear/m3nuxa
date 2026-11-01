@@ -29,12 +29,12 @@ public sealed class EditorPipeClient
 
         var appPath = Path.Combine(AppContext.BaseDirectory, "m3nuxa.App.exe");
         if (!File.Exists(appPath))
-            return new(false, "m3nuxa.App.exe не найден рядом с редактором. Запустите приложение из общей папки публикации.", null);
+            return new(false, L.Get("Editor_M3nuxaAppExeWasNot_0fc811"), null);
 
         try
         {
             using var app = Process.Start(new ProcessStartInfo(appPath) { UseShellExecute = true });
-            if (app is null) return new(false, "Не удалось запустить m3nuxa.App.exe.", null);
+            if (app is null) return new(false, L.Get("Editor_CouldNotStartM3nuxaApp_943810"), null);
             for (var attempt = 0; attempt < 5; attempt++)
             {
                 await Task.Delay(300);
@@ -43,7 +43,7 @@ public sealed class EditorPipeClient
                 if (app.HasExited) break;
             }
         }
-        catch (Exception ex) { return new(false, $"Не удалось запустить m3nuxa.App.exe: {ex.Message}", null); }
+        catch (Exception ex) { return new(false, L.Format("Editor_CouldNotStartM3nuxaApp_a59277", ex.Message), null); }
         return response;
     }
     public Task<EditorResponse> ReadAsync() => SendAsync("read");
@@ -87,7 +87,7 @@ public sealed class EditorPipeClient
                     using var writer = new StreamWriter(pipe, leaveOpen: true) { AutoFlush = true };
                     await writer.WriteLineAsync(request.ToJsonString());
                     var response = await reader.ReadLineAsync(timeout.Token);
-                    if (response is null) return new(false, "Приложение в трее закрыло соединение.", null);
+                    if (response is null) return new(false, L.Get("Editor_TheTrayApplicationClosedThe_20a486"), null);
                     var data = JsonNode.Parse(response);
                     DevLog.Write("editor-pipe", $"Received {operation} response");
                     var error = data?["error"]?.GetValue<string>();
@@ -107,6 +107,6 @@ public sealed class EditorPipeClient
             foreach (var process in processes) process.Dispose();
         }
         DevLog.Write("editor-pipe", $"No tray process answered {operation}");
-        return new(false, "m3nuxa в трее не запущен или не отвечает.", null);
+        return new(false, L.Get("Editor_M3nuxaIsNotRunningIn_b77de2"), null);
     }
 }

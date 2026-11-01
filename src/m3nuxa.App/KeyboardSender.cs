@@ -4,7 +4,7 @@ internal static class KeyboardSender
 {
     internal static void Send(string shortcut)
     {
-        if (!HotkeyParser.TryParse(shortcut, out var modifiers, out var key)) throw new InvalidOperationException("Некорректное сочетание.");
+        if (!HotkeyParser.TryParse(shortcut, out var modifiers, out var key)) throw new InvalidOperationException(L.Get("KeyboardInvalidShortcut"));
         var keys = new List<ushort>();
         if ((modifiers & 2) != 0) keys.Add(0x11);
         if ((modifiers & 1) != 0) keys.Add(0x12);
@@ -16,7 +16,7 @@ internal static class KeyboardSender
         {
             var release = keys.AsEnumerable().Reverse().Select(k => Input.Create(k, 2)).ToArray();
             SendInput((uint)release.Length, release, Marshal.SizeOf<Input>());
-            throw new InvalidOperationException("Не удалось отправить сочетание.");
+            throw new InvalidOperationException(L.Get("KeyboardSendFailed"));
         }
     }
     internal static void InsertText(string text)
@@ -26,7 +26,7 @@ internal static class KeyboardSender
             var down = Input.Create(0, 4); down.Data.Keyboard.Scan = character;
             var up = Input.Create(0, 6); up.Data.Keyboard.Scan = character;
             var pair = new[] { down, up };
-            if (SendInput(2, pair, Marshal.SizeOf<Input>()) != 2) throw new InvalidOperationException("Не удалось вставить весь текст.");
+            if (SendInput(2, pair, Marshal.SizeOf<Input>()) != 2) throw new InvalidOperationException(L.Get("KeyboardInsertFailed"));
         }
     }
     [StructLayout(LayoutKind.Sequential)] private struct Input

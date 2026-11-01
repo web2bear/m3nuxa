@@ -1,0 +1,78 @@
+<?xml version='1.0' encoding='utf-8'?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms</value>
+  </resheader>
+  <data name="Edit" xml:space="preserve">
+    <value>Изменить</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>Отмена</value>
+  </data>
+  <data name="Sample" xml:space="preserve">
+    <value>Пример пункта меню</value>
+  </data>
+  <data name="Language" xml:space="preserve">
+    <value>Язык</value>
+  </data>
+  <data name="WindowTitle" xml:space="preserve">
+    <value>m3nuxa — настройки</value>
+  </data>
+  <data name="Title" xml:space="preserve">
+    <value>Настройки</value>
+  </data>
+  <data name="AutomaticSave" xml:space="preserve">
+    <value>Изменения сохраняются автоматически</value>
+  </data>
+  <data name="Shortcut" xml:space="preserve">
+    <value>Сочетание вызова меню</value>
+  </data>
+  <data name="Clear" xml:space="preserve">
+    <value>Убрать сочетание</value>
+  </data>
+  <data name="FontSize" xml:space="preserve">
+    <value>Размер шрифта меню</value>
+  </data>
+  <data name="ShowMenu" xml:space="preserve">
+    <value>Показать меню</value>
+  </data>
+  <data name="Close" xml:space="preserve">
+    <value>Закрыть</value>
+  </data>
+  <data name="NotAssigned" xml:space="preserve">
+    <value>Не назначено</value>
+  </data>
+  <data name="Saved" xml:space="preserve">
+    <value>Сохранено</value>
+  </data>
+  <data name="RestartRequired" xml:space="preserve">
+    <value>Сохранено. Перезапустите m3nuxa и редактор, чтобы изменить язык.</value>
+  </data>
+  <data name="PressShortcut" xml:space="preserve">
+    <value>Нажмите сочетание…</value>
+  </data>
+  <data name="ReleaseKeys" xml:space="preserve">
+    <value>Отпустите клавиши для записи. Esc — отмена.</value>
+  </data>
+  <data name="EmptyFile" xml:space="preserve">
+    <value>Файл настроек пуст.</value>
+  </data>
+  <data name="InvalidShortcut" xml:space="preserve">
+    <value>Некорректное сочетание вызова меню.</value>
+  </data>
+  <data name="InvalidFontSize" xml:space="preserve">
+    <value>Размер шрифта должен быть от 10 до 24.</value>
+  </data>
+  <data name="EditorRestartRequired" xml:space="preserve">
+    <value>Язык изменён. Откройте редактор заново, чтобы обновить его язык.</value>
+  </data>
+</root>

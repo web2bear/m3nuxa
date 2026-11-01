@@ -18,6 +18,15 @@ public partial class App : Application
         TrayApplication? tray = null;
         try
         {
+            var russian = L.Language == "ru-RU";
+            if (L.Get("TrayExit") != (russian ? "Выход" : "Exit")) throw new Exception("Wrong language in launcher PRI");
+            if (L.Get("Settings/Cancel") != (russian ? "Отмена" : "Cancel")) throw new Exception("Wrong language in settings PRI");
+            if (L.Get("Fallback/EnglishOnly") != "English fallback") throw new Exception("English fallback did not resolve");
+            if (Environment.GetEnvironmentVariable("M3NUXA_RESOURCE_CHECK_ONLY") == "1")
+            {
+                await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, "result.txt"), "PASS: resource languages and English fallback");
+                Environment.Exit(0);
+            }
             var config = new ConfigStore(Path.Combine(root, "config.json"));
             tray = new TrayApplication(config);
             await CheckSettingsAsync(tray, config);

@@ -10,8 +10,8 @@ internal sealed class ShortcutEditor : StackPanel
 {
     private readonly TextBlock valueText = new() { VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap };
     private readonly Button edit = new();
-    private readonly Button clear = new() { Content = "Убрать" };
-    private readonly Button cancel = new() { Content = "Отмена", Visibility = Visibility.Collapsed };
+    private readonly Button clear = new() { Content = L.Get("Editor_Clear_9c7449") };
+    private readonly Button cancel = new() { Content = L.Get("Editor_Cancel_0ec753"), Visibility = Visibility.Collapsed };
     private readonly TextBlock status = new() { TextWrapping = TextWrapping.Wrap, FontSize = 12, Visibility = Visibility.Collapsed };
     private readonly Func<string> getValue;
     private readonly Action<string> setValue;
@@ -39,11 +39,11 @@ internal sealed class ShortcutEditor : StackPanel
         Children.Add(new TextBlock { Text = help, TextWrapping = TextWrapping.Wrap, FontSize = 12, Opacity = .65 });
         Children.Add(status);
         AutomationProperties.SetAutomationId(edit, id + "Edit");
-        AutomationProperties.SetName(edit, "Изменить: " + label);
+        AutomationProperties.SetName(edit, L.Get("Editor_Change_d06470") + label);
         AutomationProperties.SetAutomationId(clear, id + "Clear");
-        AutomationProperties.SetName(clear, "Убрать: " + label);
+        AutomationProperties.SetName(clear, L.Get("Editor_Clear_f61ac5") + label);
         AutomationProperties.SetAutomationId(cancel, id + "Cancel");
-        AutomationProperties.SetName(cancel, "Отменить запись: " + label);
+        AutomationProperties.SetName(cancel, L.Get("Editor_CancelRecording_bd0b25") + label);
         AutomationProperties.SetAutomationId(valueText, id + "Value");
         AutomationProperties.SetAutomationId(status, id + "Status");
         AutomationProperties.SetLiveSetting(status, AutomationLiveSetting.Polite);
@@ -71,8 +71,8 @@ internal sealed class ShortcutEditor : StackPanel
     internal void Refresh()
     {
         var value = getValue();
-        valueText.Text = string.IsNullOrWhiteSpace(value) ? "Не назначено" : value.Replace("+", " + ");
-        edit.Content = string.IsNullOrWhiteSpace(value) ? "Назначить" : "Изменить";
+        valueText.Text = string.IsNullOrWhiteSpace(value) ? L.Get("Editor_NotAssigned_bd9326") : value.Replace("+", " + ");
+        edit.Content = string.IsNullOrWhiteSpace(value) ? L.Get("Editor_Assign_fe1285") : L.Get("Editor_Change_9d809f");
         clear.Visibility = string.IsNullOrWhiteSpace(value) || recording ? Visibility.Collapsed : Visibility.Visible;
     }
     internal void SetError(string? message)
@@ -91,22 +91,22 @@ internal sealed class ShortcutEditor : StackPanel
         cancel.Visibility = Visibility.Visible;
         cancel.Focus(FocusState.Programmatic);
         edit.IsEnabled = false; edit.Visibility = Visibility.Collapsed; clear.Visibility = Visibility.Collapsed;
-        valueText.Text = "Подготовка…";
+        valueText.Text = L.Get("Editor_Preparing_bd54fe");
         try
         {
             var opened = await HotkeyCaptureConnection.OpenAsync();
             if (!recording || version != generation || !IsLoaded) { opened.Dispose(); return; }
             connection = opened;
             cancel.Focus(FocusState.Programmatic);
-            valueText.Text = "Нажмите новое сочетание…";
-            status.Text = "Отпустите клавиши для записи. Esc — отмена.";
+            valueText.Text = L.Get("Editor_PressANewShortcut_379ccc");
+            status.Text = L.Get("Editor_ReleaseTheKeysToRecord_3239a3");
             status.Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
             status.Visibility = Visibility.Visible;
             capture = new KeyboardCapture(App.MainWindow, (value, complete) => DispatcherQueue.TryEnqueue(async () =>
             {
                 if (!recording || version != generation) return;
                 if (complete) { DevLog.Write("shortcut", value is null ? "Keyboard capture canceled" : "Keyboard capture completed"); await StopAsync(value); }
-                else valueText.Text = value is null ? "Нажмите новое сочетание…" : value.Length == 0 ? "Нужно одно сочетание" : value.Replace("+", " + ");
+                else valueText.Text = value is null ? L.Get("Editor_PressANewShortcut_379ccc") : value.Length == 0 ? L.Get("Editor_OneShortcutIsRequired_8480d7") : value.Replace("+", " + ");
             }));
         }
         catch (Exception ex) { await StopAsync(); SetError(ex.Message); }
@@ -121,12 +121,12 @@ internal sealed class ShortcutEditor : StackPanel
         if (opened is not null)
         {
             try { await opened.CompleteAsync(); }
-            catch (Exception ex) { error = "Не удалось подтвердить восстановление горячих клавиш: " + ex.Message; }
+            catch (Exception ex) { error = L.Get("Editor_CouldNotConfirmHotkeysWere_c43cf6") + ex.Message; }
             finally { opened.Dispose(); }
         }
         if (candidate is not null && error is null)
         {
-            if (!HotkeyParser.TryParse(candidate, out _, out _)) error = "Нажмите сочетание с одной основной клавишей.";
+            if (!HotkeyParser.TryParse(candidate, out _, out _)) error = L.Get("Editor_PressAShortcutWithOne_f1ed8c");
             else error = validate(candidate);
             if (error is null && candidate != getValue()) setValue(candidate);
         }

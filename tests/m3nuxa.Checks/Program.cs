@@ -5,6 +5,7 @@ var root = Path.Combine(Path.GetTempPath(), "m3nuxa-checks-" + Guid.NewGuid().To
 Directory.CreateDirectory(root);
 try
 {
+    LocalizationChecks.Run();
     var path = Path.Combine(root, "config.json");
     var store = new ConfigStore(path);
     var legacyPath = Path.Combine(root, "legacy.json");
@@ -13,7 +14,12 @@ try
     var settingsPath = Path.Combine(root, "settings.json");
     var settings = new SettingsStore(settingsPath, "Ctrl+Shift+F8");
     Check(settings.Current.MainHotkey == "Ctrl+Shift+F8", "legacy global shortcut migrated");
-    settings.Save(settings.Current with { MainHotkey = "Ctrl+Alt+F9", MenuFontSize = 16 });
+    Check(settings.Current.Language == "en-US", "default language is English");
+    File.WriteAllText(settingsPath, "{\"MainHotkey\":\"Ctrl+Shift+F8\",\"MenuFontSize\":12}");
+    Check(new SettingsStore(settingsPath, "").Current.Language == "en-US", "legacy settings default to English");
+    File.WriteAllText(settingsPath, "{\"Language\":\"unknown\"}");
+    Check(new SettingsStore(settingsPath, "").Current.Language == "en-US", "unsupported language falls back to English");
+    settings.Save(settings.Current with { MainHotkey = "Ctrl+Alt+F9", MenuFontSize = 16, Language = "ru-RU" });
     Check(new SettingsStore(settingsPath, "Ctrl+Shift+F8").Current == settings.Current, "settings survive restart and migration does not overwrite");
     store.GlobalHotkey = () => settings.Current.MainHotkey;
     var settingsDraft = store.CreateDraft();

@@ -1,0 +1,273 @@
+<?xml version='1.0' encoding='utf-8'?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="ActionCancelled" xml:space="preserve">
+    <value> Операция отменена; уже выполненные перемещения сохранены.</value>
+  </data>
+  <data name="ActionDestinationUnavailable" xml:space="preserve">
+    <value>Папка назначения недоступна: {0}</value>
+  </data>
+  <data name="ActionDone" xml:space="preserve">
+    <value>Готово</value>
+  </data>
+  <data name="ActionFailed" xml:space="preserve">
+    <value>Действие не выполнено</value>
+  </data>
+  <data name="ActionFileResult" xml:space="preserve">
+    <value>Результат файловой операции</value>
+  </data>
+  <data name="ActionFileUnavailablePath" xml:space="preserve">
+    <value>Файл недоступен: {0}</value>
+  </data>
+  <data name="ActionFileUnavailableTarget" xml:space="preserve">
+    <value>Файл недоступен: {0}</value>
+  </data>
+  <data name="ActionFolderUnavailable" xml:space="preserve">
+    <value>Папка недоступна: {0}</value>
+  </data>
+  <data name="ActionMissingContext" xml:space="preserve">
+    <value>Недоступен контекст: {0}.</value>
+  </data>
+  <data name="ActionNestedFolder" xml:space="preserve">
+    <value>Нельзя копировать папку внутрь самой себя.</value>
+  </data>
+  <data name="ActionNoSelection" xml:space="preserve">
+    <value>В исходном окне Проводника нет выделенных файлов или папок.</value>
+  </data>
+  <data name="ActionPathRequired" xml:space="preserve">
+    <value>Не указан обязательный путь.</value>
+  </data>
+  <data name="ActionPathsMissing" xml:space="preserve">
+    <value>Нет выбранных путей Проводника.</value>
+  </data>
+  <data name="ActionSamePath" xml:space="preserve">
+    <value>Исходный объект и назначение совпадают.</value>
+  </data>
+  <data name="ActionScriptType" xml:space="preserve">
+    <value>Поддерживаются скрипты BAT, CMD и PS1.</value>
+  </data>
+  <data name="ActionSelectedPathsArgument" xml:space="preserve">
+    <value>{selectedPaths} разрешён только как отдельный аргумент.</value>
+  </data>
+  <data name="ActionShortcutFocusFailed" xml:space="preserve">
+    <value>Не удалось вернуть фокус исходному окну. Сочетание не отправлено.</value>
+  </data>
+  <data name="ActionShortcutMissing" xml:space="preserve">
+    <value>Сочетание не задано.</value>
+  </data>
+  <data name="ActionSnippetEmpty" xml:space="preserve">
+    <value>Текст сниппета пуст.</value>
+  </data>
+  <data name="ActionSourceUnavailable" xml:space="preserve">
+    <value>Исходный объект недоступен.</value>
+  </data>
+  <data name="ActionSourceWindowClosed" xml:space="preserve">
+    <value>Исходное окно уже закрыто.</value>
+  </data>
+  <data name="ActionStartFailed" xml:space="preserve">
+    <value>Не удалось запустить процесс.</value>
+  </data>
+  <data name="ActionSummary" xml:space="preserve">
+    <value>Успешно: {0}; пропущено: {1}; ошибок: {2}.</value>
+  </data>
+  <data name="ActionTargetIsFile" xml:space="preserve">
+    <value>Назначение является файлом, а источник папкой.</value>
+  </data>
+  <data name="ActionTargetIsFolder" xml:space="preserve">
+    <value>Назначение является папкой, а источник файлом.</value>
+  </data>
+  <data name="ActionTextFocusFailed" xml:space="preserve">
+    <value>Не удалось вернуть фокус исходному окну. Текст не отправлен.</value>
+  </data>
+  <data name="ActionUnclosedQuote" xml:space="preserve">
+    <value>Не закрыта кавычка в аргументах.</value>
+  </data>
+  <data name="ActionUnknown" xml:space="preserve">
+    <value>Неизвестный тип действия.</value>
+  </data>
+  <data name="ActionUnknownVariable" xml:space="preserve">
+    <value>Неизвестная переменная: {0}</value>
+  </data>
+  <data name="ActionWorkingFolderUnavailable" xml:space="preserve">
+    <value>Рабочая папка недоступна: {0}</value>
+  </data>
+  <data name="AppCreateConfigFailed" xml:space="preserve">
+    <value>Не удалось создать конфигурацию рядом с приложением.</value>
+  </data>
+  <data name="AppInvalidConfig" xml:space="preserve">
+    <value>Ошибка в файле {0}:
+{1}
+
+Да — открыть файл для исправления.
+Нет — создать пустую конфигурацию с копией ошибочного файла.
+Отмена — выйти.</value>
+  </data>
+  <data name="ContextCurrentFolder" xml:space="preserve">
+    <value>текущая папка Проводника</value>
+  </data>
+  <data name="ContextSelectedPath" xml:space="preserve">
+    <value>выбранный путь</value>
+  </data>
+  <data name="ContextSelectedText" xml:space="preserve">
+    <value>выделенный текст: функция пока недоступна</value>
+  </data>
+  <data name="FileConflictExists" xml:space="preserve">
+    <value>Объект уже существует:
+{0}</value>
+  </data>
+  <data name="FileConflictReplace" xml:space="preserve">
+    <value>Заменить</value>
+  </data>
+  <data name="FileConflictSkip" xml:space="preserve">
+    <value>Пропустить</value>
+  </data>
+  <data name="FileConflictTitle" xml:space="preserve">
+    <value>Конфликт имён</value>
+  </data>
+  <data name="FileOperationCancel" xml:space="preserve">
+    <value>Отмена</value>
+  </data>
+  <data name="FileOperationTitle" xml:space="preserve">
+    <value>Файловая операция</value>
+  </data>
+  <data name="KeyboardInsertFailed" xml:space="preserve">
+    <value>Не удалось вставить весь текст.</value>
+  </data>
+  <data name="KeyboardInvalidShortcut" xml:space="preserve">
+    <value>Некорректное сочетание.</value>
+  </data>
+  <data name="KeyboardSendFailed" xml:space="preserve">
+    <value>Не удалось отправить сочетание.</value>
+  </data>
+  <data name="SettingsCaptureInEditor" xml:space="preserve">
+    <value>Завершите запись сочетания в редакторе.</value>
+  </data>
+  <data name="SettingsHotkeyConflict" xml:space="preserve">
+    <value>Сочетание уже назначено пункту меню.</value>
+  </data>
+  <data name="SettingsHotkeyUnavailable" xml:space="preserve">
+    <value>Сочетание занято другой программой или зарезервировано Windows. Прежнее назначение сохранено.</value>
+  </data>
+  <data name="TrayCopyMcp" xml:space="preserve">
+    <value>Копировать адрес MCP</value>
+  </data>
+  <data name="TrayEditor" xml:space="preserve">
+    <value>Редактор конфигурации</value>
+  </data>
+  <data name="TrayEditorMissing" xml:space="preserve">
+    <value>Редактор WinUI 3 не найден: {0}</value>
+  </data>
+  <data name="TrayEmptyMenu" xml:space="preserve">
+    <value>Меню пусто</value>
+  </data>
+  <data name="TrayExit" xml:space="preserve">
+    <value>Выход</value>
+  </data>
+  <data name="TrayHotkeysUnavailable" xml:space="preserve">
+    <value>Горячие клавиши недоступны</value>
+  </data>
+  <data name="TrayMcp" xml:space="preserve">
+    <value>MCP HTTP-сервер</value>
+  </data>
+  <data name="TrayPipeNotReady" xml:space="preserve">
+    <value>Редакторский канал ещё не готов.</value>
+  </data>
+  <data name="TrayReload" xml:space="preserve">
+    <value>Перезагрузить конфигурацию</value>
+  </data>
+  <data name="TrayReloadFailed" xml:space="preserve">
+    <value>Не удалось загрузить конфигурацию.</value>
+  </data>
+  <data name="TraySettings" xml:space="preserve">
+    <value>Настройки…</value>
+  </data>
+  <data name="TrayStartup" xml:space="preserve">
+    <value>Автозапуск</value>
+  </data>
+  <data name="ConfigDraftOverwrite" xml:space="preserve">
+    <value>Черновик нельзя записать поверх действующей конфигурации.</value>
+  </data>
+  <data name="ConfigDraftStale" xml:space="preserve">
+    <value>Черновик устарел. Сохраните его отдельно или загрузите актуальную конфигурацию.</value>
+  </data>
+  <data name="ConfigChangedOutside" xml:space="preserve">
+    <value>Файл конфигурации был изменён извне. Явно перезагрузите его перед применением.</value>
+  </data>
+  <data name="ConfigJsonEmpty" xml:space="preserve">
+    <value>JSON не содержит конфигурацию.</value>
+  </data>
+  <data name="ConfigSchemaUnsupported" xml:space="preserve">
+    <value>Неподдерживаемая версия схемы.</value>
+  </data>
+  <data name="ConfigTreeMissing" xml:space="preserve">
+    <value>Отсутствует дерево меню.</value>
+  </data>
+  <data name="ConfigInvalidMainShortcut" xml:space="preserve">
+    <value>Основное меню: некорректное сочетание клавиш.</value>
+  </data>
+  <data name="ConfigMenu" xml:space="preserve">
+    <value>Меню</value>
+  </data>
+  <data name="ConfigEmptyItem" xml:space="preserve">
+    <value>{0}: пустой пункт.</value>
+  </data>
+  <data name="ConfigDuplicateId" xml:space="preserve">
+    <value>{0}: пустой или повторяющийся ID.</value>
+  </data>
+  <data name="ConfigUnknownKind" xml:space="preserve">
+    <value>{0}: неизвестный тип пункта.</value>
+  </data>
+  <data name="ConfigNameRequired" xml:space="preserve">
+    <value>{0}: требуется имя.</value>
+  </data>
+  <data name="ConfigSeparatorHotkey" xml:space="preserve">
+    <value>{0}: разделителю нельзя назначить сочетание.</value>
+  </data>
+  <data name="ConfigInvalidHotkey" xml:space="preserve">
+    <value>{0}: некорректное сочетание клавиш.</value>
+  </data>
+  <data name="ConfigDuplicateHotkey" xml:space="preserve">
+    <value>{0}: повторяющееся сочетание.</value>
+  </data>
+  <data name="ConfigActionMissing" xml:space="preserve">
+    <value>{0}: отсутствует действие.</value>
+  </data>
+  <data name="ConfigActionOnNonAction" xml:space="preserve">
+    <value>{0}: действие допустимо только для пункта действия.</value>
+  </data>
+  <data name="ConfigChildrenOnNonGroup" xml:space="preserve">
+    <value>{0}: дочерние пункты допустимы только для группы.</value>
+  </data>
+  <data name="ConfigChildrenMissing" xml:space="preserve">
+    <value>{0}: отсутствует список дочерних пунктов.</value>
+  </data>
+  <data name="ConfigUnknownAction" xml:space="preserve">
+    <value>{0}: неизвестное действие.</value>
+  </data>
+  <data name="ConfigShortcutRequired" xml:space="preserve">
+    <value>{0}: требуется сочетание для отправки.</value>
+  </data>
+  <data name="ConfigShortcutInvalid" xml:space="preserve">
+    <value>{0}: некорректное сочетание для отправки.</value>
+  </data>
+  <data name="ConfigSnippetRequired" xml:space="preserve">
+    <value>{0}: требуется текст сниппета.</value>
+  </data>
+  <data name="ConfigPathRequired" xml:space="preserve">
+    <value>{0}: требуется путь.</value>
+  </data>
+  <data name="ConfigPathUnavailable" xml:space="preserve">
+    <value>{0}: путь сейчас недоступен: {1}</value>
+  </data>
+</root>

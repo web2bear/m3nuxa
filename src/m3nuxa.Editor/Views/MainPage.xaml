@@ -7,16 +7,16 @@
             <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
                 <TextBlock Text="m3nuxa" FontSize="22" FontWeight="SemiBold" VerticalAlignment="Center" />
                 <MenuBar VerticalAlignment="Center">
-                    <MenuBarItem Title="Файл">
-                        <MenuFlyoutItem x:Name="ApplyMenuItem" Text="Применить" IsEnabled="False" Click="ApplyClicked" />
-                        <MenuFlyoutItem Text="Загрузить конфигурацию…" Click="LoadClicked" />
-                        <MenuFlyoutItem Text="Перезагрузить" Click="ReloadClicked" />
+                    <MenuBarItem Title="{x:Bind Localize('Editor_File_94b8df')}">
+                        <MenuFlyoutItem x:Name="ApplyMenuItem" Text="{x:Bind Localize('Editor_Apply_768af6')}" IsEnabled="False" Click="ApplyClicked" />
+                        <MenuFlyoutItem Text="{x:Bind Localize('Editor_LoadConfiguration_0439e7')}" Click="LoadClicked" />
+                        <MenuFlyoutItem Text="{x:Bind Localize('Editor_Reload_942438')}" Click="ReloadClicked" />
                         <MenuFlyoutSeparator />
-                        <MenuFlyoutItem Text="Сохранить черновик отдельно…" Click="SaveClicked" />
+                        <MenuFlyoutItem Text="{x:Bind Localize('Editor_SaveDraftSeparately_23cefc')}" Click="SaveClicked" />
                     </MenuBarItem>
-                    <MenuBarItem Title="Правка">
-                        <MenuFlyoutItem Text="Отменить" Click="UndoClicked" />
-                        <MenuFlyoutItem Text="Повторить" Click="RedoClicked" />
+                    <MenuBarItem Title="{x:Bind Localize('Editor_Edit_1f62f0')}">
+                        <MenuFlyoutItem Text="{x:Bind Localize('Editor_Undo_555ad1')}" Click="UndoClicked" />
+                        <MenuFlyoutItem Text="{x:Bind Localize('Editor_Redo_9e506a')}" Click="RedoClicked" />
                     </MenuBarItem>
                 </MenuBar>
             </StackPanel>
@@ -24,32 +24,32 @@
 
         <Grid Grid.Row="1" Padding="8,0,8,4" ColumnDefinitions="Auto,*">
             <StackPanel Orientation="Horizontal">
-                <AppBarButton Icon="Add" Label="Создать" AutomationProperties.Name="Создать пункт меню">
+                <AppBarButton Icon="Add" Label="{x:Bind Localize('Editor_Create_84370a')}" AutomationProperties.Name="{x:Bind Localize('Editor_CreateMenuItem_b78a7d')}">
                     <AppBarButton.Flyout>
                         <MenuFlyout>
-                            <MenuFlyoutItem Text="Папка…" Click="AddFolderClicked" />
-                            <MenuFlyoutItem Text="Файл…" Click="AddFileClicked" />
+                            <MenuFlyoutItem Text="{x:Bind Localize('Editor_Folder_72cf46')}" Click="AddFolderClicked" />
+                            <MenuFlyoutItem Text="{x:Bind Localize('Editor_File_c1973e')}" Click="AddFileClicked" />
                             <MenuFlyoutSeparator />
-                            <MenuFlyoutItem Text="Действие" Click="AddActionClicked" />
-                            <MenuFlyoutItem Text="Сниппет" Click="AddSnippetClicked" />
-                            <MenuFlyoutItem Text="Группа" Click="AddGroupClicked" />
-                            <MenuFlyoutItem Text="Разделитель" Click="AddSeparatorClicked" />
+                            <MenuFlyoutItem Text="{x:Bind Localize('Editor_Action_4fe9c0')}" Click="AddActionClicked" />
+                            <MenuFlyoutItem Text="{x:Bind Localize('Editor_Snippet_720dc5')}" Click="AddSnippetClicked" />
+                            <MenuFlyoutItem Text="{x:Bind Localize('Editor_Group_ae8ad7')}" Click="AddGroupClicked" />
+                            <MenuFlyoutItem Text="{x:Bind Localize('Editor_Separator_afb9a7')}" Click="AddSeparatorClicked" />
                         </MenuFlyout>
                     </AppBarButton.Flyout>
                 </AppBarButton>
-                <AppBarButton x:Name="ApplyButton" Icon="Accept" Label="Применить" IsEnabled="False" ToolTipService.ToolTip="Нет изменений для применения" Click="ApplyClicked" />
-                <AppBarToggleButton x:Name="PinButton" Icon="Pin" Label="Поверх окон" AutomationProperties.Name="Закрепить редактор поверх окон" ToolTipService.ToolTip="Закрепить редактор поверх других окон" Click="PinClicked" />
+                <AppBarButton x:Name="ApplyButton" Icon="Accept" Label="{x:Bind Localize('Editor_Apply_768af6')}" IsEnabled="False" ToolTipService.ToolTip="{x:Bind Localize('Editor_NoChangesToApply_fefed9')}" Click="ApplyClicked" />
+                <AppBarToggleButton x:Name="PinButton" Icon="Pin" Label="{x:Bind Localize('Editor_AlwaysOnTop_1bee89')}" AutomationProperties.Name="{x:Bind Localize('Editor_KeepTheEditorOnTop_3e7cbb')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_KeepTheEditorAboveOther_eb06b1')}" Click="PinClicked" />
             </StackPanel>
             <CommandBar Grid.Column="1" Background="Transparent" DefaultLabelPosition="Collapsed" OverflowButtonVisibility="Auto">
-                <AppBarButton x:Name="CutButton" Icon="Cut" Label="Вырезать" Click="CutClicked" />
-                <AppBarButton x:Name="CopyButton" Icon="Copy" Label="Копировать" Click="CopyClicked" />
-                <AppBarButton Icon="Paste" Label="Вставить текст" AutomationProperties.Name="Создать сниппет из буфера обмена" Click="PasteTextClicked" />
-                <AppBarButton x:Name="PasteButton" Icon="Paste" Label="Вставить" Click="PasteClicked" />
-                <AppBarButton x:Name="RenameButton" Icon="Rename" Label="Переименовать" Click="RenameClicked" />
-                <AppBarButton x:Name="DuplicateButton" Icon="Copy" Label="Дублировать" Click="DuplicateClicked" />
-                <AppBarButton x:Name="DeleteButton" Icon="Delete" Label="Удалить" Click="DeleteClicked" />
+                <AppBarButton x:Name="CutButton" Icon="Cut" Label="{x:Bind Localize('Editor_Cut_1b696e')}" Click="CutClicked" />
+                <AppBarButton x:Name="CopyButton" Icon="Copy" Label="{x:Bind Localize('Editor_Copy_4a05d8')}" Click="CopyClicked" />
+                <AppBarButton Icon="Paste" Label="{x:Bind Localize('Editor_InsertText_9ebca7')}" AutomationProperties.Name="{x:Bind Localize('Editor_CreateASnippetFromThe_f97cea')}" Click="PasteTextClicked" />
+                <AppBarButton x:Name="PasteButton" Icon="Paste" Label="{x:Bind Localize('Editor_Insert_eeb8ca')}" Click="PasteClicked" />
+                <AppBarButton x:Name="RenameButton" Icon="Rename" Label="{x:Bind Localize('Editor_Rename_715e8f')}" Click="RenameClicked" />
+                <AppBarButton x:Name="DuplicateButton" Icon="Copy" Label="{x:Bind Localize('Editor_Duplicate_c9a345')}" Click="DuplicateClicked" />
+                <AppBarButton x:Name="DeleteButton" Icon="Delete" Label="{x:Bind Localize('Editor_Delete_86ea33')}" Click="DeleteClicked" />
                 <AppBarSeparator />
-                <AppBarButton Icon="Setting" Label="Настройки" AutomationProperties.AutomationId="OpenSettings" Click="SettingsClicked" />
+                <AppBarButton Icon="Setting" Label="{x:Bind Localize('Editor_Settings_7f17c7')}" AutomationProperties.AutomationId="OpenSettings" Click="SettingsClicked" />
             </CommandBar>
         </Grid>
 
@@ -61,7 +61,7 @@
             </Grid.ColumnDefinitions>
             <Grid x:Name="MenuPanel" Grid.Column="0" RowDefinitions="Auto,*,Auto" AllowDrop="True" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="12">
                 <StackPanel Padding="12,10,12,6" Spacing="4">
-                    <TextBlock Text="Порядок и вложенность пунктов" Opacity="0.6" FontSize="12" />
+                    <TextBlock Text="{x:Bind Localize('Editor_ItemOrderAndHierarchy_0718c3')}" Opacity="0.6" FontSize="12" />
                 </StackPanel>
                 <TreeView x:Name="MenuTree" Grid.Row="1" Margin="8,2,8,4" SelectionMode="Single"
                           CanDragItems="True" CanReorderItems="True" SelectionChanged="MenuTreeSelectionChanged"
@@ -73,17 +73,17 @@
                     </TreeView.ItemTemplate>
                     <TreeView.ContextFlyout>
                         <MenuFlyout>
-                            <MenuFlyoutItem Text="Дублировать" Click="DuplicateClicked" />
-                            <MenuFlyoutItem Text="Удалить" Click="DeleteClicked" />
+                            <MenuFlyoutItem Text="{x:Bind Localize('Editor_Duplicate_c9a345')}" Click="DuplicateClicked" />
+                            <MenuFlyoutItem Text="{x:Bind Localize('Editor_Delete_86ea33')}" Click="DeleteClicked" />
                         </MenuFlyout>
                     </TreeView.ContextFlyout>
                 </TreeView>
-                <TextBlock Grid.Row="2" x:Name="DropHint" Margin="12,6,12,10" Text="Перетащите файлы, папки или текст сюда" FontSize="12" Opacity="0.6" TextWrapping="Wrap" />
+                <TextBlock Grid.Row="2" x:Name="DropHint" Margin="12,6,12,10" Text="{x:Bind Localize('Editor_DragFilesFoldersOrText_2e21d1')}" FontSize="12" Opacity="0.6" TextWrapping="Wrap" />
             </Grid>
             <Border Grid.Column="1" Width="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
             <Grid x:Name="DetailsPanel" Grid.Column="2" RowDefinitions="Auto,*" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="12">
                 <StackPanel Padding="14,10,14,6" Spacing="3">
-                    <TextBlock x:Name="PropertiesHint" Text="Выберите пункт слева" FontSize="12" Opacity="0.6" />
+                    <TextBlock x:Name="PropertiesHint" Text="{x:Bind Localize('Editor_SelectAnItemOnThe_2c92bb')}" FontSize="12" Opacity="0.6" />
                 </StackPanel>
                 <ScrollViewer Grid.Row="1">
                     <StackPanel x:Name="PropertiesPanel" Padding="14,2,14,14" Spacing="10" MaxWidth="680" HorizontalAlignment="Left" />
