@@ -15,17 +15,23 @@ public sealed partial class MainPage : Page
     private string Localize(string key) => L.Get(key);
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true, PropertyNameCaseInsensitive = true, Converters = { new JsonStringEnumConverter() } };
     private readonly EditorPipeClient client = new();
-    private readonly Stack<string> undo = new();
-    private readonly Stack<string> redo = new();
-    private AppConfig config = new();
+    private readonly EditorDraft draftState = new();
+    private AppConfig config { get => draftState.Config; set => draftState.Config = value; }
     private MenuNode? selected;
     private bool rendering;
-    private bool dirty;
+    private bool dirty => draftState.IsDirty;
     private bool allowClose;
     private string? dragSnapshot;
+    private string? dragNodeId;
+    private DragEscapeMonitor? dragEscapeMonitor;
+    private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer dropIndicatorTimer;
+    private readonly Brush dropAccent;
+    private string? dropTargetId;
+    private int dropTargetZone;
+    private bool dropIndicatorValid;
     private bool dragOverLogged;
     private bool draftReady;
-    private string? baseSnapshot;
+    private string? baseSnapshot => draftState.Baseline;
     private string? copiedNode;
     private string? cutNodeId;
     private ShortcutEditor? activeShortcut;
@@ -37,6 +43,10 @@ public sealed partial class MainPage : Page
     {
         DevLog.Write("editor", "MainPage constructor started");
         InitializeComponent();
+        dropAccent = DropIndicator.Background;
+        dropIndicatorTimer = DispatcherQueue.CreateTimer();
+        dropIndicatorTimer.Interval = TimeSpan.FromMilliseconds(40);
+        dropIndicatorTimer.Tick += (_, _) => UpdateDropIndicator();
         DevLog.Write("editor", "MainPage XAML initialized");
         UpdateSelectionCommands();
         var pasteText = new KeyboardAccelerator { Key = Windows.System.VirtualKey.V, Modifiers = Windows.System.VirtualKeyModifiers.Control };
@@ -77,26 +87,22 @@ public sealed partial class MainPage : Page
     private async Task LoadCurrentAsync()
     {
         DevLog.Write("editor", "Loading current configuration");
-        baseSnapshot ??= Snapshot();
         draftReady = false;
         var response = await client.BeginAsync();
         DevLog.Write("editor", $"Begin response success={response.Success} message={response.Message}");
         var draft = EditorPipeClient.ReadDraft(response);
         if (draft is null) { ShowNotice(response.Message ?? L.Get("Editor_CouldNotReadTheConfiguration_d3f938"), InfoBarSeverity.Error); return; }
-        config = draft.Config;
-        baseSnapshot = Snapshot();
+        draftState.Reset(draft.Config);
         draftReady = true;
-        dirty = false; undo.Clear(); redo.Clear();
         RefreshTree(); UpdateApplyState();
         ShowHotkeyAvailability(await client.ReadAsync());
         DevLog.Write("editor", "Current configuration loaded");
     }
 
-    private void Remember() { undo.Push(Snapshot()); redo.Clear(); }
-    private string Snapshot() => JsonSerializer.Serialize(config, JsonOptions);
+    private void Remember() => draftState.BeginChange();
+    private string Snapshot() => draftState.Snapshot();
     private void MarkDirty()
     {
-        dirty = baseSnapshot is not null && Snapshot() != baseSnapshot;
         UpdateApplyState();
     }
     private void UpdateApplyState()
@@ -445,9 +451,7 @@ public sealed partial class MainPage : Page
                 ShowNotice(L.Get("Editor_AnItemCannotContainItself_756ab5"), InfoBarSeverity.Warning);
                 return;
             }
-            Remember();
-            FindSiblings(config.Items, id)?.Remove(source);
-            destination.Add(source);
+            if (!draftState.MoveToEnd(id, destination)) return;
             cutNodeId = null;
             MarkDirty(); RefreshTree(source.Id);
             return;
@@ -487,7 +491,7 @@ public sealed partial class MainPage : Page
 
     private List<MenuNode> AddDestination() => selected?.Kind == MenuNodeKind.Group ? selected.Children : SelectedSiblings();
     private void Add(MenuNode node)
-    { Remember(); AddDestination().Add(node); MarkDirty(); RefreshTree(node.Id); }
+    { var destination = AddDestination(); draftState.Insert(destination, destination.Count, [node]); MarkDirty(); RefreshTree(node.Id); }
     private void AddGroupClicked(object sender, RoutedEventArgs args) => Add(new MenuNode { Name = L.Get("Editor_NewGroup_55c687"), Kind = MenuNodeKind.Group });
     private void AddSeparatorClicked(object sender, RoutedEventArgs args) => Add(new MenuNode { Kind = MenuNodeKind.Separator });
     private void AddSnippetClicked(object sender, RoutedEventArgs args) => Add(new MenuNode { Name = L.Get("Editor_NewSnippet_7f18a1"), Kind = MenuNodeKind.Action, Action = new MenuAction { Kind = ActionKind.InsertText } });
@@ -513,8 +517,8 @@ public sealed partial class MainPage : Page
         foreach (var path in paths) { try { imported.Add(Import(path)); } catch (Exception ex) { errors.Add($"{path}: {ex.Message}"); } }
         if (imported.Count > 0)
         {
-            Remember(); if (index < 0 || index > destination.Count) index = destination.Count;
-            destination.InsertRange(index, imported); MarkDirty(); RefreshTree(imported[^1].Id);
+            if (index < 0 || index > destination.Count) index = destination.Count;
+            draftState.Insert(destination, index, imported); MarkDirty(); RefreshTree(imported[^1].Id);
         }
         if (errors.Count > 0) ShowNotice(string.Join("\n", errors), InfoBarSeverity.Warning);
     }
@@ -524,7 +528,7 @@ public sealed partial class MainPage : Page
         if (index < 0) index = destination.Count;
         if (!isUrl) { AddDroppedText(text, destination, index); return; }
         var node = new MenuNode { Name = text, Kind = MenuNodeKind.Action, Action = new MenuAction { Kind = ActionKind.OpenItem, Path = text } };
-        Remember(); destination.Insert(index, node); MarkDirty(); RefreshTree(node.Id);
+        draftState.Insert(destination, index, [node]); MarkDirty(); RefreshTree(node.Id);
     }
 
     internal void AddDroppedPaths(IReadOnlyList<string> paths, int x, int y)
@@ -539,7 +543,7 @@ public sealed partial class MainPage : Page
         ImportPaths(paths, destination, index);
     }
 
-    private (List<MenuNode>, int) NativeDropDestination(int x, int y)
+    private (List<MenuNode>, int) NativeDropDestination(int x, int y, bool rootFallback = false)
     {
         foreach (var node in VisibleNodes(MenuTree.RootNodes))
         {
@@ -553,7 +557,7 @@ public sealed partial class MainPage : Page
             var siblings = node.Parent?.Content is NodeDisplay parent ? parent.Model.Children : config.Items;
             return (siblings, siblings.IndexOf(model) + (localY >= container.ActualHeight / 2 ? 1 : 0));
         }
-        return (AddDestination(), -1);
+        return (rootFallback ? config.Items : AddDestination(), -1);
     }
 
     private static IEnumerable<TreeViewNode> VisibleNodes(IEnumerable<TreeViewNode> nodes)
@@ -586,14 +590,14 @@ public sealed partial class MainPage : Page
     {
         if (selected is null) return;
         var clone = JsonSerializer.Deserialize<MenuNode>(JsonSerializer.Serialize(selected, JsonOptions), JsonOptions)!;
-        AssignNewIds(clone); clone.Name += L.Get("Editor_Copy_7d4e5c"); Remember(); var siblings = SelectedSiblings(); siblings.Insert(siblings.IndexOf(selected) + 1, clone); MarkDirty(); RefreshTree(clone.Id);
+        AssignNewIds(clone); clone.Name += L.Get("Editor_Copy_7d4e5c"); var siblings = SelectedSiblings(); draftState.Insert(siblings, siblings.IndexOf(selected) + 1, [clone]); MarkDirty(); RefreshTree(clone.Id);
     }
     private void DeleteClicked(object sender, RoutedEventArgs args)
-    { if (selected is null) return; Remember(); SelectedSiblings().Remove(selected); MarkDirty(); RefreshTree(); }
+    { if (selected is null || !draftState.Delete(selected.Id)) return; MarkDirty(); RefreshTree(); }
     private void UndoClicked(object sender, RoutedEventArgs args)
-    { if (undo.Count == 0) return; redo.Push(Snapshot()); config = JsonSerializer.Deserialize<AppConfig>(undo.Pop(), JsonOptions)!; MarkDirty(); RefreshTree(); }
+    { var id = selected?.Id; if (!draftState.Undo()) return; MarkDirty(); RefreshTree(id); }
     private void RedoClicked(object sender, RoutedEventArgs args)
-    { if (redo.Count == 0) return; undo.Push(Snapshot()); config = JsonSerializer.Deserialize<AppConfig>(redo.Pop(), JsonOptions)!; MarkDirty(); RefreshTree(); }
+    { var id = selected?.Id; if (!draftState.Redo()) return; MarkDirty(); RefreshTree(id); }
 
     private async void ApplyClicked(object sender, RoutedEventArgs args) => await ApplyAsync();
     private async Task<bool> ApplyAsync()
@@ -613,8 +617,9 @@ public sealed partial class MainPage : Page
         if (!response.Success) { ShowNotice(response.Message ?? L.Get("Editor_CouldNotApplyTheConfiguration_9f63ee"), InfoBarSeverity.Error); return false; }
         draftReady = false;
         var draft = EditorPipeClient.ReadDraft(await client.BeginAsync());
-        if (draft is not null) { config = draft.Config; baseSnapshot = Snapshot(); draftReady = true; RefreshTree(selected?.Id); }
-        dirty = false; undo.Clear(); redo.Clear(); UpdateApplyState(); Notice.IsOpen = false;
+        if (draft is not null) { draftState.Reset(draft.Config); draftReady = true; RefreshTree(selected?.Id); }
+        else draftState.SetBaseline();
+        UpdateApplyState(); Notice.IsOpen = false;
         var warnings = response.Data?["Validation"]?["Warnings"]?.Deserialize<string[]>() ?? [];
         if (warnings.Length > 0) ShowNotice(string.Join("\n", warnings), InfoBarSeverity.Warning);
         return true;
@@ -668,12 +673,108 @@ public sealed partial class MainPage : Page
         return await dialog.ShowAsync();
     }
 
-    private void MenuTreeDragItemsStarting(TreeView sender, TreeViewDragItemsStartingEventArgs args) => dragSnapshot = Snapshot();
+    private void MenuTreeDragItemsStarting(TreeView sender, TreeViewDragItemsStartingEventArgs args) { dragEscapeMonitor?.Dispose(); dragEscapeMonitor = new DragEscapeMonitor(); draftState.CommitPending(); dragSnapshot = Snapshot(); dragNodeId = args.Items.FirstOrDefault() is TreeViewNode node ? Model(node).Id : null; sender.CanReorderItems = false; dropIndicatorTimer.Start(); }
+    internal bool InternalDragActive() => dragSnapshot is not null && dragNodeId is not null;
+    private void HideDropIndicator() { DropIndicator.Visibility = Visibility.Collapsed; dropIndicatorValid = false; }
+    private void UpdateDropIndicator()
+    {
+        HideDropIndicator();
+        if (!InternalDragActive() || dragEscapeMonitor?.Cancelled == true || !EditorOleDropTarget.TryGetCursorPosition(App.MainWindow, out var x, out var y)) return;
+        var treeOrigin = MenuTree.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point());
+        if (x < treeOrigin.X || x >= treeOrigin.X + MenuTree.ActualWidth || y < treeOrigin.Y || y >= treeOrigin.Y + MenuTree.ActualHeight) return;
+        var overlayOrigin = DropOverlay.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point());
+        TreeViewItem? row = null;
+        TreeViewNode? target = null;
+        foreach (var node in VisibleNodes(MenuTree.RootNodes))
+        {
+            if (MenuTree.ContainerFromNode(node) is not TreeViewItem candidate) continue;
+            var p = candidate.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point());
+            if (x >= p.X && x < p.X + candidate.ActualWidth && y >= p.Y && y < p.Y + candidate.ActualHeight) { row = candidate; target = node; break; }
+        }
+        var source = dragNodeId is null ? null : FindModel(config.Items, dragNodeId);
+        if (source is null) return;
+        var (destination, _) = NativeDropDestination(x, y, rootFallback: true);
+        if (!draftState.CanMove(source.Id, destination)) return;
+        var accent = dropAccent;
+        if (row is not null && target is not null)
+        {
+            var model = Model(target);
+            var p = row.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point());
+            var inside = model.Kind == MenuNodeKind.Group && y - p.Y > row.ActualHeight / 3 && y - p.Y < row.ActualHeight * 2 / 3;
+            if (inside && (source.Id == model.Id || ContainsChild(source, model))) return;
+            if (inside)
+            {
+                dropTargetId = model.Id; dropTargetZone = 0;
+                DropIndicator.Background = null; DropIndicator.BorderBrush = accent; DropIndicator.BorderThickness = new Thickness(2);
+                DropIndicator.Width = Math.Max(0, row.ActualWidth - 4); DropIndicator.Height = Math.Max(0, row.ActualHeight - 4);
+                Canvas.SetLeft(DropIndicator, p.X - overlayOrigin.X + 2); Canvas.SetTop(DropIndicator, p.Y - overlayOrigin.Y + 2);
+            }
+            else
+            {
+                dropTargetId = model.Id; dropTargetZone = y - p.Y >= row.ActualHeight / 2 ? 1 : -1;
+                DropIndicator.Background = accent; DropIndicator.BorderThickness = new Thickness(0);
+                DropIndicator.Width = Math.Max(0, row.ActualWidth - 8); DropIndicator.Height = 3;
+                Canvas.SetLeft(DropIndicator, p.X - overlayOrigin.X + 4); Canvas.SetTop(DropIndicator, p.Y - overlayOrigin.Y + (y - p.Y >= row.ActualHeight / 2 ? row.ActualHeight : 0) - 1);
+            }
+        }
+        else
+        {
+            dropTargetId = null; dropTargetZone = 1;
+            var last = MenuTree.RootNodes.LastOrDefault();
+            var lastRow = last is null ? null : MenuTree.ContainerFromNode(last) as TreeViewItem;
+            var bottom = lastRow is null ? treeOrigin.Y : lastRow.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point()).Y + lastRow.ActualHeight;
+            foreach (var node in VisibleNodes(MenuTree.RootNodes))
+                if (MenuTree.ContainerFromNode(node) is TreeViewItem visible) { var p = visible.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point()); bottom = Math.Max(bottom, p.Y + visible.ActualHeight); }
+            DropIndicator.Background = accent; DropIndicator.BorderThickness = new Thickness(0); DropIndicator.Width = Math.Max(0, MenuTree.ActualWidth - 8); DropIndicator.Height = 3;
+            Canvas.SetLeft(DropIndicator, treeOrigin.X - overlayOrigin.X + 4); Canvas.SetTop(DropIndicator, Math.Min(treeOrigin.Y + MenuTree.ActualHeight - 3, bottom) - overlayOrigin.Y);
+        }
+        DropIndicator.Visibility = Visibility.Visible;
+        dropIndicatorValid = true;
+    }
+    internal bool CompleteInternalDrop(int x, int y)
+    {
+        if (dragNodeId is not { } id) return false;
+        var origin = MenuTree.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point());
+        if (x < origin.X || y < origin.Y || x >= origin.X + MenuTree.ActualWidth || y >= origin.Y + MenuTree.ActualHeight)
+        {
+            dragSnapshot = null; dragNodeId = null;
+            return false;
+        }
+        List<MenuNode> destination;
+        int index;
+        if (dropIndicatorValid && dropTargetId is { } targetId && FindModel(config.Items, targetId) is { } target)
+        {
+            destination = dropTargetZone == 0 ? target.Children : FindSiblings(config.Items, targetId)!;
+            index = dropTargetZone == 0 ? destination.Count : destination.IndexOf(target) + (dropTargetZone > 0 ? 1 : 0);
+        }
+        else if (dropIndicatorValid && dropTargetId is null) { destination = config.Items; index = destination.Count; }
+        else return false;
+        if (index < 0) index = destination.Count;
+        var moved = draftState.Move(id, destination, index);
+        if (!moved) ShowNotice(L.Get("Editor_AnItemCannotContainItself_756ab5"), InfoBarSeverity.Warning);
+        dragSnapshot = null; dragNodeId = null; MarkDirty(); RefreshTree(id);
+        return moved;
+    }
     private void MenuTreeDragItemsCompleted(TreeView sender, TreeViewDragItemsCompletedEventArgs args)
     {
-        if (dragSnapshot is null) return;
+        dropIndicatorTimer.Stop(); DropIndicator.Visibility = Visibility.Collapsed;
+        sender.CanReorderItems = true;
+        if (dragSnapshot is null) { dragEscapeMonitor?.Dispose(); dragEscapeMonitor = null; return; }
         try
         {
+            // TreeView can apply a different drop position than the one shown by our indicator.
+            // Reapply the drop to the original draft using the same hit test as the indicator.
+            if (dragNodeId is not null && dragEscapeMonitor is { Available: true } monitor)
+            {
+                var id = dragNodeId;
+                var dropX = 0; var dropY = 0;
+                var canDrop = !monitor.Cancelled && !EditorOleDropTarget.IsDragButtonDown()
+                    && EditorOleDropTarget.TryGetCursorPosition(App.MainWindow, out dropX, out dropY);
+                draftState.Restore(dragSnapshot);
+                RefreshTree(id);
+                if (canDrop) CompleteInternalDrop(dropX, dropY);
+                return;
+            }
             List<MenuNode> Read(IEnumerable<TreeViewNode> nodes) => nodes.Select(node =>
             {
                 var model = Model(node);
@@ -681,16 +782,22 @@ public sealed partial class MainPage : Page
                 model.Children = Read(node.Children); return model;
             }).ToList();
             config.Items = Read(MenuTree.RootNodes);
-            if (Snapshot() != dragSnapshot) { undo.Push(dragSnapshot); redo.Clear(); MarkDirty(); }
+            if (Snapshot() != dragSnapshot) { draftState.RecordChange(dragSnapshot); MarkDirty(); }
             var selectedId = sender.SelectedNode is { } node ? Model(node).Id : null;
             DispatcherQueue.TryEnqueue(() => RefreshTree(selectedId));
         }
-        catch (Exception ex) { config = JsonSerializer.Deserialize<AppConfig>(dragSnapshot, JsonOptions)!; RefreshTree(); ShowNotice(ex.Message, InfoBarSeverity.Warning); }
-        finally { dragSnapshot = null; }
+        catch (Exception ex) { draftState.Restore(dragSnapshot); RefreshTree(); ShowNotice(ex.Message, InfoBarSeverity.Warning); }
+        finally { dragSnapshot = null; dragNodeId = null; dropIndicatorValid = false; dragEscapeMonitor?.Dispose(); dragEscapeMonitor = null; }
     }
 
     private void MenuTreeDragOver(object sender, DragEventArgs args)
     {
+        if (InternalDragActive())
+        {
+            args.AcceptedOperation = DataPackageOperation.Move;
+            args.Handled = true;
+            return;
+        }
         if (!dragOverLogged)
         {
             DevLog.Write("editor", $"External DragOver: storageItems={args.DataView.Contains(StandardDataFormats.StorageItems)}");
@@ -704,6 +811,13 @@ public sealed partial class MainPage : Page
     private async void MenuTreeDrop(object sender, DragEventArgs args)
     {
         dragOverLogged = false;
+        if (InternalDragActive())
+        {
+            var point = args.GetPosition(null);
+            args.Handled = true;
+            CompleteInternalDrop((int)point.X, (int)point.Y);
+            return;
+        }
         DevLog.Write("editor", $"External Drop: storageItems={args.DataView.Contains(StandardDataFormats.StorageItems)}");
         if (dragSnapshot is not null || (!args.DataView.Contains(StandardDataFormats.StorageItems) && !args.DataView.Contains(StandardDataFormats.Text))) return;
         var deferral = args.GetDeferral(); args.Handled = true;
@@ -734,7 +848,7 @@ public sealed partial class MainPage : Page
         var title = text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim() ?? L.Get("Editor_Snippet_720dc5");
         if (title.Length > 60) title = title[..60] + "…";
         var node = new MenuNode { Name = title, Kind = MenuNodeKind.Action, Action = new MenuAction { Kind = ActionKind.InsertText, Text = text } };
-        Remember(); destination.Insert(Math.Clamp(index, 0, destination.Count), node); MarkDirty(); RefreshTree(node.Id);
+        draftState.Insert(destination, index, [node]); MarkDirty(); RefreshTree(node.Id);
     }
 
     private (List<MenuNode>, int) DropDestination(DragEventArgs args)

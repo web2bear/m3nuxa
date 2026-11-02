@@ -20,7 +20,7 @@ public sealed partial class MainPage
     internal void SetupDropChecks()
     {
         config = new AppConfig { Items = [new MenuNode { Name = "Drop group", Kind = MenuNodeKind.Group }] };
-        baseSnapshot = Snapshot();
+        draftState.SetBaseline();
         RefreshTree();
     }
     internal string DropCheckSnapshot() => Snapshot();
@@ -89,9 +89,7 @@ public sealed partial class MainPage
     internal void CheckApplyAvailability()
     {
         config = new AppConfig { Items = [new MenuNode { Name = "Исходный пункт", Kind = MenuNodeKind.Action }] };
-        baseSnapshot = Snapshot();
-        undo.Clear(); redo.Clear();
-        dirty = false;
+        draftState.SetBaseline();
         RefreshTree(); UpdateApplyState();
         Check(false, "initial state");
 

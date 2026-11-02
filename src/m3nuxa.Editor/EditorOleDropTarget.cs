@@ -23,9 +23,11 @@ public sealed class EditorOleDropTarget : IEditorDropTarget, IDisposable
     private readonly Action<string, bool, int, int> onText;
     private readonly string log;
     private readonly bool oleInitialized;
-    public EditorOleDropTarget(Window window, Action<IReadOnlyList<string>, int, int> onPaths, Action<string, bool, int, int> onText, string log)
+    private readonly Func<bool> internalDrag;
+    private readonly Func<int, int, bool> onInternalDrop;
+    public EditorOleDropTarget(Window window, Action<IReadOnlyList<string>, int, int> onPaths, Action<string, bool, int, int> onText, string log, Func<bool> internalDrag, Func<int, int, bool> onInternalDrop)
     {
-        root = WindowNative.GetWindowHandle(window); this.onPaths = onPaths; this.onText = onText; this.log = log;
+        root = WindowNative.GetWindowHandle(window); this.onPaths = onPaths; this.onText = onText; this.log = log; this.internalDrag = internalDrag; this.onInternalDrop = onInternalDrop;
         var init = OleInitialize(0);
         oleInitialized = init >= 0;
         Log($"OleInitialize={init:X8}");
@@ -42,12 +44,13 @@ public sealed class EditorOleDropTarget : IEditorDropTarget, IDisposable
     private void Log(string message) { if (log.Length != 0) File.AppendAllText(log, message + Environment.NewLine); else m3nuxa.App.DevLog.Write("editor", "OLE " + message); }
     public int DragEnter(IDataObject data, uint keys, EditorDropPoint point, ref uint effect)
     {
+        if (internalDrag()) { effect &= 2u; return 0; }
         var f = new FORMATETC { cfFormat = 15, dwAspect = DVASPECT.DVASPECT_CONTENT, lindex = -1, tymed = TYMED.TYMED_HGLOBAL };
         var hr = data.QueryGetData(ref f); var text = Supports(data, 13); var url = Supports(data, (short)RegisterClipboardFormat("UniformResourceLocatorW"));
         Log($"enter file={hr:X8} text={text} url={url} effect={effect} at={point.X},{point.Y}");
         effect = (hr == 0 || text || url) ? effect & 1u : 0; return 0;
     }
-    public int DragOver(uint keys, EditorDropPoint point, ref uint effect) { effect &= 1; return 0; }
+    public int DragOver(uint keys, EditorDropPoint point, ref uint effect) { effect &= internalDrag() ? 2u : 1u; return 0; }
     public int DragLeave() { Log("leave"); return 0; }
     public int Drop(IDataObject data, uint keys, EditorDropPoint point, ref uint effect)
     {
@@ -56,6 +59,7 @@ public sealed class EditorOleDropTarget : IEditorDropTarget, IDisposable
             var location = point; ScreenToClient(root, ref location);
             var dpi = GetDpiForWindow(root) / 96.0;
             int x = (int)(location.X / dpi), y = (int)(location.Y / dpi);
+            if (internalDrag()) { effect = onInternalDrop(x, y) ? 2u : 0u; return 0; }
             var url = ReadText(data, (short)RegisterClipboardFormat("UniformResourceLocatorW"));
             if (url is not null && Uri.TryCreate(url.Trim(), UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https") { Log("drop url"); onText(url.Trim(), true, x, y); return 0; }
             var f = new FORMATETC { cfFormat = 15, dwAspect = DVASPECT.DVASPECT_CONTENT, lindex = -1, tymed = TYMED.TYMED_HGLOBAL };
@@ -91,6 +95,18 @@ public sealed class EditorOleDropTarget : IEditorDropTarget, IDisposable
     }
     public void Dispose() { foreach (var h in windows) RevokeDragDrop(h); if (oleInitialized) OleUninitialize(); }
     private delegate bool EnumProc(nint hwnd, nint param);
+    internal static bool TryGetCursorPosition(Window window, out int x, out int y)
+    {
+        x = y = 0;
+        var hwnd = WindowNative.GetWindowHandle(window);
+        if (!GetCursorPos(out var point) || !ScreenToClient(hwnd, ref point)) return false;
+        var scale = GetDpiForWindow(hwnd) / 96.0;
+        x = (int)(point.X / scale); y = (int)(point.Y / scale);
+        return true;
+    }
+    internal static bool IsDragButtonDown() => (GetAsyncKeyState(1) & 0x8000) != 0;
+    [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int virtualKey);
+    [DllImport("user32.dll")] private static extern bool GetCursorPos(out EditorDropPoint point);
     [DllImport("user32.dll")] private static extern bool EnumChildWindows(nint hwnd, EnumProc callback, nint lParam);
     [DllImport("user32.dll")] private static extern bool ScreenToClient(nint hwnd, ref EditorDropPoint point);
     [DllImport("user32.dll")] private static extern uint GetDpiForWindow(nint hwnd);

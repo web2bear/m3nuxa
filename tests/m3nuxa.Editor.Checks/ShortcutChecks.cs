@@ -12,7 +12,7 @@ public sealed partial class MainPage
         var group = new MenuNode { Name = "Терминал", Kind = MenuNodeKind.Group, Hotkey = "Ctrl+Alt+Space" };
         var send = new MenuNode { Name = "Вставить", Kind = MenuNodeKind.Action, Action = new MenuAction { Kind = ActionKind.SendShortcut, Shortcut = "Ctrl+V" } };
         config = new AppConfig { Items = [group, send, new MenuNode { Name = "Конфликт", Kind = MenuNodeKind.Group, Hotkey = "Control+Shift+K" }] };
-        baseSnapshot = Snapshot(); undo.Clear(); redo.Clear(); dirty = false;
+        draftState.SetBaseline();
         RefreshTree(group.Id); UpdateApplyState();
         for (var attempt = 0; attempt < 100 && GetForegroundWindow() != WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow); attempt++) await Task.Delay(50);
         App.MainWindow.Activate();
@@ -31,16 +31,16 @@ public sealed partial class MainPage
         for (var attempt = 0; attempt < 40 && !dirty; attempt++) await Task.Delay(50);
         Assert(config.Items[0].Hotkey == "Ctrl+Alt+F9" && dirty, "recorded combination was not committed: " + config.Items[0].Hotkey + " | " + string.Join(" | ", Descendants(mainShortcut).OfType<TextBlock>().Select(text => text.Text)));
         UndoClicked(this, null!);
-        Assert(config.Items[0].Hotkey == "Ctrl+Alt+Space" && !dirty, "one undo must restore the whole combination: " + config.Items[0].Hotkey + " dirty=" + dirty + " history=" + undo.Count);
+        Assert(config.Items[0].Hotkey == "Ctrl+Alt+Space" && !dirty, "one undo must restore the whole combination: " + config.Items[0].Hotkey + " dirty=" + dirty + " history=" + draftState.UndoCount);
         RedoClicked(this, null!);
         MenuTree.SelectedNode = FindTreeNode(MenuTree.RootNodes, group.Id); await Task.Delay(80);
         mainShortcut = PropertiesPanel.Children.OfType<ShortcutEditor>().First();
         Assert(config.Items[0].Hotkey == "Ctrl+Alt+F9", "redo lost the combination");
 
-        var before = Snapshot(); var undoCount = undo.Count;
+        var before = Snapshot(); var undoCount = draftState.UndoCount;
         await mainShortcut.StartAsync();
         Send((0x1b, false), (0x1b, true)); await Task.Delay(150);
-        Assert(Snapshot() == before && undo.Count == undoCount, "Esc changed the draft/history");
+        Assert(Snapshot() == before && draftState.UndoCount == undoCount, "Esc changed the draft/history");
 
         await mainShortcut.StartAsync();
         Send((0x11, false), (0x10, false), (0x4b, false), (0x4b, true), (0x10, true), (0x11, true));

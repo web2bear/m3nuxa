@@ -78,6 +78,9 @@
                         </MenuFlyout>
                     </TreeView.ContextFlyout>
                 </TreeView>
+                <Canvas x:Name="DropOverlay" Grid.Row="1" IsHitTestVisible="False" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                    <Border x:Name="DropIndicator" Visibility="Collapsed" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="2" />
+                </Canvas>
                 <TextBlock Grid.Row="2" x:Name="DropHint" Margin="12,6,12,10" Text="{x:Bind Localize('Editor_DragFilesFoldersOrText_2e21d1')}" FontSize="12" Opacity="0.6" TextWrapping="Wrap" />
             </Grid>
             <Border Grid.Column="1" Width="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />

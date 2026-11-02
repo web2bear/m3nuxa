@@ -6,6 +6,7 @@ Directory.CreateDirectory(root);
 try
 {
     LocalizationChecks.Run();
+    EditorDraftChecks.Run();
     var path = Path.Combine(root, "config.json");
     var store = new ConfigStore(path);
     var legacyPath = Path.Combine(root, "legacy.json");
