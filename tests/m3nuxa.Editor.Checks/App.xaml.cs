@@ -13,6 +13,7 @@ public partial class App : Application
         try
         {
             MainWindow = new Window { Title = "m3nuxa — проверка дерева" };
+            if (MainWindow.AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter) presenter.IsAlwaysOnTop = true;
             MainWindow.AppWindow.Resize(new Windows.Graphics.SizeInt32(1160, 780));
             var displays = Microsoft.UI.Windowing.DisplayArea.FindAll();
             Microsoft.UI.Windowing.DisplayArea? additionalDisplay = null;
@@ -41,14 +42,8 @@ public partial class App : Application
             if (Environment.GetEnvironmentVariable("m3nuxa_DROP_CHECK") is { } snapshotPath)
             {
                 page.SetupDropChecks();
-                IDisposable hook;
-                if (Environment.GetEnvironmentVariable("m3nuxa_OLE_PROBE") is { } log)
-                {
-                    hook = new EditorOleDropTarget(MainWindow, page.AddDroppedPaths, page.AddProbeText, log);
-                    hook.Dispose();
-                    hook = new EditorOleDropTarget(MainWindow, page.AddDroppedPaths, page.AddProbeText, log);
-                }
-                else hook = ExplorerFileDropHook.Attach(MainWindow, page.AddDroppedPaths);
+                var log = Environment.GetEnvironmentVariable("m3nuxa_OLE_PROBE") ?? "";
+                IDisposable hook = new EditorOleDropTarget(MainWindow, page.AddDroppedPaths, page.AddProbeText, log, page.InternalDragActive, page.CompleteInternalDrop);
                 using (hook)
                 while (true)
                 {

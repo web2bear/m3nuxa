@@ -11,7 +11,7 @@ public sealed partial class MainPage
         var action = new MenuAction { Kind = ActionKind.RunProgram, Path = "abcd", Arguments = "abcd", WorkingDirectory = "abcd" };
         var node = new MenuNode { Name = "Variables", Kind = MenuNodeKind.Action, Action = action };
         config = new AppConfig { Items = [node] };
-        baseSnapshot = Snapshot(); undo.Clear(); redo.Clear(); dirty = false;
+        draftState.SetBaseline();
         RefreshTree(node.Id);
         await Task.Delay(100);
         var expected = new[] { "{selectedPaths}", "{selectedPath}", "{fileName}", "{extension}", "{parentFolder}", "{currentFolder}" };
