@@ -21,7 +21,7 @@ try {
 $env:m3nuxa_CHECK_LANGUAGE = $Language
 [IO.File]::WriteAllText($settingsPath, (@{ Language = $Language } | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
 $checkProcess = Start-Process -FilePath (Join-Path $checkDirectory 'm3nuxa.Editor.Checks.exe') -WorkingDirectory $checkDirectory -WindowStyle Hidden -PassThru
-winapp ui wait-for OpenSettings -a $checkProcess.Id -t 5000
+winapp ui wait-for CreateFolder -a $checkProcess.Id -t 5000
 if ($LASTEXITCODE -ne 0) { throw 'Тестовое окно не готово к вводу.' }
 if (-not $checkProcess.WaitForExit(20000)) {
     Stop-Process -Id $checkProcess.Id

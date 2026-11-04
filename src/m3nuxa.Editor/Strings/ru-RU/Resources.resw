@@ -412,4 +412,35 @@
   <data name="Editor_WorkingDirectory_72e5f4" xml:space="preserve">
     <value>Рабочая папка</value>
   </data>
+  <data name="Editor_ImportDesktop" xml:space="preserve">
+    <value>Импортировать рабочий стол…</value>
+  </data>
+  <data name="Editor_DesktopFoldersAsGroups" xml:space="preserve">
+    <value>Папки как группы</value>
+  </data>
+  <data name="Editor_DesktopFoldersAsLinks" xml:space="preserve">
+    <value>Папки как действия открытия</value>
+  </data>
+  <data name="Editor_PreviewDesktop" xml:space="preserve">
+    <value>Предпросмотр импорта</value>
+  </data>
+  <data name="Editor_DesktopGroup" xml:space="preserve">
+    <value>Рабочий стол</value>
+  </data>
+  <data name="Editor_DesktopSkipped" xml:space="preserve">
+    <value>Пропущенные элементы:</value>
+  </data>
+  <data name="Editor_DesktopAdd" xml:space="preserve">
+    <value>Добавить в черновик</value>
+  </data>
+  <data name="Editor_DesktopInvalidUrl" xml:space="preserve">
+    <value>Неподдерживаемый или неверный URL</value>
+  </data>
+  <data name="Editor_DesktopLimit" xml:space="preserve">
+    <value>Импорт остановлен после 500 элементов. Используйте действия открытия папок.</value>
+  </data>
+  <data name="Editor_SelectionNotInDraft" xml:space="preserve"><value>Этого пункта нет в текущем черновике.</value></data>
+  <data name="Editor_MoreCreate" xml:space="preserve"><value>Другие команды создания</value></data>
+  <data name="Editor_ConfigurationMenu" xml:space="preserve"><value>Конфигурация</value></data>
+  <data name="Editor_UnpinWindow" xml:space="preserve"><value>Открепить окно поверх остальных</value></data>
 </root>

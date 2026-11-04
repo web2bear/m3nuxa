@@ -31,6 +31,7 @@ public sealed partial class MainPage : Page
     private bool dropIndicatorValid;
     private bool dragOverLogged;
     private bool draftReady;
+    private string? pendingSelection;
     private string? baseSnapshot => draftState.Baseline;
     private string? copiedNode;
     private string? cutNodeId;
@@ -49,9 +50,17 @@ public sealed partial class MainPage : Page
         dropIndicatorTimer.Tick += (_, _) => UpdateDropIndicator();
         DevLog.Write("editor", "MainPage XAML initialized");
         UpdateSelectionCommands();
-        var pasteText = new KeyboardAccelerator { Key = Windows.System.VirtualKey.V, Modifiers = Windows.System.VirtualKeyModifiers.Control };
+        var pasteText = new KeyboardAccelerator { Key = Windows.System.VirtualKey.V, Modifiers = Windows.System.VirtualKeyModifiers.Control, ScopeOwner = MenuTree };
         pasteText.Invoked += (_, args) => { PasteTextClicked(MenuTree, null!); args.Handled = true; };
         MenuTree.KeyboardAccelerators.Add(pasteText);
+        AddTreeAccelerator(Windows.System.VirtualKey.Z, Windows.System.VirtualKeyModifiers.Control, UndoClicked);
+        AddTreeAccelerator(Windows.System.VirtualKey.Y, Windows.System.VirtualKeyModifiers.Control, RedoClicked);
+        AddTreeAccelerator(Windows.System.VirtualKey.X, Windows.System.VirtualKeyModifiers.Control, CutClicked);
+        AddTreeAccelerator(Windows.System.VirtualKey.C, Windows.System.VirtualKeyModifiers.Control, CopyClicked);
+        AddTreeAccelerator(Windows.System.VirtualKey.V, Windows.System.VirtualKeyModifiers.Control | Windows.System.VirtualKeyModifiers.Shift, PasteClicked);
+        AddTreeAccelerator(Windows.System.VirtualKey.F2, Windows.System.VirtualKeyModifiers.None, RenameClicked);
+        AddTreeAccelerator(Windows.System.VirtualKey.Delete, Windows.System.VirtualKeyModifiers.None, DeleteClicked);
+        MenuTree.AddHandler(RightTappedEvent, new RightTappedEventHandler(MenuTreeRightTapped), true);
         MenuPanel.AddHandler(DragOverEvent, new DragEventHandler(MenuTreeDragOver), true);
         MenuPanel.AddHandler(DropEvent, new DragEventHandler(MenuTreeDrop), true);
         Loaded += MainPageLoaded;
@@ -70,10 +79,28 @@ public sealed partial class MainPage : Page
         ToolTipService.SetToolTip(DropHint, L.Get("Editor_FileExplorerAndTheEditor_36ca57"));
     }
 
+    private void AddTreeAccelerator(Windows.System.VirtualKey key, Windows.System.VirtualKeyModifiers modifiers, RoutedEventHandler action)
+    {
+        var accelerator = new KeyboardAccelerator { Key = key, Modifiers = modifiers, ScopeOwner = MenuTree };
+        accelerator.Invoked += (_, args) => { action(MenuTree, null!); args.Handled = true; };
+        MenuTree.KeyboardAccelerators.Add(accelerator);
+    }
+
+    private void MenuTreeRightTapped(object sender, RightTappedRoutedEventArgs args)
+    {
+        var element = args.OriginalSource as DependencyObject;
+        while (element is not null && element != MenuTree && element is not TreeViewItem)
+            element = VisualTreeHelper.GetParent(element);
+        MenuTree.SelectedNode = element is TreeViewItem item ? MenuTree.NodeFromContainer(item) : null;
+    }
+
     private void PinClicked(object sender, RoutedEventArgs args)
     {
         if (App.MainWindow.AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter)
+        {
             presenter.IsAlwaysOnTop = PinButton.IsChecked == true;
+            ToolTipService.SetToolTip(PinButton, L.Get(presenter.IsAlwaysOnTop ? "Editor_UnpinWindow" : "Editor_KeepTheEditorAboveOther_eb06b1"));
+        }
     }
 
     private async void SettingsClicked(object sender, RoutedEventArgs args)
@@ -94,9 +121,22 @@ public sealed partial class MainPage : Page
         if (draft is null) { ShowNotice(response.Message ?? L.Get("Editor_CouldNotReadTheConfiguration_d3f938"), InfoBarSeverity.Error); return; }
         draftState.Reset(draft.Config);
         draftReady = true;
-        RefreshTree(); UpdateApplyState();
+        RefreshTree();
+        if (pendingSelection is not null) { SelectMenuItem(pendingSelection); pendingSelection = null; }
+        UpdateApplyState();
         ShowHotkeyAvailability(await client.ReadAsync());
         DevLog.Write("editor", "Current configuration loaded");
+    }
+
+    public void SelectMenuItem(string id)
+    {
+        if (!draftReady) { pendingSelection = id; return; }
+        var node = FindTreeNode(MenuTree.RootNodes, id);
+        if (node is null) { ShowNotice(L.Get("Editor_SelectionNotInDraft"), InfoBarSeverity.Warning); return; }
+        for (var parent = node.Parent; parent is not null; parent = parent.Parent) parent.IsExpanded = true;
+        MenuTree.SelectedNode = node;
+        MenuTree.UpdateLayout();
+        if (MenuTree.ContainerFromNode(node) is FrameworkElement container) container.StartBringIntoView();
     }
 
     private void Remember() => draftState.BeginChange();
@@ -108,7 +148,6 @@ public sealed partial class MainPage : Page
     private void UpdateApplyState()
     {
         ApplyButton.IsEnabled = dirty;
-        ApplyMenuItem.IsEnabled = dirty;
         ToolTipService.SetToolTip(ApplyButton, dirty ? L.Get("Editor_ThereAreUnsavedChangesApply_226d2b") : L.Get("Editor_NoChangesToApply_fefed9"));
     }
     private void ShowNotice(string message, InfoBarSeverity severity = InfoBarSeverity.Informational)
@@ -135,7 +174,6 @@ public sealed partial class MainPage : Page
     {
         var display = new NodeDisplay(model);
         var node = new TreeViewNode { Content = display, IsExpanded = true };
-        display.RightTapped += (_, _) => MenuTree.SelectedNode = node;
         foreach (var child in model.Children) node.Children.Add(BuildNode(child));
         return node;
     }
@@ -511,6 +549,81 @@ public sealed partial class MainPage : Page
         catch (Exception ex) { ShowNotice(ex.Message, InfoBarSeverity.Error); }
     }
 
+    private async void ImportDesktopClicked(object sender, RoutedEventArgs args)
+    {
+        var choice = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
+        choice.Items.Add(L.Get("Editor_DesktopFoldersAsGroups"));
+        choice.Items.Add(L.Get("Editor_DesktopFoldersAsLinks"));
+        choice.SelectedIndex = 0;
+        var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = L.Get("Editor_ImportDesktop"), Content = choice, PrimaryButtonText = L.Get("Editor_PreviewDesktop"), CloseButtonText = L.Get("Editor_Cancel_0ec753") };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        var destination = AddDestination();
+        try
+        {
+            var errors = new List<string>();
+            var root = new MenuNode { Name = L.Get("Editor_DesktopGroup"), Kind = MenuNodeKind.Group };
+            var roots = new[] { Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory) }.Where(p => !string.IsNullOrWhiteSpace(p)).Distinct(StringComparer.OrdinalIgnoreCase);
+            var groupFolders = choice.SelectedIndex == 0;
+            var limitMessage = L.Get("Editor_DesktopLimit");
+            IsEnabled = false;
+            try
+            {
+                await Task.Run(() =>
+                {
+                    var remaining = 500;
+                    foreach (var path in roots) ImportDesktopDirectory(path, root.Children, groupFolders, errors, 0, ref remaining, limitMessage);
+                });
+            }
+            finally { IsEnabled = true; }
+            if (!IsLoaded) return;
+            var lines = new List<string>();
+            void Describe(IEnumerable<MenuNode> nodes, int depth) { foreach (var node in nodes) { lines.Add(new string(' ', depth * 2) + node.Name); if (node.Kind == MenuNodeKind.Group) Describe(node.Children, depth + 1); } }
+            Describe(root.Children, 0);
+            if (errors.Count > 0) { lines.Add(""); lines.Add(L.Get("Editor_DesktopSkipped")); lines.AddRange(errors); }
+            var preview = new ScrollViewer { MaxHeight = 400, Content = new TextBlock { Text = string.Join("\n", lines), TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true } };
+            var confirm = new ContentDialog { XamlRoot = XamlRoot, Title = L.Get("Editor_PreviewDesktop"), Content = preview, PrimaryButtonText = L.Get("Editor_DesktopAdd"), CloseButtonText = L.Get("Editor_Cancel_0ec753"), IsPrimaryButtonEnabled = root.Children.Count > 0 };
+            if (await confirm.ShowAsync() == ContentDialogResult.Primary)
+            {
+                draftState.Insert(destination, destination.Count, [root]); MarkDirty(); RefreshTree(root.Id);
+            }
+        }
+        catch (Exception ex) { ShowNotice(ex.Message, InfoBarSeverity.Error); }
+    }
+
+    private static void ImportDesktopDirectory(string path, List<MenuNode> destination, bool groupFolders, List<string> errors, int depth, ref int remaining, string limitMessage)
+    {
+        if (depth > 32) { errors.Add(path); return; }
+        string[] entries;
+        try { entries = Directory.GetFileSystemEntries(path); }
+        catch (Exception ex) { errors.Add($"{path}: {ex.Message}"); return; }
+        Array.Sort(entries, StringComparer.CurrentCultureIgnoreCase);
+        foreach (var entry in entries)
+        {
+            if (remaining <= 0) { if (!errors.Contains(limitMessage)) errors.Add(limitMessage); return; }
+            try
+            {
+                var attributes = File.GetAttributes(entry);
+                if ((attributes & (FileAttributes.Hidden | FileAttributes.System)) != 0) continue;
+                if ((attributes & FileAttributes.ReparsePoint) != 0) { errors.Add(entry); continue; }
+                remaining--;
+                if ((attributes & FileAttributes.Directory) != 0 && groupFolders)
+                {
+                    var group = new MenuNode { Name = Path.GetFileName(entry), Kind = MenuNodeKind.Group };
+                    ImportDesktopDirectory(entry, group.Children, true, errors, depth + 1, ref remaining, limitMessage);
+                    destination.Add(group);
+                }
+                else if ((attributes & FileAttributes.Directory) == 0 && Path.GetExtension(entry).Equals(".url", StringComparison.OrdinalIgnoreCase))
+                {
+                    var url = File.ReadLines(entry).FirstOrDefault(line => line.StartsWith("URL=", StringComparison.OrdinalIgnoreCase))?[4..];
+                    if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)) throw new InvalidDataException(L.Get("Editor_DesktopInvalidUrl"));
+                    destination.Add(new MenuNode { Name = Path.GetFileNameWithoutExtension(entry), Kind = MenuNodeKind.Action, Action = new MenuAction { Kind = ActionKind.OpenItem, Path = url }, IconPath = entry });
+                }
+                else destination.Add(Import(entry));
+            }
+            catch (Exception ex) { errors.Add($"{entry}: {ex.Message}"); }
+        }
+    }
+
     private void ImportPaths(IEnumerable<string> paths, List<MenuNode> destination, int index = -1)
     {
         var imported = new List<MenuNode>(); var errors = new List<string>();
@@ -580,7 +693,7 @@ public sealed partial class MainPage : Page
             action.Path = (string)link.TargetPath; action.Arguments = (string)link.Arguments; action.WorkingDirectory = (string)link.WorkingDirectory;
             if (string.IsNullOrWhiteSpace(action.Path)) throw new InvalidOperationException(L.Get("Editor_TheShortcutHasNoTarget_17c4cf"));
             extension = Path.GetExtension(action.Path).ToLowerInvariant();
-            action.Kind = Directory.Exists(action.Path) ? ActionKind.OpenFolder : extension is ".bat" or ".cmd" or ".ps1" ? ActionKind.RunScript : ActionKind.RunProgram;
+            action.Kind = Directory.Exists(action.Path) ? ActionKind.OpenFolder : extension is ".bat" or ".cmd" or ".ps1" ? ActionKind.RunScript : extension == ".exe" ? ActionKind.RunProgram : ActionKind.OpenItem;
         }
         if (extension == ".ps1") action.Interpreter = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator).Any(part => File.Exists(Path.Combine(part, "pwsh.exe"))) ? "pwsh.exe" : "powershell.exe";
         return new MenuNode { Name = directory ? Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar)) : Path.GetFileNameWithoutExtension(path), Kind = MenuNodeKind.Action, Action = action, IconPath = path };

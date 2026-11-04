@@ -2,64 +2,92 @@
 <Page x:Class="m3nuxa.Editor.Views.MainPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" RowDefinitions="Auto,Auto,*,Auto">
-        <Grid Grid.Row="0" Padding="16,6,16,4">
-            <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
-                <TextBlock Text="m3nuxa" FontSize="22" FontWeight="SemiBold" VerticalAlignment="Center" />
-                <MenuBar VerticalAlignment="Center">
-                    <MenuBarItem Title="{x:Bind Localize('Editor_File_94b8df')}">
-                        <MenuFlyoutItem x:Name="ApplyMenuItem" Text="{x:Bind Localize('Editor_Apply_768af6')}" IsEnabled="False" Click="ApplyClicked" />
-                        <MenuFlyoutItem Text="{x:Bind Localize('Editor_LoadConfiguration_0439e7')}" Click="LoadClicked" />
-                        <MenuFlyoutItem Text="{x:Bind Localize('Editor_Reload_942438')}" Click="ReloadClicked" />
-                        <MenuFlyoutSeparator />
-                        <MenuFlyoutItem Text="{x:Bind Localize('Editor_SaveDraftSeparately_23cefc')}" Click="SaveClicked" />
-                    </MenuBarItem>
-                    <MenuBarItem Title="{x:Bind Localize('Editor_Edit_1f62f0')}">
-                        <MenuFlyoutItem Text="{x:Bind Localize('Editor_Undo_555ad1')}" Click="UndoClicked" />
-                        <MenuFlyoutItem Text="{x:Bind Localize('Editor_Redo_9e506a')}" Click="RedoClicked" />
-                    </MenuBarItem>
-                </MenuBar>
-            </StackPanel>
-        </Grid>
+    <Page.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="ToolbarGoldBrush" Color="#EAB84C" />
+                    <SolidColorBrush x:Key="ToolbarBlueBrush" Color="#70BCEC" />
+                    <SolidColorBrush x:Key="ToolbarGreenBrush" Color="#70C98C" />
+                    <SolidColorBrush x:Key="ToolbarPurpleBrush" Color="#C68AF0" />
+                    <SolidColorBrush x:Key="ToolbarGrayBrush" Color="#A9B4C4" />
+                    <SolidColorBrush x:Key="ToolbarRedBrush" Color="#EC7777" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="ToolbarGoldBrush" Color="#8B5900" />
+                    <SolidColorBrush x:Key="ToolbarBlueBrush" Color="#00629B" />
+                    <SolidColorBrush x:Key="ToolbarGreenBrush" Color="#147038" />
+                    <SolidColorBrush x:Key="ToolbarPurpleBrush" Color="#7536A0" />
+                    <SolidColorBrush x:Key="ToolbarGrayBrush" Color="#505C6A" />
+                    <SolidColorBrush x:Key="ToolbarRedBrush" Color="#B3262E" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="HighContrast">
+                    <SolidColorBrush x:Key="ToolbarGoldBrush" Color="{ThemeResource SystemColorButtonTextColor}" />
+                    <SolidColorBrush x:Key="ToolbarBlueBrush" Color="{ThemeResource SystemColorButtonTextColor}" />
+                    <SolidColorBrush x:Key="ToolbarGreenBrush" Color="{ThemeResource SystemColorButtonTextColor}" />
+                    <SolidColorBrush x:Key="ToolbarPurpleBrush" Color="{ThemeResource SystemColorButtonTextColor}" />
+                    <SolidColorBrush x:Key="ToolbarGrayBrush" Color="{ThemeResource SystemColorButtonTextColor}" />
+                    <SolidColorBrush x:Key="ToolbarRedBrush" Color="{ThemeResource SystemColorButtonTextColor}" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Page.Resources>
+    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" RowDefinitions="Auto,*,Auto">
+        <CommandBar Grid.Row="0" Margin="8,0,8,4" HorizontalAlignment="Left" Background="Transparent" DefaultLabelPosition="Collapsed" OverflowButtonVisibility="Auto">
+            <AppBarButton x:Name="ApplyButton" MinWidth="40" Label="{x:Bind Localize('Editor_Apply_768af6')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_Apply_768af6')}" Click="ApplyClicked" IsEnabled="False">
+                <AppBarButton.Icon><SymbolIcon Symbol="Accept" Foreground="{ThemeResource ToolbarGreenBrush}" /></AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton AutomationProperties.AutomationId="LoadConfiguration" MinWidth="40" Label="{x:Bind Localize('Editor_LoadConfiguration_0439e7')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_LoadConfiguration_0439e7')}" Click="LoadClicked">
+                <AppBarButton.Icon><SymbolIcon Symbol="OpenFile" Foreground="{ThemeResource ToolbarBlueBrush}" /></AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton AutomationProperties.AutomationId="ReloadConfiguration" MinWidth="40" Label="{x:Bind Localize('Editor_Reload_942438')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_Reload_942438')}" Click="ReloadClicked">
+                <AppBarButton.Icon><SymbolIcon Symbol="Refresh" Foreground="{ThemeResource ToolbarBlueBrush}" /></AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton AutomationProperties.AutomationId="SaveDraft" MinWidth="40" Label="{x:Bind Localize('Editor_SaveDraftSeparately_23cefc')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_SaveDraftSeparately_23cefc')}" Click="SaveClicked">
+                <AppBarButton.Icon><SymbolIcon Symbol="Save" Foreground="{ThemeResource ToolbarBlueBrush}" /></AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarSeparator />
+            <AppBarButton AutomationProperties.AutomationId="ImportDesktop" MinWidth="40" Label="{x:Bind Localize('Editor_ImportDesktop')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_ImportDesktop')}" Click="ImportDesktopClicked">
+                <AppBarButton.Icon><SymbolIcon Symbol="Import" Foreground="{ThemeResource ToolbarGreenBrush}" /></AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarSeparator />
+            <AppBarToggleButton x:Name="PinButton" MinWidth="40" Label="{x:Bind Localize('Editor_AlwaysOnTop_1bee89')}" AutomationProperties.Name="{x:Bind Localize('Editor_KeepTheEditorOnTop_3e7cbb')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_KeepTheEditorAboveOther_eb06b1')}" Click="PinClicked">
+                <AppBarToggleButton.Icon><SymbolIcon Symbol="Pin" /></AppBarToggleButton.Icon>
+            </AppBarToggleButton>
+            <AppBarButton AutomationProperties.AutomationId="OpenSettings" MinWidth="40" Label="{x:Bind Localize('Editor_Settings_7f17c7')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_Settings_7f17c7')}" Click="SettingsClicked">
+                <AppBarButton.Icon><SymbolIcon Symbol="Setting" Foreground="{ThemeResource ToolbarGrayBrush}" /></AppBarButton.Icon>
+            </AppBarButton>
+        </CommandBar>
 
-        <Grid Grid.Row="1" Padding="8,0,8,4" ColumnDefinitions="Auto,*">
-            <StackPanel Orientation="Horizontal">
-                <AppBarButton Icon="Add" Label="{x:Bind Localize('Editor_Create_84370a')}" AutomationProperties.Name="{x:Bind Localize('Editor_CreateMenuItem_b78a7d')}">
-                    <AppBarButton.Flyout>
-                        <MenuFlyout>
-                            <MenuFlyoutItem Text="{x:Bind Localize('Editor_Folder_72cf46')}" Click="AddFolderClicked" />
-                            <MenuFlyoutItem Text="{x:Bind Localize('Editor_File_c1973e')}" Click="AddFileClicked" />
-                            <MenuFlyoutSeparator />
-                            <MenuFlyoutItem Text="{x:Bind Localize('Editor_Action_4fe9c0')}" Click="AddActionClicked" />
-                            <MenuFlyoutItem Text="{x:Bind Localize('Editor_Snippet_720dc5')}" Click="AddSnippetClicked" />
-                            <MenuFlyoutItem Text="{x:Bind Localize('Editor_Group_ae8ad7')}" Click="AddGroupClicked" />
-                            <MenuFlyoutItem Text="{x:Bind Localize('Editor_Separator_afb9a7')}" Click="AddSeparatorClicked" />
-                        </MenuFlyout>
-                    </AppBarButton.Flyout>
-                </AppBarButton>
-                <AppBarButton x:Name="ApplyButton" Icon="Accept" Label="{x:Bind Localize('Editor_Apply_768af6')}" IsEnabled="False" ToolTipService.ToolTip="{x:Bind Localize('Editor_NoChangesToApply_fefed9')}" Click="ApplyClicked" />
-                <AppBarToggleButton x:Name="PinButton" Icon="Pin" Label="{x:Bind Localize('Editor_AlwaysOnTop_1bee89')}" AutomationProperties.Name="{x:Bind Localize('Editor_KeepTheEditorOnTop_3e7cbb')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_KeepTheEditorAboveOther_eb06b1')}" Click="PinClicked" />
-            </StackPanel>
-            <CommandBar Grid.Column="1" Background="Transparent" DefaultLabelPosition="Collapsed" OverflowButtonVisibility="Auto">
-                <AppBarButton x:Name="CutButton" Icon="Cut" Label="{x:Bind Localize('Editor_Cut_1b696e')}" Click="CutClicked" />
-                <AppBarButton x:Name="CopyButton" Icon="Copy" Label="{x:Bind Localize('Editor_Copy_4a05d8')}" Click="CopyClicked" />
-                <AppBarButton Icon="Paste" Label="{x:Bind Localize('Editor_InsertText_9ebca7')}" AutomationProperties.Name="{x:Bind Localize('Editor_CreateASnippetFromThe_f97cea')}" Click="PasteTextClicked" />
-                <AppBarButton x:Name="PasteButton" Icon="Paste" Label="{x:Bind Localize('Editor_Insert_eeb8ca')}" Click="PasteClicked" />
-                <AppBarButton x:Name="RenameButton" Icon="Rename" Label="{x:Bind Localize('Editor_Rename_715e8f')}" Click="RenameClicked" />
-                <AppBarButton x:Name="DuplicateButton" Icon="Copy" Label="{x:Bind Localize('Editor_Duplicate_c9a345')}" Click="DuplicateClicked" />
-                <AppBarButton x:Name="DeleteButton" Icon="Delete" Label="{x:Bind Localize('Editor_Delete_86ea33')}" Click="DeleteClicked" />
-                <AppBarSeparator />
-                <AppBarButton Icon="Setting" Label="{x:Bind Localize('Editor_Settings_7f17c7')}" AutomationProperties.AutomationId="OpenSettings" Click="SettingsClicked" />
-            </CommandBar>
-        </Grid>
-
-        <Grid x:Name="WorkspaceGrid" Grid.Row="2" Padding="16,0,16,0">
+        <Grid x:Name="WorkspaceGrid" Grid.Row="1" Padding="8,0,16,0" ColumnSpacing="8">
             <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="380" />
-                <ColumnDefinition Width="8" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <Grid x:Name="MenuPanel" Grid.Column="0" RowDefinitions="Auto,*,Auto" AllowDrop="True" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="12">
+            <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" VerticalAlignment="Stretch">
+                <StackPanel Spacing="2">
+                    <Button Style="{StaticResource SubtleButtonStyle}" AutomationProperties.AutomationId="CreateFolder" Width="40" Height="40" Padding="0" AutomationProperties.Name="{x:Bind Localize('Editor_Folder_72cf46')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_Folder_72cf46')}" Click="AddFolderClicked">
+                        <SymbolIcon Symbol="Folder" Foreground="{ThemeResource ToolbarGoldBrush}" />
+                    </Button>
+                    <Button Style="{StaticResource SubtleButtonStyle}" Width="40" Height="40" Padding="0" AutomationProperties.Name="{x:Bind Localize('Editor_File_c1973e')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_File_c1973e')}" Click="AddFileClicked">
+                        <SymbolIcon Symbol="Document" Foreground="{ThemeResource ToolbarBlueBrush}" />
+                    </Button>
+                    <Button Style="{StaticResource SubtleButtonStyle}" Width="40" Height="40" Padding="0" AutomationProperties.Name="{x:Bind Localize('Editor_Action_4fe9c0')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_Action_4fe9c0')}" Click="AddActionClicked">
+                        <SymbolIcon Symbol="Play" Foreground="{ThemeResource ToolbarPurpleBrush}" />
+                    </Button>
+                    <Button Style="{StaticResource SubtleButtonStyle}" Width="40" Height="40" Padding="0" AutomationProperties.Name="{x:Bind Localize('Editor_Snippet_720dc5')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_Snippet_720dc5')}" Click="AddSnippetClicked">
+                        <SymbolIcon Symbol="Edit" Foreground="{ThemeResource ToolbarBlueBrush}" />
+                    </Button>
+                    <Button Style="{StaticResource SubtleButtonStyle}" Width="40" Height="40" Padding="0" AutomationProperties.Name="{x:Bind Localize('Editor_Group_ae8ad7')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_Group_ae8ad7')}" Click="AddGroupClicked">
+                        <SymbolIcon Symbol="AllApps" Foreground="{ThemeResource ToolbarBlueBrush}" />
+                    </Button>
+                    <Button Style="{StaticResource SubtleButtonStyle}" Width="40" Height="40" Padding="0" AutomationProperties.Name="{x:Bind Localize('Editor_Separator_afb9a7')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_Separator_afb9a7')}" Click="AddSeparatorClicked">
+                        <SymbolIcon Symbol="Remove" Foreground="{ThemeResource ToolbarGrayBrush}" />
+                    </Button>
+                </StackPanel>
+            </ScrollViewer>
+            <Grid x:Name="MenuPanel" Grid.Column="1" RowDefinitions="Auto,*,Auto" AllowDrop="True" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
                 <StackPanel Padding="12,10,12,6" Spacing="4">
                     <TextBlock Text="{x:Bind Localize('Editor_ItemOrderAndHierarchy_0718c3')}" Opacity="0.6" FontSize="12" />
                 </StackPanel>
@@ -68,13 +96,19 @@
                           DragItemsStarting="MenuTreeDragItemsStarting" DragItemsCompleted="MenuTreeDragItemsCompleted" AllowDrop="True">
                     <TreeView.ItemTemplate>
                         <DataTemplate>
-                            <TreeViewItem Content="{Binding Content}" />
+                            <TreeViewItem Content="{Binding Content}" MinHeight="30" Padding="0,2" />
                         </DataTemplate>
                     </TreeView.ItemTemplate>
                     <TreeView.ContextFlyout>
                         <MenuFlyout>
-                            <MenuFlyoutItem Text="{x:Bind Localize('Editor_Duplicate_c9a345')}" Click="DuplicateClicked" />
-                            <MenuFlyoutItem Text="{x:Bind Localize('Editor_Delete_86ea33')}" Click="DeleteClicked" />
+                            <MenuFlyoutItem x:Name="CutButton" KeyboardAcceleratorTextOverride="Ctrl+X" Text="{x:Bind Localize('Editor_Cut_1b696e')}" Click="CutClicked"><MenuFlyoutItem.Icon><SymbolIcon Symbol="Cut" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                            <MenuFlyoutItem x:Name="CopyButton" KeyboardAcceleratorTextOverride="Ctrl+C" Text="{x:Bind Localize('Editor_Copy_4a05d8')}" Click="CopyClicked"><MenuFlyoutItem.Icon><SymbolIcon Symbol="Copy" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                            <MenuFlyoutItem x:Name="PasteButton" KeyboardAcceleratorTextOverride="Ctrl+Shift+V" Text="{x:Bind Localize('Editor_Insert_eeb8ca')}" Click="PasteClicked"><MenuFlyoutItem.Icon><SymbolIcon Symbol="Paste" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                            <MenuFlyoutItem KeyboardAcceleratorTextOverride="Ctrl+V" Text="{x:Bind Localize('Editor_InsertText_9ebca7')}" Click="PasteTextClicked"><MenuFlyoutItem.Icon><SymbolIcon Symbol="Paste" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                            <MenuFlyoutSeparator />
+                            <MenuFlyoutItem x:Name="RenameButton" KeyboardAcceleratorTextOverride="F2" Text="{x:Bind Localize('Editor_Rename_715e8f')}" Click="RenameClicked"><MenuFlyoutItem.Icon><SymbolIcon Symbol="Rename" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                            <MenuFlyoutItem x:Name="DuplicateButton" Text="{x:Bind Localize('Editor_Duplicate_c9a345')}" Click="DuplicateClicked"><MenuFlyoutItem.Icon><SymbolIcon Symbol="Copy" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                            <MenuFlyoutItem x:Name="DeleteButton" KeyboardAcceleratorTextOverride="Del" Text="{x:Bind Localize('Editor_Delete_86ea33')}" Click="DeleteClicked"><MenuFlyoutItem.Icon><SymbolIcon Symbol="Delete" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
                         </MenuFlyout>
                     </TreeView.ContextFlyout>
                 </TreeView>
@@ -83,8 +117,7 @@
                 </Canvas>
                 <TextBlock Grid.Row="2" x:Name="DropHint" Margin="12,6,12,10" Text="{x:Bind Localize('Editor_DragFilesFoldersOrText_2e21d1')}" FontSize="12" Opacity="0.6" TextWrapping="Wrap" />
             </Grid>
-            <Border Grid.Column="1" Width="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
-            <Grid x:Name="DetailsPanel" Grid.Column="2" RowDefinitions="Auto,*" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="12">
+            <Grid x:Name="DetailsPanel" Grid.Column="2" RowDefinitions="Auto,*" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
                 <StackPanel Padding="14,10,14,6" Spacing="3">
                     <TextBlock x:Name="PropertiesHint" Text="{x:Bind Localize('Editor_SelectAnItemOnThe_2c92bb')}" FontSize="12" Opacity="0.6" />
                 </StackPanel>
@@ -93,6 +126,6 @@
                 </ScrollViewer>
             </Grid>
         </Grid>
-        <InfoBar x:Name="Notice" Grid.Row="3" IsOpen="False" IsClosable="True" Margin="20,12" Severity="Informational" />
+        <InfoBar x:Name="Notice" Grid.Row="2" IsOpen="False" IsClosable="True" Margin="20,12" Severity="Informational" />
     </Grid>
 </Page>
