@@ -85,7 +85,7 @@ public partial class App
         }
         finally { failureWindow.Close(); }
         var items = new List<MenuFlyoutItemBase>();
-        LauncherMenu.Fill(items, [new MenuNode { Name = "Group", Kind = MenuNodeKind.Group, Children = [new MenuNode { Name = "Child", Kind = MenuNodeKind.Action }] }], _ => {}, settings.Current.MenuFontSize);
+        LauncherMenu.Fill(items, [new MenuNode { Name = "Group", Kind = MenuNodeKind.Group, Children = [new MenuNode { Name = "Child", Kind = MenuNodeKind.Action }] }], _ => {}, _ => {}, settings.Current.MenuFontSize);
         var group = (MenuFlyoutSubItem)items[0];
         if (group.FontSize != 18 || ((MenuFlyoutItem)group.Items[0]).FontSize != 18) throw new Exception("Font size not propagated to nested menus");
     }

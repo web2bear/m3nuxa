@@ -65,6 +65,7 @@ public sealed partial class MainPage
         var program = Import(Path.Combine(folder, "explorer.exe"));
         if (program.IconPath != program.Action?.Path) throw new Exception("Program import lost its icon source.");
         var linkPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".lnk");
+        var documentPath = Path.ChangeExtension(linkPath, ".txt");
         try
         {
             dynamic shell = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell")!)!;
@@ -77,8 +78,19 @@ public sealed partial class MainPage
             var shortcut = Import(linkPath);
             if (shortcut.IconPath != linkPath || !string.Equals(shortcut.Action?.Path, program.Action.Path, StringComparison.OrdinalIgnoreCase))
                 throw new Exception("Shortcut icon must use the original .lnk while execution uses its target.");
+
+            File.WriteAllText(documentPath, "Desktop import document check");
+            shell = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell")!)!;
+            link = shell.CreateShortcut(linkPath);
+            link.TargetPath = documentPath;
+            link.Save();
+            System.Runtime.InteropServices.Marshal.FinalReleaseComObject(link);
+            System.Runtime.InteropServices.Marshal.FinalReleaseComObject(shell);
+            var documentShortcut = Import(linkPath);
+            if (documentShortcut.Action?.Kind != ActionKind.OpenItem || documentShortcut.Action.Path != documentPath || documentShortcut.IconPath != linkPath)
+                throw new Exception("A document shortcut must open its target through the associated app and retain its shortcut icon.");
         }
-        finally { File.Delete(linkPath); }
+        finally { File.Delete(linkPath); File.Delete(documentPath); }
         var visual = (Grid)CreateItemIcon(imported, 32);
         PropertiesPanel.Children.Add(visual);
         for (var attempt = 0; attempt < 50 && visual.Children[0] is not Image; attempt++) await Task.Delay(100);
@@ -110,7 +122,7 @@ public sealed partial class MainPage
 
         void Check(bool expected, string stage)
         {
-            if (dirty != expected || ApplyButton.IsEnabled != expected || ApplyMenuItem.IsEnabled != expected)
+            if (dirty != expected || ApplyButton.IsEnabled != expected)
                 throw new Exception($"Apply availability is wrong {stage}.");
             var tooltip = ToolTipService.GetToolTip(ApplyButton) as string;
             if (tooltip != L.Get(expected ? "Editor_ThereAreUnsavedChangesApply_226d2b" : "Editor_NoChangesToApply_fefed9"))

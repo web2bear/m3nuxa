@@ -412,4 +412,35 @@ or select an existing item.</value>
   <data name="Editor_WorkingDirectory_72e5f4" xml:space="preserve">
     <value>Working directory</value>
   </data>
+  <data name="Editor_ImportDesktop" xml:space="preserve">
+    <value>Import desktop…</value>
+  </data>
+  <data name="Editor_DesktopFoldersAsGroups" xml:space="preserve">
+    <value>Folders as groups</value>
+  </data>
+  <data name="Editor_DesktopFoldersAsLinks" xml:space="preserve">
+    <value>Folders as open-folder actions</value>
+  </data>
+  <data name="Editor_PreviewDesktop" xml:space="preserve">
+    <value>Preview desktop import</value>
+  </data>
+  <data name="Editor_DesktopGroup" xml:space="preserve">
+    <value>Desktop</value>
+  </data>
+  <data name="Editor_DesktopSkipped" xml:space="preserve">
+    <value>Skipped items:</value>
+  </data>
+  <data name="Editor_DesktopAdd" xml:space="preserve">
+    <value>Add to draft</value>
+  </data>
+  <data name="Editor_DesktopInvalidUrl" xml:space="preserve">
+    <value>Unsupported or invalid URL</value>
+  </data>
+  <data name="Editor_DesktopLimit" xml:space="preserve">
+    <value>Import stopped after 500 items. Narrow the selection or use folder actions.</value>
+  </data>
+  <data name="Editor_SelectionNotInDraft" xml:space="preserve"><value>This item is not present in the current draft.</value></data>
+  <data name="Editor_MoreCreate" xml:space="preserve"><value>More creation commands</value></data>
+  <data name="Editor_ConfigurationMenu" xml:space="preserve"><value>Configuration</value></data>
+  <data name="Editor_UnpinWindow" xml:space="preserve"><value>Unpin window from the top</value></data>
 </root>

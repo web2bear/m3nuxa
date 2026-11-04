@@ -1,5 +1,6 @@
 <Project>
   <PropertyGroup>
+    <Version>0.2.0-alpha</Version>
     <SatelliteResourceLanguages>en-US;ru-RU</SatelliteResourceLanguages>
   </PropertyGroup>
   <ItemGroup>

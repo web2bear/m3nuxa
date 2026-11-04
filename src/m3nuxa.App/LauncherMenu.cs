@@ -10,7 +10,7 @@ internal static class LauncherMenu
 {
     public static MenuFlyout Create() => new() { MenuFlyoutPresenterStyle = (Style)Application.Current.Resources["LauncherPresenterStyle"] };
 
-    public static void Fill(IList<MenuFlyoutItemBase> target, IEnumerable<MenuNode> nodes, Action<MenuNode> execute, double fontSize = 12)
+    public static void Fill(IList<MenuFlyoutItemBase> target, IEnumerable<MenuNode> nodes, Action<MenuNode> execute, Action<MenuNode> edit, double fontSize = 12)
     {
         foreach (var node in nodes)
         {
@@ -18,12 +18,14 @@ internal static class LauncherMenu
             if (node.Kind == MenuNodeKind.Group)
             {
                 var group = new MenuFlyoutSubItem { Text = node.Name, FontSize = fontSize };
-                target.Add(group); Fill(group.Items, node.Children, execute, fontSize); LoadIcon(group, node);
+                group.RightTapped += (_, e) => { e.Handled = true; edit(node); };
+                target.Add(group); Fill(group.Items, node.Children, execute, edit, fontSize); LoadIcon(group, node);
             }
             else
             {
                 var item = new MenuFlyoutItem { Text = node.Name, FontSize = fontSize, KeyboardAcceleratorTextOverride = node.Hotkey ?? "" };
                 item.Click += (_, _) => execute(node);
+                item.RightTapped += (_, e) => { e.Handled = true; edit(node); };
                 target.Add(item); LoadIcon(item, node);
             }
         }

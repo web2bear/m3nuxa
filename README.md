@@ -1,65 +1,87 @@
+<div align="center">
+
 # m3nuxa
 
-Персональное меню быстрых действий для Windows 11: любимые папки, программы, скрипты и текстовые заготовки под рукой. Вызовите меню у курсора сочетанием клавиш или откройте его из трея.
+### Your workflow. One shortcut away.
 
-## Что умеет
+A personal command menu for Windows 11. Bring your apps, project folders, scripts, and text snippets together — right where you're working.
 
-- **Открывать папки и запускать программы** с заданными аргументами и рабочей папкой.
-- **Запускать BAT, CMD и PowerShell-скрипты** с параметрами, видимой или скрытой консолью.
-- **Отправлять сочетания клавиш и вставлять текстовые заготовки** в окно, из которого вызвано меню.
-- **Копировать и перемещать выделенные в Проводнике файлы и папки** в заранее выбранные места. Для файловых операций предусмотрены прогресс, отмена и обработка совпадающих имён.
-- **Организовывать действия во вложенные группы** с иконками и разделителями. Группе можно назначить сочетание для открытия её подменю, действию — для прямого запуска.
-- **Настраивать меню в визуальном редакторе**: добавлять программы, скрипты, ярлыки и папки перетаскиванием, менять порядок пунктов, дублировать их, отменять и повторять правки.
-- **Редактировать меню через AI-агента по MCP**: читать дерево, готовить и проверять изменения, применять их с резервной копией.
+**[Download for Windows](https://github.com/web2bear/m3nuxa/releases)** · [Quick start](#get-started-in-minutes) · [User guide](docs/USER_GUIDE.md) · [Русский](docs/README-RU.md)
 
-## Для каких задач
+Windows 11 · Portable · English & Russian · Native Windows interface
 
-Соберите рабочие инструменты в одном месте: например, группу проекта с папкой исходников, IDE и скриптами запуска. Вынесите часто используемые команды приложений и текстовые ответы в отдельные пункты. Создайте действия для раскладывания выбранных файлов по рабочим папкам без повторного поиска назначения.
+</div>
 
-Приложение работает в трее. Настройки и меню хранятся рядом с ним, поэтому portable-папку можно переносить между компьютерами; пути к внешним программам и папкам нужно учитывать при переносе.
+![A compact, nested m3nuxa menu with Workspaces, Web & Apps, Text snippets, and File actions](docs/screenshots/showcase/quick-menu.png)
 
-## Установка и первый запуск
+## Less searching. More doing.
 
-Требуется **Windows 11**. Для готовой автономной portable-сборки отдельная установка .NET не нужна.
+Open your project folder. Launch your editor. Paste a meeting template. Send selected files to their destination. Put the actions you repeat into a menu that follows your workflow.
 
-1. Поместите всю папку portable-сборки в каталог, доступный для записи.
-2. Запустите `m3nuxa.App.exe`. Редактор `m3nuxa.Editor.exe` должен находиться в той же папке.
-3. Нажмите правой кнопкой на значок в трее и откройте редактор. Добавьте свои пункты и нажмите **«Применить»**.
-4. Откройте меню левым кликом по значку или сочетанием **Ctrl+Alt+Space**.
+Press **Ctrl+Alt+Space** to open your menu at the cursor, or click the tray icon. Use nested groups to keep a growing collection easy to navigate. Give an action its own hotkey for direct access, or assign one to a group to open just that part of your menu.
 
-Сочетание вызова, размер шрифта и язык интерфейса меняются через настройки в трее или шестерёнку редактора. Доступны English и Русский; по умолчанию выбран английский. Язык меню трея и настроек меняется сразу. Чтобы изменить язык уже открытого редактора, сохраните его изменения и откройте редактор заново. Автозапуск включается в служебном меню трея. Перед сохранением дерева создаётся резервная копия; хранятся десять последних версий.
+## A home for your everyday actions
 
-## Сборка из исходников
+- **Launch your workspace.** Keep project folders, apps, websites, and scripts together. Set arguments and working directories for the tools you use.
+- **Make repeated typing effortless.** Insert ready-to-use replies, meeting notes, and other text snippets into the window you were using.
+- **Work with the files you selected.** Copy or move files from Explorer to a chosen destination, with progress, cancellation, and file-conflict handling.
+- **Keep useful shortcuts close.** Send a keyboard shortcut to the source application from a named menu action.
+- **Use the context you already have.** Build actions around the current Explorer folder, selected file path, file name, or parent folder.
 
-На Windows установите **.NET 10 SDK**, скачайте или клонируйте репозиторий и выполните PowerShell-команду из его корня:
+## Build a menu that feels like yours
 
-```powershell
-.\publish-portable.ps1
-```
+The visual editor puts your menu tree and the selected item's settings side by side. Add groups, actions, snippets, and separators; drag items into place; choose icons that make each command easy to recognize.
 
-Скрипт соберёт автономную Release-версию для x64 в `dist/m3nuxa/` и запустит приложение. Переносить нужно эту папку целиком.
+![The m3nuxa visual editor showing a nested workflow and a Copy selected items action with its destination folder](docs/screenshots/showcase/editor.png)
 
-Для другой архитектуры:
+Drag supported files, folders, or shortcuts into the tree to create actions. Import items from your desktop to get started faster. Changes stay in a draft until you click **Apply**, and a backup is created before the saved configuration is replaced.
 
-```powershell
-.\publish-portable.ps1 -RuntimeIdentifier win-x86
-.\publish-portable.ps1 -RuntimeIdentifier win-arm64
-```
+**Try a few useful collections:**
 
-**Перед повторной сборкой сохраните правки в редакторе:** скрипт останавливает запущенные App и Editor, а после успешной публикации запускает новый App.
+- **Project workspace** — source folder, code editor, terminal, and documentation.
+- **Writing toolkit** — reusable replies, meeting templates, and text shortcuts.
+- **File workflow** — common destinations and actions for selected Explorer items.
 
-## Текущие ограничения
+## Quietly available from the tray
 
-Получение выделенного текста из сторонних приложений пока не включено. Вставка заранее заданного текста поддерживается, но подстановка `selectedText` возвращает ошибку отсутствующего контекста. Работа с выделением Проводника, возврат фокуса и открытие нового окна Проводника требуют проверки в вашей среде Windows 11.
+Open the editor, reload your configuration, change settings, or enable startup with Windows from the tray menu. Customize the menu hotkey, font size, and interface language in settings.
 
-## Документация
+<p align="center">
+  <img src="docs/screenshots/showcase/tray-menu.png" alt="The m3nuxa tray menu with editor, settings, reload, MCP server, and startup options" width="420">
+</p>
 
-- [Редактор, горячие клавиши и хранение настроек](docs/USER_GUIDE.md).
-- [Подключение AI-агента через MCP](docs/MCP.md).
-- [Отладка, диагностика и проверки](docs/DEVELOPMENT.md).
-- [Наборы иконок](docs/ICON_PACKS.md).
-- [Термины проекта](docs/CONTEXT.md) и [требования](docs/REQUIREMENTS.md).
-- [История продуктовых решений](docs/PRODUCT_DISCOVERY.md) и [обзор согласованных требований](docs/REQUIREMENTS_REVIEW.md).
-- Исследования: [библиотеки автоматизации](docs/research-dotnet-automation-libraries.md), [LibreAutomate](docs/research-libreautomate.md), [интеграция с Windows](docs/research-windows-menu-platform.md).
+## Let your AI assistant help organize it
 
-Требования и исследования фиксируют решения на дату написания и могут включать ещё не реализованные сценарии.
+m3nuxa includes a local **MCP server**. A compatible assistant can read your menu, prepare a separate draft, create or rearrange items, validate the result, and apply changes with a backup.
+
+Describe the workflow you want — for example, “Create a group for my project with its folder, editor, documentation, and a meeting-notes snippet.” Your assistant can turn that request into editable menu items.
+
+[Connect an assistant through MCP →](docs/MCP.md)
+
+## Get started in minutes
+
+1. **[Download a portable build from Releases](https://github.com/web2bear/m3nuxa/releases)** and extract the entire archive into a writable folder.
+2. Run **m3nuxa.App.exe**. Keep the editor and the other supplied files alongside it.
+3. Right-click the tray icon and choose **Edit configuration**. Add a few actions, then click **Apply**.
+4. Press **Ctrl+Alt+Space** and make it your own.
+
+The self-contained portable build does not require a separate .NET installation. Keep the whole folder when moving it: configuration and settings live alongside the application. Paths to external apps and folders must still be valid on the destination computer.
+
+> **Preview software:** check the release notes for the build you download. The screenshots show the current development interface; an earlier release may look different.
+
+## Details & documentation
+
+**Requirements:** Windows 11. The interface is available in English and Russian. The default portable build targets x64; source publishing also supports x86 and ARM64.
+
+**Current scope:** predefined text insertion is supported. Reading selected text from other applications is not implemented; templates that depend on `selectedText` are not available. Explorer selection and returning focus to another application depend on the Windows environment.
+
+**Build from source:** install the .NET 10 SDK and the Windows/WinUI build prerequisites, then run `./publish-portable.ps1` from the repository root. Save editor changes first: the script stops running instances, publishes both components, and starts the tray app. See the development guide for checks and diagnostics.
+
+- [User guide: editing, hotkeys, and settings](docs/USER_GUIDE.md)
+- [MCP setup and supported tools](docs/MCP.md)
+- [Development, debugging, and checks](docs/DEVELOPMENT.md)
+- [Included icons and attribution](docs/ICON_PACKS.md)
+- [Previous README and detailed setup in Russian](docs/README-RU.md)
+- [Domain terminology](docs/CONTEXT.md) · [Requirements](docs/REQUIREMENTS.md) · [Product decisions](docs/PRODUCT_DISCOVERY.md)
+
+Most detailed project documentation is currently in Russian. Requirements and research notes record decisions at the time they were written; the current implementation and release notes define what a particular build supports.

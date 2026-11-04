@@ -5,6 +5,7 @@ using Windows.Graphics;
 using Windows.ApplicationModel.DataTransfer;
 using System.Runtime.InteropServices;
 using System.Diagnostics;
+using System.IO.Pipes;
 using System.Text.Json;
 using Microsoft.Win32;
 
@@ -169,16 +170,38 @@ internal sealed class TrayApplication : IDisposable
         }
     }
 
-    private void OpenEditor()
+    private void OpenEditor() => OpenEditor(null);
+
+    private async void OpenEditor(string? nodeId)
     {
         DevLog.Write("app", "OpenEditor requested");
+        var path = Path.Combine(AppContext.BaseDirectory, "m3nuxa.Editor.exe");
+        if (_editor is null || _editor.HasExited)
+        {
+            _editor = Process.GetProcessesByName("m3nuxa.Editor").FirstOrDefault(process =>
+            {
+                try { return string.Equals(process.MainModule?.FileName, path, StringComparison.OrdinalIgnoreCase); }
+                catch (Exception ex) { DevLog.Write("app", "Could not inspect editor process", ex); return false; }
+            });
+        }
         if (_editor is { HasExited: false })
         {
             DevLog.Write("app", $"Editor already running pid={_editor.Id} hwnd={_editor.MainWindowHandle}");
+            if (nodeId is not null)
+            {
+                try
+                {
+                    using var pipe = new NamedPipeClientStream(".", $"m3nuxa-editor-{Environment.UserName}-{_editor.Id}", PipeDirection.Out);
+                    await pipe.ConnectAsync(1000);
+                    using var writer = new StreamWriter(pipe) { AutoFlush = true };
+                    await writer.WriteLineAsync(nodeId);
+                }
+                catch (Exception ex) { DevLog.Write("app", "Could not select editor item", ex); }
+            }
+            _editor.Refresh();
             if (_editor.MainWindowHandle != IntPtr.Zero) NativeMethods.SetForegroundWindow(_editor.MainWindowHandle);
             return;
         }
-        var path = Path.Combine(AppContext.BaseDirectory, "m3nuxa.Editor.exe");
         if (!File.Exists(path))
         {
             DevLog.Write("app", $"Editor not found: {path}");
@@ -187,7 +210,9 @@ internal sealed class TrayApplication : IDisposable
         }
         try
         {
-            _editor = Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+            var start = new ProcessStartInfo(path) { UseShellExecute = true };
+            if (nodeId is not null) { start.ArgumentList.Add("--select"); start.ArgumentList.Add(nodeId); }
+            _editor = Process.Start(start);
             DevLog.Write("app", $"Editor process started pid={_editor?.Id}");
             if (_editor is not null)
             {
@@ -214,7 +239,7 @@ internal sealed class TrayApplication : IDisposable
     {
         var invocation = InvocationContext.Capture(_foreground.LastWindow);
         var menu = LauncherMenu.Create();
-        LauncherMenu.Fill(menu.Items, nodes, node => _ = Execute(node, invocation), _settings.Current.MenuFontSize);
+        LauncherMenu.Fill(menu.Items, nodes, node => _ = Execute(node, invocation), node => { _menu?.Hide(); OpenEditor(node.Id); }, _settings.Current.MenuFontSize);
         if (menu.Items.Count == 0) menu.Items.Add(new MenuFlyoutItem { Text = L.Get("TrayEmptyMenu"), IsEnabled = false });
         ShowFlyout(menu);
     }
