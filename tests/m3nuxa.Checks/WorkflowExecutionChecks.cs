@@ -10,6 +10,14 @@ internal static class WorkflowExecutionChecks
         var directory = Path.Combine(root, "workflow-execution");
         Directory.CreateDirectory(directory);
         var context = new InvocationContext(IntPtr.Zero, [], null);
+        var unknown = await ActionExecutor.ExecuteAsync(new MenuAction { Kind = (ActionKind)999 }, context);
+        Check(!unknown.Success && unknown.Error == L.Get("ActionUnknown"), "unknown action reports a safe error");
+        var sensitivePath = Path.Combine(directory, "sensitive missing folder");
+        var sensitive = await ActionExecutor.ExecuteAsync(
+            new MenuAction { Kind = ActionKind.OpenFolder, Path = "{clipboardText}" },
+            context with { ClipboardText = sensitivePath });
+        Check(!sensitive.Success && sensitive.Error == L.Get("WorkflowSensitiveError") &&
+            !sensitive.Error.Contains(sensitivePath, StringComparison.Ordinal), "handler errors do not expose sensitive values");
         var observed = new List<int>();
         var timer = Stopwatch.StartNew();
         var result = await WorkflowExecutor.RunAsync([
@@ -45,7 +53,7 @@ internal static class WorkflowExecutionChecks
         Directory.CreateDirectory(sourceDir); Directory.CreateDirectory(targetDir);
         var sourceFile = Path.Combine(sourceDir, "move.txt");
         var targetFile = Path.Combine(targetDir, "move.txt");
-        var copyOrMove = typeof(ActionExecutor).GetMethod("CopyOrMove", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+        var copyOrMove = typeof(FileActionOperations).GetMethod("CopyOrMove", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
         ActionResult RunMove(Func<string, FileConflictChoice> conflict) => (ActionResult)copyOrMove.Invoke(null,
             [new[] { sourceFile }, targetDir, true, CancellationToken.None, (Action<int, string>)((_, _) => { }), conflict])!;
         File.WriteAllText(sourceFile, "new content");
