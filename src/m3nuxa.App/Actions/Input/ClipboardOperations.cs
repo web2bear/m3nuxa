@@ -79,4 +79,3 @@ internal static class ClipboardOperations
         }
     }
 }
-
