@@ -39,6 +39,7 @@ public partial class App : Application
                     throw new Exception($"Check window is outside the additional screen work area: {position.X},{position.Y}, {size.Width}x{size.Height}.");
             }
             page.CheckLocalization();
+            page.CheckConfigurationTitle();
             if (Environment.GetEnvironmentVariable("m3nuxa_DROP_CHECK") is { } snapshotPath)
             {
                 page.SetupDropChecks();
@@ -65,7 +66,9 @@ public partial class App : Application
                 if (picker.StartFolder != bundled) throw new Exception("Deleted last folder must fall back to the bundle.");
             }
             finally { Directory.Delete(pickerRoot, true); }
+            await page.CheckPropertyPanelLayoutAsync();
             await page.CheckContextVariablesAsync();
+            await page.CheckWorkflowStepsAsync();
             await page.CheckTreeIconConsistencyAsync();
             await page.CheckExplorerIconsAsync();
             await page.CheckTreeReorderAsync();

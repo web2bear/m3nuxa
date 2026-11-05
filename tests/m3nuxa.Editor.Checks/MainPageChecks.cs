@@ -5,6 +5,22 @@ namespace m3nuxa.Editor.Views;
 
 public sealed partial class MainPage
 {
+    private IEnumerable<UIElement> PropertyElements() => PropertiesPanel.Children.SelectMany(child =>
+        child is Border { Child: StackPanel section } ? section.Children.Cast<UIElement>() : Enumerable.Repeat(child, 1));
+
+    internal void CheckConfigurationTitle()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "config.json");
+        var imported = Path.Combine(Path.GetTempPath(), "imported.json");
+        UpdateConfigurationTitle(new EditorResponse(true, null, new System.Text.Json.Nodes.JsonObject { ["configPath"] = path }));
+        if (!App.MainWindow.Title.Contains(path, StringComparison.Ordinal)) throw new Exception("Active configuration path missing from title.");
+        ShowConfigurationTitle(imported);
+        if (!App.MainWindow.Title.Contains(path, StringComparison.Ordinal) || !App.MainWindow.Title.Contains(imported, StringComparison.Ordinal))
+            throw new Exception("Imported source and apply destination should both be shown.");
+        UpdateConfigurationTitle(new EditorResponse(true, null, new System.Text.Json.Nodes.JsonObject()));
+        if (App.MainWindow.Title.Contains(path, StringComparison.Ordinal)) throw new Exception("Unsaved configuration should not show an old path.");
+    }
+
     internal void CheckLocalization()
     {
         var expectedLanguage = Environment.GetEnvironmentVariable("m3nuxa_CHECK_LANGUAGE") ?? "en-US";
@@ -159,7 +175,7 @@ public sealed partial class MainPage
             MenuTree.SelectedNode = FindTreeNode(MenuTree.RootNodes, id);
             await SettleAsync();
             var model = id == group.Id ? group : action;
-            if (selected?.Id != id || PropertiesPanel.Children[0] is not TextBox name || name.Text != model.Name)
+            if (selected?.Id != id || PropertyElements().OfType<TextBox>().FirstOrDefault() is not TextBox name || name.Text != model.Name)
                 throw new Exception($"Properties show the wrong model for {model.Name}.");
             CheckRows("after selection");
         }
@@ -167,10 +183,12 @@ public sealed partial class MainPage
         // A pending name edit must still target its original item after selection changes.
         MenuTree.SelectedNode = FindTreeNode(MenuTree.RootNodes, action.Id);
         await SettleAsync();
-        var actionName = (TextBox)PropertiesPanel.Children[0];
+        var actionName = PropertyElements().OfType<TextBox>().First();
+        var oldSection = (StackPanel)((Border)PropertiesPanel.Children[0]).Child;
         MenuTree.SelectedNode = FindTreeNode(MenuTree.RootNodes, group.Id);
         await SettleAsync();
         // Keep the old editor loaded while delivering its pending edit.
+        oldSection.Children.Remove(actionName);
         PropertiesPanel.Children.Add(actionName);
         actionName.Text = "VLC renamed";
         await SettleAsync();

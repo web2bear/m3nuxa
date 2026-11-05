@@ -443,4 +443,38 @@
   <data name="Editor_MoreCreate" xml:space="preserve"><value>Другие команды создания</value></data>
   <data name="Editor_ConfigurationMenu" xml:space="preserve"><value>Конфигурация</value></data>
   <data name="Editor_UnpinWindow" xml:space="preserve"><value>Открепить окно поверх остальных</value></data>
+  <data name="Workflow_Steps" xml:space="preserve"><value>Шаги</value></data>
+  <data name="Workflow_Add" xml:space="preserve"><value>Добавить</value></data>
+  <data name="Workflow_Duplicate" xml:space="preserve"><value>Дублировать</value></data>
+  <data name="Workflow_Delete" xml:space="preserve"><value>Удалить</value></data>
+  <data name="Workflow_MoveUp" xml:space="preserve"><value>Вверх</value></data>
+  <data name="Workflow_MoveDown" xml:space="preserve"><value>Вниз</value></data>
+  <data name="Workflow_RestoreClipboard" xml:space="preserve"><value>Восстанавливать предыдущее содержимое буфера</value></data>
+  <data name="Workflow_Duration" xml:space="preserve"><value>Длительность</value></data>
+  <data name="Workflow_Units" xml:space="preserve"><value>Единицы</value></data>
+  <data name="Workflow_Milliseconds" xml:space="preserve"><value>Миллисекунды</value></data>
+  <data name="Workflow_Seconds" xml:space="preserve"><value>Секунды</value></data>
+  <data name="Workflow_Minutes" xml:space="preserve"><value>Минуты</value></data>
+  <data name="Workflow_Wait" xml:space="preserve"><value>Ожидать завершения процесса</value></data>
+  <data name="Workflow_TimeoutEnabled" xml:space="preserve"><value>Ограничить время ожидания</value></data>
+  <data name="Workflow_TimeoutMs" xml:space="preserve"><value>Время ожидания (миллисекунды)</value></data>
+  <data name="Workflow_Delay" xml:space="preserve"><value>Задержка</value></data>
+  <data name="Workflow_SetClipboard" xml:space="preserve"><value>Записать текст в буфер</value></data>
+  <data name="Workflow_PasteText" xml:space="preserve"><value>Вставить текст</value></data>
+  <data name="Workflow_ValueSources" xml:space="preserve"><value>Буфер, окружение и папки</value></data>
+  <data name="Workflow_ClipboardValue" xml:space="preserve"><value>Текст буфера на момент выполнения шага</value></data>
+  <data name="Workflow_EnvValue" xml:space="preserve"><value>Переменная окружения; измените её имя</value></data>
+  <data name="Workflow_Desktop" xml:space="preserve"><value>Рабочий стол</value></data>
+  <data name="Workflow_Documents" xml:space="preserve"><value>Документы</value></data>
+  <data name="Workflow_Downloads" xml:space="preserve"><value>Загрузки</value></data>
+  <data name="Workflow_Pictures" xml:space="preserve"><value>Изображения</value></data>
+  <data name="Workflow_Music" xml:space="preserve"><value>Музыка</value></data>
+  <data name="Workflow_Videos" xml:space="preserve"><value>Видео</value></data>
+  <data name="Workflow_Profile" xml:space="preserve"><value>Профиль пользователя</value></data>
+  <data name="Workflow_Temp" xml:space="preserve"><value>Временная папка</value></data>
+  <data name="Workflow_Required" xml:space="preserve"><value>Необходимо заполнить значение.</value></data>
+  <data name="Workflow_TypeText" xml:space="preserve"><value>Ввести текст</value></data>
+  <data name="Workflow_ItemSettings" xml:space="preserve"><value>Свойства пункта</value></data>
+  <data name="Workflow_StepSettings" xml:space="preserve"><value>Шаг {0} · {1}</value></data>
+  <data name="Editor_ApplyDestination" xml:space="preserve"><value>(Применить → {0})</value></data>
 </root>

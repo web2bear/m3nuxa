@@ -100,11 +100,18 @@ internal sealed class McpHttpTools
             ["node"] = JsonSerializer.SerializeToNode(node, JsonOptions), ["parentId"] = parentId, ["index"] = index
         })).ToJsonString();
 
-    [McpServerTool(Name = "update"), Description("Replace an item in a draft, retaining its ID.")]
+    [McpServerTool(Name = "update"), Description("Update item properties while preserving its ID, kind, steps and children. Use set_steps to edit steps and create, move or delete to edit children.")]
     public static async Task<string> Update(AgentPipe pipe, string draftId, string id, MenuNode node) =>
         (await pipe.ExecuteAsync(draftId, "update", new JsonObject
         {
             ["id"] = id, ["node"] = JsonSerializer.SerializeToNode(node, JsonOptions)
+        })).ToJsonString();
+
+    [McpServerTool(Name = "set_steps"), Description("Replace the ordered steps of an action in a draft. Pass at least one step. Use this tool to add, edit, reorder or remove steps.")]
+    public static async Task<string> SetSteps(AgentPipe pipe, string draftId, string id, List<MenuAction> steps) =>
+        (await pipe.ExecuteAsync(draftId, "setSteps", new JsonObject
+        {
+            ["id"] = id, ["steps"] = JsonSerializer.SerializeToNode(steps, JsonOptions)
         })).ToJsonString();
 
     [McpServerTool(Name = "move"), Description("Move an item within a draft. Omit parentId to move it to the root.")]

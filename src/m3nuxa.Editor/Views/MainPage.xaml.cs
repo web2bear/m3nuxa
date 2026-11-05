@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using m3nuxa.App;
@@ -18,6 +19,9 @@ public sealed partial class MainPage : Page
     private readonly EditorDraft draftState = new();
     private AppConfig config { get => draftState.Config; set => draftState.Config = value; }
     private MenuNode? selected;
+    private string? stepNodeId;
+    private string? activeConfigurationPath;
+    private int selectedStepIndex;
     private bool rendering;
     private bool dirty => draftState.IsDirty;
     private bool allowClose;
@@ -119,6 +123,7 @@ public sealed partial class MainPage : Page
         DevLog.Write("editor", $"Begin response success={response.Success} message={response.Message}");
         var draft = EditorPipeClient.ReadDraft(response);
         if (draft is null) { ShowNotice(response.Message ?? L.Get("Editor_CouldNotReadTheConfiguration_d3f938"), InfoBarSeverity.Error); return; }
+        UpdateConfigurationTitle(response);
         draftState.Reset(draft.Config);
         draftReady = true;
         RefreshTree();
@@ -126,6 +131,22 @@ public sealed partial class MainPage : Page
         UpdateApplyState();
         ShowHotkeyAvailability(await client.ReadAsync());
         DevLog.Write("editor", "Current configuration loaded");
+    }
+
+    private void UpdateConfigurationTitle(EditorResponse response)
+    {
+        activeConfigurationPath = response.Data?["configPath"]?.GetValue<string>();
+        ShowConfigurationTitle(activeConfigurationPath);
+    }
+
+    private void ShowConfigurationTitle(string? sourcePath)
+    {
+        var title = L.Get("Editor_M3nuxaMenuEditor_652d6b");
+        if (!string.IsNullOrWhiteSpace(sourcePath)) title += $" — {sourcePath}";
+        if (!string.IsNullOrWhiteSpace(sourcePath) && !string.IsNullOrWhiteSpace(activeConfigurationPath) &&
+            !string.Equals(sourcePath, activeConfigurationPath, StringComparison.OrdinalIgnoreCase))
+            title += "  " + L.Format("Editor_ApplyDestination", activeConfigurationPath);
+        App.MainWindow.Title = title;
     }
 
     public void SelectMenuItem(string id)
@@ -223,19 +244,18 @@ public sealed partial class MainPage : Page
                 item.Kind == MenuNodeKind.Group ? L.Get("Editor_OpensThisGroupFromAny_904c25") : L.Get("Editor_RunsThisActionFromAny_30cdee"),
                 () => item.Hotkey, value => item.Hotkey = value, item.Id));
             AddIconPicker(item);
+            WrapPropertiesSection(0, L.Get("Workflow_ItemSettings"));
             if (item.Kind != MenuNodeKind.Action) return;
-            item.Action ??= new MenuAction();
-            var action = item.Action;
-            var choices = ActionChoices();
-            var combo = new ComboBox { Header = L.Get("Editor_ActionType_c83f7f"), HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = choices, DisplayMemberPath = "Label", SelectedItem = choices.First(choice => choice.Kind == action.Kind) };
-            combo.SelectionChanged += (_, _) =>
-            {
-                if (rendering || combo.SelectedItem is not ActionChoice choice || choice.Kind == action.Kind) return;
-                Remember(); action.Kind = choice.Kind; MarkDirty(); RenderProperties();
-            };
-            PropertiesPanel.Children.Add(combo);
+            if (stepNodeId != item.Id) { stepNodeId = item.Id; selectedStepIndex = 0; }
+            if (item.Steps.Count == 0) return;
+            selectedStepIndex = Math.Clamp(selectedStepIndex, 0, item.Steps.Count - 1);
+            var stepsStart = PropertiesPanel.Children.Count;
+            AddStepControls(item);
+            WrapPropertiesSection(stepsStart, L.Get("Workflow_Steps"));
+            var action = item.Steps[selectedStepIndex];
+            var settingsStart = PropertiesPanel.Children.Count;
             if (action.Kind is ActionKind.OpenItem or ActionKind.OpenFolder or ActionKind.RunProgram or ActionKind.RunScript or ActionKind.CopySelection or ActionKind.MoveSelection)
-                AddText(action.Kind is ActionKind.CopySelection or ActionKind.MoveSelection ? L.Get("Editor_DestinationFolder_40a307") : L.Get("Editor_Path_1b46c6"), action.Path, value => action.Path = value, variables: true, browse: action.Kind is ActionKind.OpenFolder or ActionKind.CopySelection or ActionKind.MoveSelection ? "folder" : "file");
+                AddText(action.Kind is ActionKind.CopySelection or ActionKind.MoveSelection ? L.Get("Editor_DestinationFolder_40a307") : L.Get("Editor_Path_1b46c6"), action.Path, value => action.Path = value, variables: true, browse: action.Kind is ActionKind.OpenFolder or ActionKind.CopySelection or ActionKind.MoveSelection ? "folder" : "file", required: true);
             if (action.Kind is ActionKind.RunProgram or ActionKind.RunScript)
             {
                 AddText(L.Get("Editor_Arguments_3c3a07"), action.Arguments, value => action.Arguments = value, variables: true);
@@ -251,9 +271,152 @@ public sealed partial class MainPage : Page
             if (action.Kind == ActionKind.SendShortcut)
                 PropertiesPanel.Children.Add(CreateShortcutEditor("SentShortcut", L.Get("Editor_ShortcutToSend_bc4001"),
                     L.Get("Editor_PressedInTheWindowFrom_9e476c"), () => action.Shortcut, value => action.Shortcut = value, item.Id, sent: true));
-            if (action.Kind == ActionKind.InsertText) AddText(L.Get("Editor_SnippetText_d7c024"), action.Text, value => action.Text = value, multiline: true);
+            if (action.Kind is ActionKind.InsertText or ActionKind.PasteText or ActionKind.SetClipboardText)
+                AddText(L.Get("Editor_SnippetText_d7c024"), action.Text, value => action.Text = value, variables: true, multiline: true, required: action.Kind != ActionKind.SetClipboardText);
+            if (action.Kind == ActionKind.PasteText)
+            {
+                var restore = new ToggleSwitch { Header = L.Get("Workflow_RestoreClipboard"), IsOn = action.RestoreClipboard };
+                restore.Toggled += (_, _) => { if (rendering) return; Remember(); action.RestoreClipboard = restore.IsOn; MarkDirty(); };
+                PropertiesPanel.Children.Add(restore);
+            }
+            if (action.Kind == ActionKind.Delay) AddDuration(action);
+            if (action.Kind is ActionKind.RunProgram or ActionKind.RunScript) AddProcessWait(action);
+            var stepName = ActionChoices().FirstOrDefault(choice => choice.Kind == action.Kind)?.Label ?? action.Kind.ToString();
+            WrapPropertiesSection(settingsStart, L.Format("Workflow_StepSettings", selectedStepIndex + 1, stepName));
         }
         finally { rendering = false; }
+    }
+
+    private IEnumerable<UIElement> CurrentPropertyElements() => PropertiesPanel.Children.SelectMany(child =>
+        child is Border { Child: StackPanel section } ? section.Children.Cast<UIElement>() : Enumerable.Repeat(child, 1));
+
+    private void WrapPropertiesSection(int start, string title)
+    {
+        var section = new StackPanel { Spacing = 10 };
+        section.Children.Add(new TextBlock { Text = title, FontSize = 16,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
+        while (PropertiesPanel.Children.Count > start)
+        {
+            var child = PropertiesPanel.Children[start];
+            PropertiesPanel.Children.RemoveAt(start);
+            section.Children.Add(child);
+        }
+        PropertiesPanel.Children.Add(new Border { Style = (Style)Resources["WorkflowSectionStyle"], Child = section,
+            Shadow = new ThemeShadow(), Translation = new System.Numerics.Vector3(0, 0, 8) });
+    }
+
+    private void AddStepControls(MenuNode item)
+    {
+        var choices = ActionChoices();
+        var items = new ObservableCollection<MenuAction>(item.Steps);
+        var list = new ListView { SelectionMode = ListViewSelectionMode.Single, MaxHeight = 240,
+            CanDragItems = true, CanReorderItems = true, AllowDrop = true };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(list, L.Get("Workflow_Steps"));
+        // Each displayed entry holds the actual step, so native list reordering retains all settings.
+        foreach (var step in items)
+            list.Items.Add(new ListViewItem { Style = (Style)Resources["WorkflowStepStyle"], Tag = step, Content = choices.FirstOrDefault(c => c.Kind == step.Kind)?.Label ?? step.Kind.ToString() });
+        list.SelectedIndex = selectedStepIndex;
+        var reordering = false;
+        list.SelectionChanged += (_, _) =>
+        {
+            if (rendering || reordering || list.SelectedIndex < 0 || list.SelectedIndex == selectedStepIndex) return;
+            selectedStepIndex = list.SelectedIndex; RenderProperties();
+        };
+        list.DragItemsStarting += (_, _) => { if (!rendering) { Remember(); reordering = true; } };
+        list.DragItemsCompleted += (_, _) =>
+        {
+            reordering = false;
+            var reordered = list.Items.Cast<ListViewItem>().Select(entry => (MenuAction)entry.Tag).ToList();
+            if (reordered.Count != item.Steps.Count) return;
+            item.Steps.Clear(); item.Steps.AddRange(reordered);
+            selectedStepIndex = Math.Max(0, list.SelectedIndex); MarkDirty(); RenderProperties();
+        };
+        PropertiesPanel.Children.Add(list);
+        var commands = new CommandBar { DefaultLabelPosition = CommandBarDefaultLabelPosition.Right, IsOpen = false };
+        var add = new AppBarButton { Label = L.Get("Workflow_Add"), Icon = new SymbolIcon(Symbol.Add) };
+        var flyout = new MenuFlyout();
+        foreach (var choice in choices)
+        {
+            var option = new MenuFlyoutItem { Text = choice.Label };
+            option.Click += (_, _) =>
+            {
+                Remember(); var index = Math.Min(selectedStepIndex + 1, item.Steps.Count);
+                item.Steps.Insert(index, new MenuAction { Kind = choice.Kind }); selectedStepIndex = index;
+                MarkDirty(); RenderProperties();
+            };
+            flyout.Items.Add(option);
+        }
+        add.Flyout = flyout; commands.PrimaryCommands.Add(add);
+        void Command(string label, IconElement icon, bool enabled, Action action)
+        {
+            var button = new AppBarButton { Label = L.Get(label), Icon = icon, IsEnabled = enabled };
+            button.Click += (_, _) => { Remember(); action(); MarkDirty(); RenderProperties(); };
+            commands.PrimaryCommands.Add(button);
+        }
+        Command("Workflow_Duplicate", new SymbolIcon(Symbol.Copy), true, () =>
+        {
+            var copy = JsonSerializer.Deserialize<MenuAction>(JsonSerializer.Serialize(item.Steps[selectedStepIndex], JsonOptions), JsonOptions)!;
+            item.Steps.Insert(++selectedStepIndex, copy);
+        });
+        Command("Workflow_Delete", new SymbolIcon(Symbol.Delete), item.Steps.Count > 1, () =>
+        { item.Steps.RemoveAt(selectedStepIndex); selectedStepIndex = Math.Min(selectedStepIndex, item.Steps.Count - 1); });
+        void Move(int delta)
+        {
+            var destination = selectedStepIndex + delta;
+            (item.Steps[selectedStepIndex], item.Steps[destination]) = (item.Steps[destination], item.Steps[selectedStepIndex]);
+            selectedStepIndex = destination;
+        }
+        Command("Workflow_MoveUp", new FontIcon { Glyph = "\uE70E" }, selectedStepIndex > 0, () => Move(-1));
+        Command("Workflow_MoveDown", new FontIcon { Glyph = "\uE70D" }, selectedStepIndex < item.Steps.Count - 1, () => Move(1));
+        PropertiesPanel.Children.Add(commands);
+    }
+
+    private void AddDuration(MenuAction action)
+    {
+        var box = new NumberBox { Header = L.Get("Workflow_Duration"), Minimum = 0, Maximum = int.MaxValue,
+            SmallChange = 1, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact, Value = action.DelayMilliseconds };
+        var units = new ComboBox { Header = L.Get("Workflow_Units") };
+        units.Items.Add(L.Get("Workflow_Milliseconds")); units.Items.Add(L.Get("Workflow_Seconds")); units.Items.Add(L.Get("Workflow_Minutes"));
+        units.SelectedIndex = 0;
+        var factor = 1d;
+        var changingUnits = false;
+        units.SelectionChanged += (_, _) =>
+        {
+            if (rendering || units.SelectedIndex < 0) return;
+            changingUnits = true;
+            factor = units.SelectedIndex == 0 ? 1 : units.SelectedIndex == 1 ? 1000 : 60000;
+            box.Maximum = int.MaxValue / factor; box.Value = action.DelayMilliseconds / factor;
+            changingUnits = false;
+        };
+        box.ValueChanged += (_, args) =>
+        {
+            if (rendering || changingUnits || double.IsNaN(args.NewValue) || args.NewValue < 0 || args.NewValue * factor > int.MaxValue) return;
+            var value = (int)Math.Round(args.NewValue * factor);
+            if (value == action.DelayMilliseconds) return;
+            Remember(); action.DelayMilliseconds = value; MarkDirty();
+        };
+        PropertiesPanel.Children.Add(box); PropertiesPanel.Children.Add(units);
+    }
+
+    private void AddProcessWait(MenuAction action)
+    {
+        var wait = new ToggleSwitch { Header = L.Get("Workflow_Wait"), IsOn = action.WaitForExit };
+        wait.Toggled += (_, _) => { if (rendering) return; Remember(); action.WaitForExit = wait.IsOn; MarkDirty(); RenderProperties(); };
+        PropertiesPanel.Children.Add(wait);
+        if (!action.WaitForExit) return;
+        var enabled = new ToggleSwitch { Header = L.Get("Workflow_TimeoutEnabled"), IsOn = action.TimeoutMilliseconds.HasValue };
+        enabled.Toggled += (_, _) => { if (rendering) return; Remember(); action.TimeoutMilliseconds = enabled.IsOn ? 30000 : null; MarkDirty(); RenderProperties(); };
+        PropertiesPanel.Children.Add(enabled);
+        if (!action.TimeoutMilliseconds.HasValue) return;
+        var timeout = new NumberBox { Header = L.Get("Workflow_TimeoutMs"), Minimum = 1, Maximum = int.MaxValue,
+            SmallChange = 1000, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact, Value = action.TimeoutMilliseconds.Value };
+        timeout.ValueChanged += (_, args) =>
+        {
+            if (rendering || double.IsNaN(args.NewValue) || args.NewValue < 1 || args.NewValue > int.MaxValue) return;
+            var value = (int)args.NewValue; if (action.TimeoutMilliseconds == value) return;
+            Remember(); action.TimeoutMilliseconds = value; MarkDirty();
+        };
+        PropertiesPanel.Children.Add(timeout);
     }
 
     private ShortcutEditor CreateShortcutEditor(string id, string label, string help, Func<string> getter, Action<string> setter,
@@ -311,13 +474,16 @@ public sealed partial class MainPage : Page
             field.SetError(unavailableHotkeys.Contains(CanonicalHotkey(getter())) ? L.Get("Editor_TheShortcutIsUnavailableAnother_920562") : null);
     }
 
-    private void AddText(string label, string value, Action<string> setter, bool variables = false, bool multiline = false, string placeholder = "", string? browse = null)
+    private void AddText(string label, string value, Action<string> setter, bool variables = false, bool multiline = false, string placeholder = "", string? browse = null, bool required = false)
     {
         var text = new TextBox { Header = label, Text = value, PlaceholderText = placeholder, HorizontalAlignment = HorizontalAlignment.Stretch,
             AcceptsReturn = multiline, TextWrapping = multiline ? TextWrapping.Wrap : TextWrapping.NoWrap, MinHeight = multiline ? 160 : 0 };
         text.GotFocus += (_, _) => { if (!rendering) Remember(); };
         text.TextChanged += (_, _) => { if (rendering) return; setter(text.Text); MarkDirty(); };
-        if (!variables && browse is null) { PropertiesPanel.Children.Add(text); return; }
+        var error = new TextBlock { Text = L.Get("Workflow_Required"), TextWrapping = TextWrapping.Wrap,
+            Visibility = required && (multiline ? string.IsNullOrEmpty(value) : string.IsNullOrWhiteSpace(value)) ? Visibility.Visible : Visibility.Collapsed };
+        text.TextChanged += (_, _) => error.Visibility = required && (multiline ? string.IsNullOrEmpty(text.Text) : string.IsNullOrWhiteSpace(text.Text)) ? Visibility.Visible : Visibility.Collapsed;
+        if (!variables && browse is null) { PropertiesPanel.Children.Add(text); if (required) PropertiesPanel.Children.Add(error); return; }
         var row = new Grid { ColumnDefinitions = { new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }, new ColumnDefinition { Width = GridLength.Auto } }, ColumnSpacing = 8 };
         row.Children.Add(text);
         if (browse is not null)
@@ -351,7 +517,7 @@ public sealed partial class MainPage : Page
             };
             Grid.SetColumn(browseButton, 1); row.Children.Add(browseButton);
         }
-        if (!variables) { PropertiesPanel.Children.Add(row); return; }
+        if (!variables) { PropertiesPanel.Children.Add(row); if (required) PropertiesPanel.Children.Add(error); return; }
         var picker = new Button { Content = new FontIcon { Glyph = "\uE8EF", FontSize = 14 }, VerticalAlignment = VerticalAlignment.Bottom, Width = 36, Height = 32, Padding = new Thickness(0) };
         ToolTipService.SetToolTip(picker, L.Get("Editor_InsertContextVariable_65542b"));
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(picker, L.Get("Editor_InsertContextVariable_cdf409") + label);
@@ -360,14 +526,14 @@ public sealed partial class MainPage : Page
             var position = text.SelectionStart;
             var (dialog, list) = CreateVariableDialog();
             if (await dialog.ShowAsync() != ContentDialogResult.Primary || list.SelectedItem is not ListViewItem { Tag: string variable }) return;
-            if (!PropertiesPanel.Children.Contains(row)) return;
+            if (!CurrentPropertyElements().Contains(row)) return;
             position = Math.Min(position, text.Text.Length);
             Remember();
             text.Text = text.Text.Insert(position, variable);
             text.SelectionStart = position + variable.Length;
             text.Focus(FocusState.Programmatic);
         };
-        Grid.SetColumn(picker, browse is null ? 1 : 2); row.Children.Add(picker); PropertiesPanel.Children.Add(row);
+        Grid.SetColumn(picker, browse is null ? 1 : 2); row.Children.Add(picker); PropertiesPanel.Children.Add(row); if (required) PropertiesPanel.Children.Add(error);
     }
 
     private (ContentDialog dialog, ListView list) CreateVariableDialog()
@@ -387,6 +553,12 @@ public sealed partial class MainPage : Page
         }
         Group(L.Get("Editor_SelectedItems_9bf8fd"), ("{selectedPaths}", L.Get("Editor_AllSelectedPathsOnlyAs_795834")), ("{selectedPath}", L.Get("Editor_PathOfTheFirstSelected_e68d42")), ("{fileName}", L.Get("Editor_NameOfTheFirstSelected_cae089")), ("{extension}", L.Get("Editor_ExtensionOfTheFirstSelected_b49b82")), ("{parentFolder}", L.Get("Editor_ParentFolderOfTheFirst_f82d35")));
         Group(L.Get("Editor_FileExplorer_1fd2be"), ("{currentFolder}", L.Get("Editor_CurrentFolderInFileExplorer_428c9c")));
+        Group(L.Get("Workflow_ValueSources"), ("{clipboardText}", L.Get("Workflow_ClipboardValue")),
+            ("{env:PATH}", L.Get("Workflow_EnvValue")), ("{env:TEMP}", L.Get("Workflow_EnvValue")),
+            ("{knownFolder:Desktop}", L.Get("Workflow_Desktop")), ("{knownFolder:Documents}", L.Get("Workflow_Documents")),
+            ("{knownFolder:Downloads}", L.Get("Workflow_Downloads")), ("{knownFolder:Pictures}", L.Get("Workflow_Pictures")),
+            ("{knownFolder:Music}", L.Get("Workflow_Music")), ("{knownFolder:Videos}", L.Get("Workflow_Videos")),
+            ("{knownFolder:Profile}", L.Get("Workflow_Profile")), ("{knownFolder:Temp}", L.Get("Workflow_Temp")));
         var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = L.Get("Editor_ContextVariables_930107"), Content = list, PrimaryButtonText = L.Get("Editor_Insert_eeb8ca"), CloseButtonText = L.Get("Editor_Cancel_0ec753"), IsPrimaryButtonEnabled = false, DefaultButton = ContentDialogButton.Primary };
         list.SelectionChanged += (_, _) => dialog.IsPrimaryButtonEnabled = list.SelectedItem is ListViewItem { Tag: string };
         return (dialog, list);
@@ -440,7 +612,7 @@ public sealed partial class MainPage : Page
     private void RenameClicked(object sender, RoutedEventArgs args)
     {
         if (selected is null || selected.Kind == MenuNodeKind.Separator) return;
-        if (PropertiesPanel.Children.FirstOrDefault() is TextBox name)
+        if (CurrentPropertyElements().OfType<TextBox>().FirstOrDefault() is TextBox name)
         {
             name.Focus(FocusState.Programmatic);
             name.SelectAll();
@@ -533,7 +705,23 @@ public sealed partial class MainPage : Page
     private void AddGroupClicked(object sender, RoutedEventArgs args) => Add(new MenuNode { Name = L.Get("Editor_NewGroup_55c687"), Kind = MenuNodeKind.Group });
     private void AddSeparatorClicked(object sender, RoutedEventArgs args) => Add(new MenuNode { Kind = MenuNodeKind.Separator });
     private void AddSnippetClicked(object sender, RoutedEventArgs args) => Add(new MenuNode { Name = L.Get("Editor_NewSnippet_7f18a1"), Kind = MenuNodeKind.Action, Action = new MenuAction { Kind = ActionKind.InsertText } });
-    private void AddActionClicked(object sender, RoutedEventArgs args) => Add(new MenuNode { Name = L.Get("Editor_NewAction_991100"), Kind = MenuNodeKind.Action, Action = new MenuAction() });
+    private void AddActionClicked(object sender, RoutedEventArgs args)
+    {
+        if (sender is not FrameworkElement anchor) return;
+        var menu = new MenuFlyout();
+        foreach (var choice in ActionChoices())
+        {
+            var option = new MenuFlyoutItem { Text = choice.Label };
+            option.Click += (_, _) => Add(new MenuNode
+            {
+                Name = choice.Label,
+                Kind = MenuNodeKind.Action,
+                Action = new MenuAction { Kind = choice.Kind }
+            });
+            menu.Items.Add(option);
+        }
+        menu.ShowAt(anchor);
+    }
 
     private async void AddFolderClicked(object sender, RoutedEventArgs args)
     {
@@ -708,9 +896,9 @@ public sealed partial class MainPage : Page
     private void DeleteClicked(object sender, RoutedEventArgs args)
     { if (selected is null || !draftState.Delete(selected.Id)) return; MarkDirty(); RefreshTree(); }
     private void UndoClicked(object sender, RoutedEventArgs args)
-    { var id = selected?.Id; if (!draftState.Undo()) return; MarkDirty(); RefreshTree(id); }
+    { var id = selected?.Id; if (!draftState.Undo()) return; ShowConfigurationTitle(activeConfigurationPath); MarkDirty(); RefreshTree(id); }
     private void RedoClicked(object sender, RoutedEventArgs args)
-    { var id = selected?.Id; if (!draftState.Redo()) return; MarkDirty(); RefreshTree(id); }
+    { var id = selected?.Id; if (!draftState.Redo()) return; ShowConfigurationTitle(activeConfigurationPath); MarkDirty(); RefreshTree(id); }
 
     private async void ApplyClicked(object sender, RoutedEventArgs args) => await ApplyAsync();
     private async Task<bool> ApplyAsync()
@@ -729,8 +917,9 @@ public sealed partial class MainPage : Page
         ShowHotkeyAvailability(response);
         if (!response.Success) { ShowNotice(response.Message ?? L.Get("Editor_CouldNotApplyTheConfiguration_9f63ee"), InfoBarSeverity.Error); return false; }
         draftReady = false;
-        var draft = EditorPipeClient.ReadDraft(await client.BeginAsync());
-        if (draft is not null) { draftState.Reset(draft.Config); draftReady = true; RefreshTree(selected?.Id); }
+        var begin = await client.BeginAsync();
+        var draft = EditorPipeClient.ReadDraft(begin);
+        if (draft is not null) { UpdateConfigurationTitle(begin); draftState.Reset(draft.Config); draftReady = true; RefreshTree(selected?.Id); }
         else draftState.SetBaseline();
         UpdateApplyState(); Notice.IsOpen = false;
         var warnings = response.Data?["Validation"]?["Warnings"]?.Deserialize<string[]>() ?? [];
@@ -771,13 +960,18 @@ public sealed partial class MainPage : Page
             var file = await picker.PickSingleFileAsync(); if (file is null) return;
             var loaded = JsonSerializer.Deserialize<AppConfig>(await File.ReadAllTextAsync(file.Path), JsonOptions) ?? throw new InvalidDataException(L.Get("Editor_TheFileDoesNotContain_2469d6"));
             Remember(); config = loaded; MarkDirty(); RefreshTree();
+            ShowConfigurationTitle(file.Path);
         }
         catch (Exception ex) { ShowNotice(ex.Message, InfoBarSeverity.Error); }
     }
     private async void SaveClicked(object sender, RoutedEventArgs args)
     {
         var picker = new FileSavePicker { SuggestedFileName = "m3nuxa-draft" }; picker.FileTypeChoices.Add(L.Get("Editor_JsonConfiguration_453120"), [".json"]); InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindow));
-        try { var file = await picker.PickSaveFileAsync(); if (file is not null) await File.WriteAllTextAsync(file.Path, Snapshot()); }
+        try
+        {
+            var file = await picker.PickSaveFileAsync();
+            if (file is not null) { await File.WriteAllTextAsync(file.Path, Snapshot()); ShowConfigurationTitle(file.Path); }
+        }
         catch (Exception ex) { ShowNotice(ex.Message, InfoBarSeverity.Error); }
     }
     private async Task<ContentDialogResult> ConfirmAsync(string title, string message, string primary, string secondary = "")
@@ -977,7 +1171,7 @@ public sealed partial class MainPage : Page
     }
 
     private static ActionChoice[] ActionChoices() =>
-    [new(ActionKind.OpenItem, L.Get("Editor_OpenAFileOrLink_5464f3")), new(ActionKind.OpenFolder, L.Get("Editor_OpenFolder_54724f")), new(ActionKind.RunProgram, L.Get("Editor_RunAProgram_079b79")), new(ActionKind.RunScript, L.Get("Editor_RunAScript_3fa155")), new(ActionKind.SendShortcut, L.Get("Editor_SendShortcut_9a9f31")), new(ActionKind.CopySelection, L.Get("Editor_CopySelectedItems_427b62")), new(ActionKind.MoveSelection, L.Get("Editor_MoveSelectedItems_457829")), new(ActionKind.InsertText, L.Get("Editor_InsertText_9ebca7"))];
+    [new(ActionKind.OpenItem, L.Get("Editor_OpenAFileOrLink_5464f3")), new(ActionKind.OpenFolder, L.Get("Editor_OpenFolder_54724f")), new(ActionKind.RunProgram, L.Get("Editor_RunAProgram_079b79")), new(ActionKind.RunScript, L.Get("Editor_RunAScript_3fa155")), new(ActionKind.SendShortcut, L.Get("Editor_SendShortcut_9a9f31")), new(ActionKind.CopySelection, L.Get("Editor_CopySelectedItems_427b62")), new(ActionKind.MoveSelection, L.Get("Editor_MoveSelectedItems_457829")), new(ActionKind.InsertText, L.Get("Workflow_TypeText")), new(ActionKind.Delay, L.Get("Workflow_Delay")), new(ActionKind.SetClipboardText, L.Get("Workflow_SetClipboard")), new(ActionKind.PasteText, L.Get("Workflow_PasteText"))];
     private sealed record ActionChoice(ActionKind Kind, string Label);
     private static FrameworkElement CreateItemIcon(MenuNode node, int size)
     {

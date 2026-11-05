@@ -19,7 +19,7 @@ public sealed partial class MainPage
         FocusCheckWindow();
         await Task.Delay(100);
 
-        var mainShortcut = PropertiesPanel.Children.OfType<ShortcutEditor>().First();
+        var mainShortcut = PropertyElements().OfType<ShortcutEditor>().First();
         await mainShortcut.StartAsync();
         Assert(Descendants(mainShortcut).OfType<TextBlock>().Any(text => text.Text == L.Get("Editor_PressANewShortcut_379ccc")), "recording did not start: " + string.Join(" | ", Descendants(mainShortcut).OfType<TextBlock>().Select(text => text.Text)));
         Send((0x11, false), (0x12, false), (0x78, false));
@@ -34,7 +34,7 @@ public sealed partial class MainPage
         Assert(config.Items[0].Hotkey == "Ctrl+Alt+Space" && !dirty, "one undo must restore the whole combination: " + config.Items[0].Hotkey + " dirty=" + dirty + " history=" + draftState.UndoCount);
         RedoClicked(this, null!);
         MenuTree.SelectedNode = FindTreeNode(MenuTree.RootNodes, group.Id); await Task.Delay(80);
-        mainShortcut = PropertiesPanel.Children.OfType<ShortcutEditor>().First();
+        mainShortcut = PropertyElements().OfType<ShortcutEditor>().First();
         Assert(config.Items[0].Hotkey == "Ctrl+Alt+F9", "redo lost the combination");
 
         var before = Snapshot(); var undoCount = draftState.UndoCount;
@@ -48,27 +48,27 @@ public sealed partial class MainPage
         Assert(Snapshot() == before && Descendants(mainShortcut).OfType<TextBlock>().Any(text => text.Text.Contains("Конфликт")), "duplicate did not preserve old value or explain conflict");
 
         MenuTree.SelectedNode = FindTreeNode(MenuTree.RootNodes, group.Id); await Task.Delay(80);
-        mainShortcut = PropertiesPanel.Children.OfType<ShortcutEditor>().First();
+        mainShortcut = PropertyElements().OfType<ShortcutEditor>().First();
         await mainShortcut.StartAsync();
-        ((TextBox)PropertiesPanel.Children[0]).Focus(FocusState.Programmatic);
+        (PropertyElements().OfType<TextBox>().First()).Focus(FocusState.Programmatic);
         await Task.Delay(180);
         Assert(Snapshot() == before && Descendants(mainShortcut).OfType<Button>().Single(button => button.Content as string == L.Get("Editor_Cancel_0ec753")).Visibility == Visibility.Collapsed,
             "moving focus out did not cancel recording");
 
         MenuTree.SelectedNode = FindTreeNode(MenuTree.RootNodes, send.Id); await Task.Delay(80);
-        var sent = PropertiesPanel.Children.OfType<ShortcutEditor>().Last();
+        var sent = PropertyElements().OfType<ShortcutEditor>().Last();
         await sent.StartAsync();
         Send((0x11, false), (0x10, false), (0x4b, false), (0x4b, true), (0x10, true), (0x11, true));
         await Task.Delay(180);
         Assert(config.Items[1].Action?.Shortcut == "Ctrl+Shift+K", "sent shortcut incorrectly shares global duplicate restrictions");
 
-        var item = PropertiesPanel.Children.OfType<ShortcutEditor>().First();
+        var item = PropertyElements().OfType<ShortcutEditor>().First();
         await item.StartAsync();
         MenuTree.SelectedNode = FindTreeNode(MenuTree.RootNodes, group.Id); await Task.Delay(180);
         Assert(config.Items[1].Hotkey == "", "changing selection committed a recording");
 
         MenuTree.SelectedNode = FindTreeNode(MenuTree.RootNodes, group.Id); await Task.Delay(80);
-        mainShortcut = PropertiesPanel.Children.OfType<ShortcutEditor>().First();
+        mainShortcut = PropertyElements().OfType<ShortcutEditor>().First();
         var clear = Descendants(mainShortcut).OfType<Button>().Single(button => button.Content as string == L.Get("Editor_Clear_9c7449"));
         ((IInvokeProvider)new ButtonAutomationPeer(clear).GetPattern(PatternInterface.Invoke)).Invoke();
         await Task.Delay(50);
@@ -76,7 +76,7 @@ public sealed partial class MainPage
         UndoClicked(this, null!);
         Assert(config.Items[0].Hotkey == "Ctrl+Alt+F9", "clear is not undoable");
         MenuTree.SelectedNode = FindTreeNode(MenuTree.RootNodes, group.Id); await Task.Delay(80);
-        mainShortcut = PropertiesPanel.Children.OfType<ShortcutEditor>().First();
+        mainShortcut = PropertyElements().OfType<ShortcutEditor>().First();
 
         ShowHotkeyAvailability(new EditorResponse(true, null, System.Text.Json.Nodes.JsonNode.Parse("{\"unavailableHotkeys\":[\"Control+Alt+F9\"]}")!));
         Assert(Descendants(mainShortcut).OfType<TextBlock>().Any(text => text.Text == L.Get("Editor_TheShortcutIsUnavailableAnother_920562")), "registration failure missing next to field");

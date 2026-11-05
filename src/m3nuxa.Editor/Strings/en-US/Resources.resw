@@ -443,4 +443,38 @@ or select an existing item.</value>
   <data name="Editor_MoreCreate" xml:space="preserve"><value>More creation commands</value></data>
   <data name="Editor_ConfigurationMenu" xml:space="preserve"><value>Configuration</value></data>
   <data name="Editor_UnpinWindow" xml:space="preserve"><value>Unpin window from the top</value></data>
+  <data name="Workflow_Steps" xml:space="preserve"><value>Steps</value></data>
+  <data name="Workflow_Add" xml:space="preserve"><value>Add</value></data>
+  <data name="Workflow_Duplicate" xml:space="preserve"><value>Duplicate</value></data>
+  <data name="Workflow_Delete" xml:space="preserve"><value>Delete</value></data>
+  <data name="Workflow_MoveUp" xml:space="preserve"><value>Move up</value></data>
+  <data name="Workflow_MoveDown" xml:space="preserve"><value>Move down</value></data>
+  <data name="Workflow_RestoreClipboard" xml:space="preserve"><value>Restore previous clipboard contents</value></data>
+  <data name="Workflow_Duration" xml:space="preserve"><value>Duration</value></data>
+  <data name="Workflow_Units" xml:space="preserve"><value>Units</value></data>
+  <data name="Workflow_Milliseconds" xml:space="preserve"><value>Milliseconds</value></data>
+  <data name="Workflow_Seconds" xml:space="preserve"><value>Seconds</value></data>
+  <data name="Workflow_Minutes" xml:space="preserve"><value>Minutes</value></data>
+  <data name="Workflow_Wait" xml:space="preserve"><value>Wait for process to exit</value></data>
+  <data name="Workflow_TimeoutEnabled" xml:space="preserve"><value>Limit waiting time</value></data>
+  <data name="Workflow_TimeoutMs" xml:space="preserve"><value>Timeout (milliseconds)</value></data>
+  <data name="Workflow_Delay" xml:space="preserve"><value>Delay</value></data>
+  <data name="Workflow_SetClipboard" xml:space="preserve"><value>Set clipboard text</value></data>
+  <data name="Workflow_PasteText" xml:space="preserve"><value>Paste text</value></data>
+  <data name="Workflow_ValueSources" xml:space="preserve"><value>Clipboard, environment and folders</value></data>
+  <data name="Workflow_ClipboardValue" xml:space="preserve"><value>Text in clipboard when the step runs</value></data>
+  <data name="Workflow_EnvValue" xml:space="preserve"><value>Environment variable; edit its name</value></data>
+  <data name="Workflow_Desktop" xml:space="preserve"><value>Desktop</value></data>
+  <data name="Workflow_Documents" xml:space="preserve"><value>Documents</value></data>
+  <data name="Workflow_Downloads" xml:space="preserve"><value>Downloads</value></data>
+  <data name="Workflow_Pictures" xml:space="preserve"><value>Pictures</value></data>
+  <data name="Workflow_Music" xml:space="preserve"><value>Music</value></data>
+  <data name="Workflow_Videos" xml:space="preserve"><value>Videos</value></data>
+  <data name="Workflow_Profile" xml:space="preserve"><value>User profile</value></data>
+  <data name="Workflow_Temp" xml:space="preserve"><value>Temporary folder</value></data>
+  <data name="Workflow_Required" xml:space="preserve"><value>A value is required.</value></data>
+  <data name="Workflow_TypeText" xml:space="preserve"><value>Type text</value></data>
+  <data name="Workflow_ItemSettings" xml:space="preserve"><value>Item settings</value></data>
+  <data name="Workflow_StepSettings" xml:space="preserve"><value>Step {0} · {1}</value></data>
+  <data name="Editor_ApplyDestination" xml:space="preserve"><value>(Apply → {0})</value></data>
 </root>

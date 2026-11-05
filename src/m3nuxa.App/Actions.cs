@@ -7,6 +7,7 @@ namespace m3nuxa.App;
 
 internal sealed record InvocationContext(IntPtr SourceWindow, IReadOnlyList<string> SelectedPaths, string? CurrentFolder)
 {
+    public string? ClipboardText { get; init; }
     public static InvocationContext Capture(IntPtr? sourceWindow = null)
     {
         var window = sourceWindow ?? NativeMethods.GetForegroundWindow();
@@ -40,6 +41,9 @@ internal sealed record InvocationContext(IntPtr SourceWindow, IReadOnlyList<stri
     }
 }
 
+// Messages in this exception contain no expanded parameter values and may be shown to the user.
+internal sealed class WorkflowSafeException(string message) : InvalidOperationException(message) { }
+
 internal sealed record ActionResult(int Succeeded, int Skipped, IReadOnlyList<string> Failures, bool Cancelled)
 {
     public bool Success => !Cancelled && Failures.Count == 0;
@@ -53,6 +57,8 @@ internal static class ActionExecutor
     {
         try
         {
+            if (UsesClipboardValue(action) && context.ClipboardText is null)
+                context = context with { ClipboardText = await ClipboardOperations.ReadTextAsync(cancellationToken) };
             switch (action.Kind)
             {
                 case ActionKind.OpenFolder:
@@ -61,16 +67,25 @@ internal static class ActionExecutor
                     Process.Start(new ProcessStartInfo("explorer.exe") { ArgumentList = { "/n", folder }, UseShellExecute = false });
                     return Ok();
                 case ActionKind.OpenItem:
-                    var target = ExpandSingle(action.Path, context);
+                    var target = ExpandSingle(action.Path, context, encodeUrlComponents: action.Path.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || action.Path.StartsWith("https://", StringComparison.OrdinalIgnoreCase));
                     if (!(Uri.TryCreate(target, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https") && !File.Exists(target))
                         throw new FileNotFoundException(L.Format("ActionFileUnavailableTarget", target));
                     _ = Process.Start(new ProcessStartInfo(target) { UseShellExecute = true });
                     return Ok();
                 case ActionKind.RunProgram:
-                    StartProcess(action, context, false);
+                    await StartProcessAsync(action, context, false, cancellationToken);
                     return Ok();
                 case ActionKind.RunScript:
-                    StartProcess(action, context, true);
+                    await StartProcessAsync(action, context, true, cancellationToken);
+                    return Ok();
+                case ActionKind.Delay:
+                    await Task.Delay(action.DelayMilliseconds, cancellationToken);
+                    return Ok();
+                case ActionKind.SetClipboardText:
+                    await ClipboardOperations.SetTextAsync(TemplateExpander.Expand(action.Text, context), cancellationToken);
+                    return Ok();
+                case ActionKind.PasteText:
+                    await ClipboardOperations.PasteTextAsync(TemplateExpander.Expand(action.Text, context), context, action.RestoreClipboard, cancellationToken);
                     return Ok();
                 case ActionKind.SendShortcut:
                     SendShortcut(action.Shortcut, context);
@@ -87,14 +102,25 @@ internal static class ActionExecutor
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            MessageBox.Show( ex.Message, L.Get("ActionFailed"), MessageBoxButtons.OK, MessageBoxIcon.Error);
-            return new ActionResult(0, 0, [ex.Message], false);
+            return new ActionResult(0, 0, [UsesSensitiveValue(action) && ex is not WorkflowSafeException ? L.Get("WorkflowSensitiveError") : ex.Message], false);
         }
     }
 
     private static ActionResult Ok() => new(1, 0, [], false);
 
-    private static void StartProcess(MenuAction action, InvocationContext context, bool script)
+    internal static bool UsesClipboardValue(MenuAction action) =>
+        new[] { action.Path, action.Arguments, action.WorkingDirectory, action.Text }
+            .Any(value => value?.Contains("{clipboardText}", StringComparison.Ordinal) == true);
+
+    internal static bool UsesSensitiveValue(MenuAction action) =>
+        action.Kind is ActionKind.SetClipboardText or ActionKind.PasteText || new[] { action.Path, action.Arguments, action.WorkingDirectory, action.Text }
+            .Any(value => value?.Contains("{clipboardText}", StringComparison.Ordinal) == true ||
+                          value?.Contains("{env:", StringComparison.Ordinal) == true);
+
+    internal static bool RequiresInputGate(MenuAction action) => UsesClipboardValue(action) ||
+        action.Kind is ActionKind.SendShortcut or ActionKind.InsertText or ActionKind.PasteText or ActionKind.SetClipboardText;
+
+    private static async Task StartProcessAsync(MenuAction action, InvocationContext context, bool script, CancellationToken cancellationToken)
     {
         var path = ExpandSingle(action.Path, context);
         if (!File.Exists(path)) throw new FileNotFoundException(L.Format("ActionFileUnavailablePath", path));
@@ -129,17 +155,27 @@ internal static class ActionExecutor
         };
         foreach (var arg in prefix) info.ArgumentList.Add(arg);
         foreach (var arg in ExpandArguments(action.Arguments, context)) info.ArgumentList.Add(arg);
-        _ = Process.Start(info) ?? throw new InvalidOperationException(L.Get("ActionStartFailed"));
+        using var process = Process.Start(info) ?? throw new InvalidOperationException(L.Get("ActionStartFailed"));
+        if (!action.WaitForExit) return;
+        try
+        {
+            if (action.TimeoutMilliseconds is int timeout)
+                await process.WaitForExitAsync(cancellationToken).WaitAsync(TimeSpan.FromMilliseconds(timeout), cancellationToken);
+            else
+                await process.WaitForExitAsync(cancellationToken);
+        }
+        catch (TimeoutException) { throw new WorkflowSafeException(L.Get("WorkflowProcessTimeout")); }
+        if (process.ExitCode != 0) throw new WorkflowSafeException(L.Format("WorkflowProcessExitCode", process.ExitCode));
     }
 
     private static void SendShortcut(string? shortcut, InvocationContext context)
     {
         if (string.IsNullOrWhiteSpace(shortcut)) throw new InvalidOperationException(L.Get("ActionShortcutMissing"));
         if (context.SourceWindow == IntPtr.Zero || !NativeMethods.IsWindow(context.SourceWindow))
-            throw new InvalidOperationException(L.Get("ActionSourceWindowClosed"));
+            throw new WorkflowSafeException(L.Get("ActionSourceWindowClosed"));
         if (!NativeMethods.SetForegroundWindow(context.SourceWindow) ||
             NativeMethods.GetForegroundWindow() != context.SourceWindow)
-            throw new InvalidOperationException(L.Get("ActionShortcutFocusFailed"));
+            throw new WorkflowSafeException(L.Get("ActionShortcutFocusFailed"));
         KeyboardSender.Send(shortcut);
     }
 
@@ -147,9 +183,9 @@ internal static class ActionExecutor
     {
         if (string.IsNullOrEmpty(text)) throw new InvalidOperationException(L.Get("ActionSnippetEmpty"));
         if (context.SourceWindow == IntPtr.Zero || !NativeMethods.IsWindow(context.SourceWindow))
-            throw new InvalidOperationException(L.Get("ActionSourceWindowClosed"));
+            throw new WorkflowSafeException(L.Get("ActionSourceWindowClosed"));
         if (!NativeMethods.SetForegroundWindow(context.SourceWindow) || NativeMethods.GetForegroundWindow() != context.SourceWindow)
-            throw new InvalidOperationException(L.Get("ActionTextFocusFailed"));
+            throw new WorkflowSafeException(L.Get("ActionTextFocusFailed"));
         KeyboardSender.InsertText(text);
     }
 
@@ -166,22 +202,23 @@ internal static class ActionExecutor
         dialog.CancelRequested += (_, _) => linked.Cancel();
         dialog.Activate();
         var ui = SynchronizationContext.Current ?? throw new InvalidOperationException("UI thread required.");
-        var result = await Task.Run(() => CopyOrMove(context.SelectedPaths, destination, move, linked.Token,
+        var token = linked.Token;
+        var result = await Task.Run(() => CopyOrMove(context.SelectedPaths, destination, move, token,
             (index, item) => ui.Post(_ => dialog.Report(index, item), null),
             path =>
             {
-                FileConflictChoice choice = FileConflictChoice.Cancel;
                 var completion = new TaskCompletionSource<FileConflictChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
-                ui.Post(async _ => { try { completion.SetResult(await dialog.AskConflict(path)); } catch (Exception ex) { completion.SetException(ex); } }, null);
-                choice = completion.Task.GetAwaiter().GetResult();
-                return choice;
+                ui.Post(async _ =>
+                {
+                    try
+                    {
+                        if (token.IsCancellationRequested) { completion.TrySetCanceled(token); return; }
+                        completion.TrySetResult(await dialog.AskConflict(UsesSensitiveValue(action) ? "…" : path, token));
+                    }
+                    catch (Exception ex) { completion.TrySetException(ex); }
+                }, null);
+                return completion.Task.WaitAsync(token).GetAwaiter().GetResult();
             }));
-        dialog.Dispose();
-        var summary = L.Format("ActionSummary", result.Succeeded, result.Skipped, result.Failures.Count) +
-            (result.Cancelled ? L.Get("ActionCancelled") : "") +
-            (result.Failures.Count > 0 ? "\n\n" + string.Join("\n", result.Failures) : "");
-        MessageBox.Show( summary, L.Get("ActionFileResult"), MessageBoxButtons.OK,
-            result.Failures.Count > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
         return result;
     }
 
@@ -200,6 +237,9 @@ internal static class ActionExecutor
             try
             {
                 var target = Path.Combine(destination, Path.GetFileName(source.TrimEnd(Path.DirectorySeparatorChar)));
+                if (Path.GetFullPath(source).TrimEnd(Path.DirectorySeparatorChar).Equals(
+                    Path.GetFullPath(target).TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase))
+                    throw new IOException(L.Get("ActionSamePath"));
                 var exists = File.Exists(target) || Directory.Exists(target);
                 if (exists)
                 {
@@ -210,9 +250,6 @@ internal static class ActionExecutor
                     }
                     if (cancelled) break;
                 }
-                if (Path.GetFullPath(source).TrimEnd(Path.DirectorySeparatorChar).Equals(
-                    Path.GetFullPath(target).TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase))
-                    throw new IOException(L.Get("ActionSamePath"));
                 if (Directory.Exists(source))
                 {
                     var sourceFull = Path.GetFullPath(source).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
@@ -304,10 +341,10 @@ internal static class ActionExecutor
         finally { if (Directory.Exists(staged)) Directory.Delete(staged, true); }
     }
 
-    private static string ExpandSingle(string? template, InvocationContext context)
+    private static string ExpandSingle(string? template, InvocationContext context, bool encodeUrlComponents = false)
     {
         if (string.IsNullOrWhiteSpace(template)) throw new InvalidOperationException(L.Get("ActionPathRequired"));
-        return TemplateExpander.Expand(template, context);
+        return TemplateExpander.Expand(template, context, encodeUrlComponents);
     }
 
     private static IReadOnlyList<string> ExpandArguments(string? template, InvocationContext context)
@@ -329,13 +366,26 @@ internal static class ActionExecutor
 
 internal static class TemplateExpander
 {
-    private static readonly Regex Variable = new(@"\{([a-zA-Z]+)\}", RegexOptions.Compiled);
+    private static readonly Regex Variable = new(@"\{([a-zA-Z]+(?::[^{}]+)?)\}", RegexOptions.Compiled);
 
-    public static string Expand(string template, InvocationContext context) => Variable.Replace(template, match =>
+    public static string Expand(string template, InvocationContext context, bool encodeUrlComponents = false) =>
+        Variable.Replace(template, match =>
+        {
+            var value = ExpandVariable(match, context);
+            return encodeUrlComponents ? Uri.EscapeDataString(value) : value;
+        });
+
+    private static string ExpandVariable(Match match, InvocationContext context)
     {
         var first = context.SelectedPaths.FirstOrDefault();
-        return match.Groups[1].Value switch
+        var key = match.Groups[1].Value;
+        if (key.StartsWith("env:", StringComparison.Ordinal))
+            return Environment.GetEnvironmentVariable(key[4..]) ?? throw Missing(key);
+        if (key.StartsWith("knownFolder:", StringComparison.Ordinal))
+            return KnownFolders.Resolve(key[12..]);
+        return key switch
         {
+            "clipboardText" => context.ClipboardText ?? throw Missing("clipboard text"),
             "currentFolder" => context.CurrentFolder ?? throw Missing(L.Get("ContextCurrentFolder")),
             "selectedPath" => first ?? throw Missing(L.Get("ContextSelectedPath")),
             "fileName" => first is null ? throw Missing(L.Get("ContextSelectedPath")) : Path.GetFileName(first),
@@ -345,9 +395,9 @@ internal static class TemplateExpander
             "selectedPaths" => throw new InvalidOperationException(L.Get("ActionSelectedPathsArgument")),
             _ => throw new InvalidOperationException(L.Format("ActionUnknownVariable", match.Value))
         };
-    });
+    }
 
-    private static InvalidOperationException Missing(string name) => new(L.Format("ActionMissingContext", name));
+    private static WorkflowSafeException Missing(string name) => new(L.Format("ActionMissingContext", name));
 }
 
 internal static class CommandLineTokenizer

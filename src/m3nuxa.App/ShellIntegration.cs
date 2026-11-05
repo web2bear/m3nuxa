@@ -14,6 +14,7 @@ internal sealed class ShellIntegration : IDisposable
     private readonly Dictionary<int, MenuNode?> bindings = [];
     private readonly uint taskbarCreated = RegisterWindowMessage("TaskbarCreated");
     private NotifyData data;
+    private Action? balloonClicked;
     private readonly System.Drawing.Icon trayIcon;
     public ShellIntegration(Window window, Action<bool> clicked, Action<MenuNode?> hotkey)
     {
@@ -39,6 +40,7 @@ internal sealed class ShellIntegration : IDisposable
         {
             if (message == taskbarCreated) AddIcon();
             if (message == 0x8001 && (int)lparam is 0x202 or 0x205) clicked((int)lparam == 0x205);
+            if (message == 0x8001 && (int)lparam == 0x405) balloonClicked?.Invoke();
             if (message == 0x312 && bindings.TryGetValue((int)wparam, out var node)) hotkey(node);
         }
         catch (Exception ex) { DevLog.Write("shell", "Callback failed", ex); }
@@ -56,8 +58,9 @@ internal sealed class ShellIntegration : IDisposable
         }
         return unavailable;
     }
-    public void ShowBalloonTip(int timeout, string title, string text, ToolTipIcon icon)
+    public void ShowBalloonTip(int timeout, string title, string text, ToolTipIcon icon, Action? onClick = null)
     {
+        balloonClicked = onClick;
         var notification = data; notification.Flags = 0x10; notification.Title = title[..Math.Min(title.Length, 63)];
         notification.Info = text[..Math.Min(text.Length, 255)]; notification.InfoFlags = icon == ToolTipIcon.Error ? 3u : 2u;
         Shell_NotifyIcon(1, ref notification);
