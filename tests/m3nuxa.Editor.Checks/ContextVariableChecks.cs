@@ -14,11 +14,12 @@ public sealed partial class MainPage
         draftState.SetBaseline();
         RefreshTree(node.Id);
         await Task.Delay(100);
-        var expected = new[] { "{selectedPaths}", "{selectedPath}", "{fileName}", "{extension}", "{parentFolder}", "{currentFolder}" };
+        var expected = new[] { "{selectedPaths}", "{selectedPath}", "{fileName}", "{extension}", "{parentFolder}", "{currentFolder}", "{clipboardText}", "{env:PATH}", "{env:TEMP}", "{knownFolder:Desktop}", "{knownFolder:Documents}", "{knownFolder:Downloads}", "{knownFolder:Pictures}", "{knownFolder:Music}", "{knownFolder:Videos}", "{knownFolder:Profile}", "{knownFolder:Temp}" };
         var argumentsLabel = L.Get("Editor_Arguments_3c3a07");
         foreach (var label in new[] { L.Get("Editor_Path_1b46c6"), argumentsLabel, L.Get("Editor_WorkingDirectory_72e5f4") })
         {
-            var row = PropertiesPanel.Children.OfType<Grid>().Single(grid => grid.Children.OfType<TextBox>().Any(t => (string)t.Header == label));
+            var row = PropertyElements().OfType<Grid>().Single(grid => grid.Children.OfType<TextBox>().Any(t => (string)t.Header == label));
+            if (!CurrentPropertyElements().Contains(row)) throw new Exception(label + ": variable field detached from the current panel.");
             var variableButton = row.Children.OfType<Button>().Single(b => Microsoft.UI.Xaml.Automation.AutomationProperties.GetName(b).StartsWith(L.Get("Editor_InsertContextVariable_cdf409"), StringComparison.Ordinal));
             if (label != argumentsLabel)
             {

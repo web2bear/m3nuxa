@@ -33,6 +33,7 @@ public partial class App : Application
             var displays = Microsoft.UI.Windowing.DisplayArea.FindAll();
             var testArea = displays[0].WorkArea;
             for (var i = 0; i < displays.Count; i++) if (!displays[i].IsPrimary) { testArea = displays[i].WorkArea; break; }
+            await CheckEarlyFileConflictAsync(testArea);
             SetCursorPos(testArea.X + 160, testArea.Y + 160);
             var iconPath = Path.Combine(root, "icon.png");
             using (var bitmap = new System.Drawing.Bitmap(24, 24)) { using var graphics = System.Drawing.Graphics.FromImage(bitmap); graphics.Clear(System.Drawing.Color.Magenta); bitmap.Save(iconPath); }
@@ -122,6 +123,16 @@ public partial class App : Application
         catch (Exception ex) { await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, "result.txt"), "FAIL: " + ex); tray?.Dispose(); Directory.Delete(root, true); Environment.Exit(1); }
         finally { tray?.Dispose(); Directory.Delete(root, true); }
     }
+    private static async Task CheckEarlyFileConflictAsync(Windows.Graphics.RectInt32 area)
+    {
+        using var progress = new FileOperationProgressDialog(1);
+        progress.AppWindow.Move(new Windows.Graphics.PointInt32(area.X + 40, area.Y + 40));
+        progress.Activate();
+        using var cancel = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
+        var result = await progress.AskConflict("example.txt", cancel.Token);
+        if (result != FileConflictChoice.Cancel) throw new Exception("Cancelled conflict dialog must return Cancel.");
+    }
+
     private static void CheckIcon(IconElement? candidate, string name)
     {
         if (candidate is not ImageIcon { Source: Microsoft.UI.Xaml.Media.Imaging.BitmapImage { PixelWidth: > 0 } } icon) throw new Exception(name + " image not loaded");

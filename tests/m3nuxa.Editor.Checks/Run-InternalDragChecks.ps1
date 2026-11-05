@@ -28,8 +28,8 @@ try {
     $editor = Start-Process (Join-Path $out 'm3nuxa.Editor.Checks.exe') -PassThru
     for ($i=0; $i -lt 60 -and (!(Test-Path $state) -or $editor.MainWindowHandle -eq 0); $i++) { Start-Sleep -Milliseconds 200; $editor.Refresh() }
     if (!(Test-Path $state) -or $editor.MainWindowHandle -eq 0) { throw 'Test editor did not start.' }
-    $null = Invoke-Winapp @('ui','invoke','Создать пункт меню','-a',"$($editor.Id)",'--json')
     $null = Invoke-Winapp @('ui','invoke','Действие','-a',"$($editor.Id)",'--json')
+    $null = Invoke-Winapp @('ui','invoke','Открыть папку','-a',"$($editor.Id)",'--json')
     Start-Sleep -Milliseconds 500
     $tree = Invoke-Winapp @('ui','inspect','-a',"$($editor.Id)",'--depth','15','--json')
     $rows = @(Flatten $tree.windows.elements | Where-Object { $_.type -eq 'TreeItem' })

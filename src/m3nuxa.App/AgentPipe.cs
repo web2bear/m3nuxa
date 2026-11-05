@@ -130,11 +130,11 @@ internal sealed class AgentPipe : IDisposable
         DevLog.Write("app-pipe", $"Handling {operation}");
         var args = request["arguments"] as JsonObject ?? new JsonObject();
         if (operation == "openSettings") { OpenSettings?.Invoke(); return new JsonObject(); }
-        if (operation == "read") return JsonSerializer.SerializeToNode(new { version = _store.Version, config = _store.Current, mainHotkey = _store.GlobalHotkey?.Invoke(), unavailableHotkeys = _hotkeyStatus?.Invoke() }, JsonOptions)!;
+        if (operation == "read") return JsonSerializer.SerializeToNode(new { version = _store.Version, config = _store.Current, configPath = File.Exists(_store.FilePath) ? Path.GetFullPath(_store.FilePath) : null, mainHotkey = _store.GlobalHotkey?.Invoke(), unavailableHotkeys = _hotkeyStatus?.Invoke() }, JsonOptions)!;
         if (operation == "begin")
         {
             _drafts[session] = _store.CreateDraft();
-            return JsonSerializer.SerializeToNode(new { version = _drafts[session].BaseVersion, config = _drafts[session].Config }, JsonOptions)!;
+            return JsonSerializer.SerializeToNode(new { version = _drafts[session].BaseVersion, config = _drafts[session].Config, configPath = File.Exists(_store.FilePath) ? Path.GetFullPath(_store.FilePath) : null }, JsonOptions)!;
         }
         if (operation == "reload")
         {
@@ -172,9 +172,32 @@ internal sealed class AgentPipe : IDisposable
             var id = RequiredId(args);
             var replacement = args["node"]?.Deserialize<MenuNode>(JsonOptions) ?? throw new ArgumentException("Требуется node.");
             var (list, index) = Find(items, id);
+            var existing = list[index];
+            if (existing.Kind != replacement.Kind)
+                throw new InvalidOperationException("Update cannot change the item kind; create a new item instead.");
+            if (replacement.Steps is { Count: > 0 } &&
+                JsonSerializer.Serialize(replacement.Steps, JsonOptions) != JsonSerializer.Serialize(existing.Steps, JsonOptions))
+                throw new InvalidOperationException("Update cannot change workflow steps; use setSteps explicitly.");
+            if (replacement.Children is { Count: > 0 } &&
+                JsonSerializer.Serialize(replacement.Children, JsonOptions) != JsonSerializer.Serialize(existing.Children, JsonOptions))
+                throw new InvalidOperationException("Update cannot change children; use create, move or delete explicitly.");
+            // Omitted lists deserialize as empty: preserve existing data rather than losing it.
+            replacement.Steps = existing.Steps;
+            replacement.Children = existing.Children;
             replacement.Id = id;
             list[index] = replacement;
             return JsonSerializer.SerializeToNode(replacement, JsonOptions)!;
+        }
+        if (operation == "setSteps")
+        {
+            var (list, index) = Find(items, RequiredId(args));
+            var node = list[index];
+            if (node.Kind != MenuNodeKind.Action) throw new InvalidOperationException("Steps can only be set on an action.");
+            var steps = args["steps"]?.Deserialize<List<MenuAction>>(JsonOptions) ?? throw new ArgumentException("Steps are required.");
+            if (steps.Count == 0) throw new ArgumentException("An action must contain at least one step.");
+            if (steps.Any(step => step is null)) throw new ArgumentException("Steps cannot contain null entries.");
+            node.Steps = steps;
+            return JsonSerializer.SerializeToNode(node, JsonOptions)!;
         }
         if (operation is "delete" or "move")
         {

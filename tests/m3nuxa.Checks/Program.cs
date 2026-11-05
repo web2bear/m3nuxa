@@ -5,6 +5,9 @@ var root = Path.Combine(Path.GetTempPath(), "m3nuxa-checks-" + Guid.NewGuid().To
 Directory.CreateDirectory(root);
 try
 {
+    WorkflowModelChecks.Run(root);
+    WorkflowExecutionChecks.Run(root);
+    AgentPipeWorkflowChecks.Run(root);
     LocalizationChecks.Run();
     EditorDraftChecks.Run();
     var path = Path.Combine(root, "config.json");
@@ -76,6 +79,33 @@ try
     using (var fallback = ItemIcon.Load(iconNode))
         Check(fallback is { Width: > 0 }, "corrupt custom icon falls back to Explorer");
     Check(ItemIcon.Png(new MenuNode { Action = new MenuAction { Path = root } }) is { Length: > 0 }, "editor PNG shell icon");
+    var largeIcon = Path.Combine(root, "large-photo.jpg");
+    using (var photo = new System.Drawing.Bitmap(4000, 3000))
+    using (var graphics = System.Drawing.Graphics.FromImage(photo))
+    { graphics.Clear(System.Drawing.Color.MediumPurple); photo.Save(largeIcon, System.Drawing.Imaging.ImageFormat.Jpeg); }
+    var largeNode = new MenuNode { IconPath = largeIcon };
+    var iconWatch = System.Diagnostics.Stopwatch.StartNew();
+    var iconPng = ItemIcon.PngAsync(largeNode).GetAwaiter().GetResult()!;
+    iconWatch.Stop();
+    using (var iconStream = new MemoryStream(iconPng))
+    using (var thumbnail = System.Drawing.Image.FromStream(iconStream))
+    {
+        Console.WriteLine($"Large image icon: {thumbnail.Width}x{thumbnail.Height}, {iconPng.Length} bytes, {iconWatch.ElapsedMilliseconds} ms");
+        Check(thumbnail.Width == 64 && thumbnail.Height == 48, "large source produces bounded icon without distortion");
+    }
+    iconWatch.Restart();
+    var warmIconPng = ItemIcon.PngAsync(largeNode).GetAwaiter().GetResult()!;
+    iconWatch.Stop();
+    Console.WriteLine($"Cached large image icon: {iconWatch.ElapsedMilliseconds} ms");
+    Check(ReferenceEquals(iconPng, warmIconPng), "repeated icon request uses cached bytes");
+    using (var replacement = new System.Drawing.Bitmap(16, 16))
+    using (var graphics = System.Drawing.Graphics.FromImage(replacement))
+    { graphics.Clear(System.Drawing.Color.LimeGreen); replacement.Save(largeIcon, System.Drawing.Imaging.ImageFormat.Jpeg); }
+    File.SetLastWriteTimeUtc(largeIcon, DateTime.UtcNow.AddSeconds(2));
+    var replacedPng = ItemIcon.PngAsync(largeNode).GetAwaiter().GetResult()!;
+    using (var updatedStream = new MemoryStream(replacedPng))
+    using (var updated = System.Drawing.Image.FromStream(updatedStream))
+        Check(updated.Width == 16 && updated.Height == 16, "modified image invalidates icon cache");
     Check(HotkeyParser.TryParse("Ctrl+Alt+Space", out var modifiers, out var key) && modifiers == 3 && key == 32, "global hotkey parse");
     Check(HotkeyParser.TryParse("Win+D1", out modifiers, out key) && modifiers == 8 && key == 49, "legacy digit key alias");
     Check(HotkeyParser.TryParse("Ctrl+OemPlus", out modifiers, out key) && key == 0xbb, "legacy OEM key alias");

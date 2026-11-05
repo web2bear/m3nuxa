@@ -270,4 +270,34 @@ Cancel — exit.</value>
   <data name="ConfigPathUnavailable" xml:space="preserve">
     <value>{0}: path is currently unavailable: {1}</value>
   </data>
+  <data name="ConfigStep" xml:space="preserve"><value>Step</value></data>
+  <data name="ConfigDelayInvalid" xml:space="preserve"><value>{0}: delay must not be negative.</value></data>
+  <data name="ConfigTimeoutInvalid" xml:space="preserve"><value>{0}: timeout must be greater than zero.</value></data>
+  <data name="WorkflowRuns" xml:space="preserve"><value>Action runs</value></data>
+  <data name="WorkflowClear" xml:space="preserve"><value>Clear completed</value></data>
+  <data name="WorkflowRunning" xml:space="preserve"><value>Running</value></data>
+  <data name="WorkflowCancelled" xml:space="preserve"><value>Cancelled</value></data>
+  <data name="WorkflowSuccess" xml:space="preserve"><value>Completed</value></data>
+  <data name="WorkflowFailed" xml:space="preserve"><value>Failed</value></data>
+  <data name="WorkflowStep" xml:space="preserve"><value>Step {0}: {1}</value></data>
+  <data name="WorkflowCancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="WorkflowAlreadyRunning" xml:space="preserve"><value>This action is already running. Open action runs from the tray for details.</value></data>
+  <data name="WorkflowSensitiveError" xml:space="preserve"><value>Action failed. Details are hidden because the parameters contain clipboard text or an environment variable.</value></data>
+  <data name="WorkflowProcessTimeout" xml:space="preserve"><value>The process did not finish within the configured timeout.</value></data>
+  <data name="WorkflowProcessExitCode" xml:space="preserve"><value>The process exited with code {0}.</value></data>
+  <data name="WorkflowClipboardNoText" xml:space="preserve"><value>Clipboard does not contain text.</value></data>
+  <data name="WorkflowFolderUnavailable" xml:space="preserve"><value>The system folder is unavailable.</value></data>
+  <data name="WorkflowFolderUnknown" xml:space="preserve"><value>Unknown system folder: {0}.</value></data>
+  <data name="WorkflowFolderUnavailableNamed" xml:space="preserve"><value>System folder is unavailable: {0}.</value></data>
+  <data name="WorkflowKindOpenFolder" xml:space="preserve"><value>Open folder</value></data>
+  <data name="WorkflowKindRunProgram" xml:space="preserve"><value>Run program</value></data>
+  <data name="WorkflowKindRunScript" xml:space="preserve"><value>Run script</value></data>
+  <data name="WorkflowKindSendShortcut" xml:space="preserve"><value>Send shortcut</value></data>
+  <data name="WorkflowKindCopySelection" xml:space="preserve"><value>Copy selected items</value></data>
+  <data name="WorkflowKindMoveSelection" xml:space="preserve"><value>Move selected items</value></data>
+  <data name="WorkflowKindInsertText" xml:space="preserve"><value>Insert text</value></data>
+  <data name="WorkflowKindOpenItem" xml:space="preserve"><value>Open file or link</value></data>
+  <data name="WorkflowKindDelay" xml:space="preserve"><value>Delay</value></data>
+  <data name="WorkflowKindSetClipboardText" xml:space="preserve"><value>Set clipboard text</value></data>
+  <data name="WorkflowKindPasteText" xml:space="preserve"><value>Paste text</value></data>
 </root>

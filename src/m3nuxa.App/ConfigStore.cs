@@ -148,9 +148,14 @@ public sealed class ConfigStore
         return new ConfigStore(target);
     }
 
-    private static AppConfig ReadConfig(string file) =>
-        JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(file), JsonOptions)
-        ?? throw new InvalidDataException(L.Get("ConfigJsonEmpty"));
+    private static AppConfig ReadConfig(string file)
+    {
+        var config = JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(file), JsonOptions)
+            ?? throw new InvalidDataException(L.Get("ConfigJsonEmpty"));
+        // Migration is in memory; Apply creates a backup before replacing the source file.
+        if (config.SchemaVersion == 1) config.SchemaVersion = 2;
+        return config;
+    }
 
     private static AppConfig Clone(AppConfig value) =>
         new() { SchemaVersion = value.SchemaVersion, MainHotkey = value.MainHotkey, Items = JsonSerializer.Deserialize<List<MenuNode>>(JsonSerializer.Serialize(value.Items, JsonOptions), JsonOptions)! };
@@ -172,7 +177,7 @@ public sealed class ConfigStore
     {
         var errors = new List<string>();
         var warnings = new List<string>();
-        if (config.SchemaVersion != 1) errors.Add(L.Get("ConfigSchemaUnsupported"));
+        if (config.SchemaVersion != 2) errors.Add(L.Get("ConfigSchemaUnsupported"));
         if (config.Items is null) errors.Add(L.Get("ConfigTreeMissing"));
         var hotkeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var mainHotkey = GlobalHotkey?.Invoke() ?? "";
@@ -202,10 +207,16 @@ public sealed class ConfigStore
                 }
                 if (node.Kind == MenuNodeKind.Action)
                 {
-                    if (node.Action is null) errors.Add(L.Format("ConfigActionMissing", label));
-                    else ValidateAction(node.Action, label);
+                    if (node.Steps is null || node.Steps.Count == 0) errors.Add(L.Format("ConfigActionMissing", label));
+                    else for (var i = 0; i < node.Steps.Count; i++)
+                    {
+                        var step = node.Steps[i];
+                        var stepLabel = $"{label} / {L.Get("ConfigStep")} {i + 1}";
+                        if (step is null) errors.Add(L.Format("ConfigActionMissing", stepLabel));
+                        else ValidateAction(step, stepLabel);
+                    }
                 }
-                else if (node.Action is not null) errors.Add(L.Format("ConfigActionOnNonAction", label));
+                else if (node.Steps is null || node.Steps.Count > 0) errors.Add(L.Format("ConfigActionOnNonAction", label));
                 if (node.Kind != MenuNodeKind.Group && node.Children?.Count > 0) errors.Add(L.Format("ConfigChildrenOnNonGroup", label));
                 if (node.Children is null) errors.Add(L.Format("ConfigChildrenMissing", label));
                 else if (node.Kind == MenuNodeKind.Group) Visit(node.Children, label);
@@ -215,13 +226,21 @@ public sealed class ConfigStore
         void ValidateAction(MenuAction action, string label)
         {
             if (!Enum.IsDefined(action.Kind)) { errors.Add(L.Format("ConfigUnknownAction", label)); return; }
+            if (action.Kind == ActionKind.Delay)
+            {
+                if (action.DelayMilliseconds < 0) errors.Add(L.Format("ConfigDelayInvalid", label));
+                return;
+            }
+            if (action.Kind == ActionKind.SetClipboardText) return;
+            if (action.Kind is ActionKind.RunProgram or ActionKind.RunScript && action.TimeoutMilliseconds is <= 0)
+                errors.Add(L.Format("ConfigTimeoutInvalid", label));
             if (action.Kind == ActionKind.SendShortcut)
             {
                 if (string.IsNullOrWhiteSpace(action.Shortcut)) errors.Add(L.Format("ConfigShortcutRequired", label));
                 else if (!HotkeyParser.TryParse(action.Shortcut, out _, out _)) errors.Add(L.Format("ConfigShortcutInvalid", label));
                 return;
             }
-            if (action.Kind == ActionKind.InsertText)
+            if (action.Kind is ActionKind.InsertText or ActionKind.PasteText)
             {
                 if (string.IsNullOrEmpty(action.Text)) errors.Add(L.Format("ConfigSnippetRequired", label));
                 return;

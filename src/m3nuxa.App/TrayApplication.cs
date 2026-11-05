@@ -31,7 +31,10 @@ internal sealed class TrayApplication : IDisposable
     private Process? _editor;
     private MenuFlyout? _menu;
     private bool _hotkeysSuspended;
+    private bool _exiting;
     private IReadOnlyList<string> _unavailableHotkeys = [];
+    private readonly List<WorkflowRun> _workflowRuns = [];
+    private WorkflowRunsWindow? _workflowWindow;
 
     public TrayApplication(ConfigStore store)
     {
@@ -70,6 +73,7 @@ internal sealed class TrayApplication : IDisposable
         void Add(string text, Action action) { var item = new MenuFlyoutItem { Text = text }; item.Click += (_, _) => action(); menu.Items.Add(item); }
         Add(L.Get("TrayEditor"), OpenEditor);
         Add(L.Get("TraySettings"), OpenSettings);
+        Add(L.Get("WorkflowRuns"), ShowWorkflowRuns);
         Add(L.Get("TrayReload"), Reload);
         _mcpMenuItem = new ToggleMenuFlyoutItem { Text = L.Get("TrayMcp"), IsChecked = _mcpHttp.IsRunning };
         _mcpMenuItem.Click += (_, _) => _ = SetMcpEnabledAsync(!_mcpHttp.IsRunning, true);
@@ -80,7 +84,7 @@ internal sealed class TrayApplication : IDisposable
         _startupMenuItem = new ToggleMenuFlyoutItem { Text = L.Get("TrayStartup"), IsChecked = IsStartupEnabled() };
         _startupMenuItem.Click += (_, _) => ToggleStartup(); menu.Items.Add(_startupMenuItem);
         menu.Items.Add(new MenuFlyoutSeparator());
-        Add(L.Get("TrayExit"), async () => { await _mcpHttp.StopAsync(); Dispose(); _window.Close(); Application.Current.Exit(); });
+        Add(L.Get("TrayExit"), async () => await ExitAsync());
         return menu;
     }
 
@@ -267,14 +271,70 @@ internal sealed class TrayApplication : IDisposable
     [StructLayout(LayoutKind.Sequential)] private struct CursorPoint { public int X, Y; }
     [DllImport("user32.dll")] private static extern bool GetCursorPos(out CursorPoint point);
 
+    private async Task ExitAsync()
+    {
+        if (_exiting) return;
+        _exiting = true;
+        foreach (var run in _workflowRuns.Where(run => !run.Finished)) run.Cancellation.Cancel();
+        await Task.WhenAll(_workflowRuns.Where(run => !run.Finished).Select(run => run.Completion.Task));
+        await _mcpHttp.StopAsync();
+        Dispose();
+        _window.Close();
+        Application.Current.Exit();
+    }
+
+    private void ShowWorkflowRuns()
+    {
+        if (_workflowWindow is null)
+        {
+            _workflowWindow = new WorkflowRunsWindow(_workflowRuns);
+            _workflowWindow.Closed += (_, _) => _workflowWindow = null;
+        }
+        _workflowWindow.Refresh();
+        _workflowWindow.Activate();
+    }
+
     private async Task Execute(MenuNode node, InvocationContext? context)
     {
-        if (node.Action is null) return;
+        if (_exiting || node.Steps.Count == 0) return;
+        if (_workflowRuns.Any(run => run.NodeId == node.Id && !run.Finished))
+        {
+            _tray.ShowBalloonTip(5000, L.Get("WorkflowRuns"), L.Get("WorkflowAlreadyRunning"), ToolTipIcon.Warning, ShowWorkflowRuns);
+            ShowWorkflowRuns();
+            return;
+        }
+        // A running action must be isolated from later configuration edits.
+        var steps = JsonSerializer.Deserialize<List<MenuAction>>(JsonSerializer.Serialize(node.Steps))!;
+        var run = new WorkflowRun { NodeId = node.Id, Name = node.Name };
+        _workflowRuns.Add(run);
+        _workflowWindow?.Refresh();
         try
         {
-            await ActionExecutor.ExecuteAsync(node.Action, context ?? InvocationContext.Capture());
+            var result = await WorkflowExecutor.RunAsync(steps, context ?? InvocationContext.Capture(), run.Cancellation.Token,
+                (index, step) =>
+                {
+                    run.StepIndex = index;
+                    run.StepKind = L.Get("WorkflowKind" + step.Kind);
+                    _workflowWindow?.Refresh();
+                });
+            run.FileSteps = result.FileSteps;
+            run.Cancelled = result.Cancelled;
+            run.Error = result.Error;
+            run.StepIndex = result.StepIndex;
+            if (run.Error is not null && !_disposed)
+                _tray.ShowBalloonTip(5000, run.Name, run.Error, ToolTipIcon.Error, ShowWorkflowRuns);
         }
-        catch (Exception ex) { MessageBox.Show(ex.Message, node.Name); }
+        catch (Exception ex)
+        {
+            run.Error = ex.Message;
+            if (!_disposed) _tray.ShowBalloonTip(5000, run.Name, run.Error, ToolTipIcon.Error, ShowWorkflowRuns);
+        }
+        finally
+        {
+            run.Finished = true;
+            run.Completion.TrySetResult();
+            _workflowWindow?.Refresh();
+        }
     }
 
     private void OnHotkey(MenuNode? node)
@@ -327,6 +387,8 @@ internal sealed class TrayApplication : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        foreach (var run in _workflowRuns.Where(run => !run.Finished)) run.Cancellation.Cancel();
+        _workflowWindow?.Close();
         _tray.Dispose();
         _menu?.Hide();
         _foreground.Dispose();

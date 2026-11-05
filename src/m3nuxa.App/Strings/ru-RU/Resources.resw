@@ -270,4 +270,34 @@
   <data name="ConfigPathUnavailable" xml:space="preserve">
     <value>{0}: путь сейчас недоступен: {1}</value>
   </data>
+  <data name="ConfigStep" xml:space="preserve"><value>Шаг</value></data>
+  <data name="ConfigDelayInvalid" xml:space="preserve"><value>{0}: задержка не может быть отрицательной.</value></data>
+  <data name="ConfigTimeoutInvalid" xml:space="preserve"><value>{0}: тайм-аут должен быть больше нуля.</value></data>
+  <data name="WorkflowRuns" xml:space="preserve"><value>Выполнение действий</value></data>
+  <data name="WorkflowClear" xml:space="preserve"><value>Очистить завершённые</value></data>
+  <data name="WorkflowRunning" xml:space="preserve"><value>Выполняется</value></data>
+  <data name="WorkflowCancelled" xml:space="preserve"><value>Отменено</value></data>
+  <data name="WorkflowSuccess" xml:space="preserve"><value>Завершено</value></data>
+  <data name="WorkflowFailed" xml:space="preserve"><value>Ошибка</value></data>
+  <data name="WorkflowStep" xml:space="preserve"><value>Шаг {0}: {1}</value></data>
+  <data name="WorkflowCancel" xml:space="preserve"><value>Отменить</value></data>
+  <data name="WorkflowAlreadyRunning" xml:space="preserve"><value>Это действие уже выполняется. Подробности доступны в окне выполнения через трей.</value></data>
+  <data name="WorkflowSensitiveError" xml:space="preserve"><value>Не удалось выполнить действие. Подробности скрыты, поскольку параметры содержат текст буфера или переменную окружения.</value></data>
+  <data name="WorkflowProcessTimeout" xml:space="preserve"><value>Процесс не завершился за установленное время.</value></data>
+  <data name="WorkflowProcessExitCode" xml:space="preserve"><value>Процесс завершился с кодом {0}.</value></data>
+  <data name="WorkflowClipboardNoText" xml:space="preserve"><value>Буфер обмена не содержит текста.</value></data>
+  <data name="WorkflowFolderUnavailable" xml:space="preserve"><value>Системная папка недоступна.</value></data>
+  <data name="WorkflowFolderUnknown" xml:space="preserve"><value>Неизвестная системная папка: {0}.</value></data>
+  <data name="WorkflowFolderUnavailableNamed" xml:space="preserve"><value>Системная папка недоступна: {0}.</value></data>
+  <data name="WorkflowKindOpenFolder" xml:space="preserve"><value>Открыть папку</value></data>
+  <data name="WorkflowKindRunProgram" xml:space="preserve"><value>Запустить программу</value></data>
+  <data name="WorkflowKindRunScript" xml:space="preserve"><value>Запустить скрипт</value></data>
+  <data name="WorkflowKindSendShortcut" xml:space="preserve"><value>Отправить сочетание</value></data>
+  <data name="WorkflowKindCopySelection" xml:space="preserve"><value>Копировать выбранные объекты</value></data>
+  <data name="WorkflowKindMoveSelection" xml:space="preserve"><value>Переместить выбранные объекты</value></data>
+  <data name="WorkflowKindInsertText" xml:space="preserve"><value>Ввести текст</value></data>
+  <data name="WorkflowKindOpenItem" xml:space="preserve"><value>Открыть файл или ссылку</value></data>
+  <data name="WorkflowKindDelay" xml:space="preserve"><value>Задержка</value></data>
+  <data name="WorkflowKindSetClipboardText" xml:space="preserve"><value>Записать текст в буфер</value></data>
+  <data name="WorkflowKindPasteText" xml:space="preserve"><value>Вставить текст</value></data>
 </root>
