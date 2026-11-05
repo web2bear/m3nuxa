@@ -64,7 +64,8 @@ internal static class ActionExecutor
                 case ActionKind.OpenFolder:
                     var folder = ExpandSingle(action.Path, context);
                     if (!Directory.Exists(folder)) throw new DirectoryNotFoundException(L.Format("ActionFolderUnavailable", folder));
-                    Process.Start(new ProcessStartInfo("explorer.exe") { ArgumentList = { "/n", folder }, UseShellExecute = false });
+                    // Explorer uses commas, rather than whitespace, to separate its switches from the path.
+                    Process.Start(new ProcessStartInfo("explorer.exe") { Arguments = $"/n,\"{folder}\"", UseShellExecute = false });
                     return Ok();
                 case ActionKind.OpenItem:
                     var target = ExpandSingle(action.Path, context, encodeUrlComponents: action.Path.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || action.Path.StartsWith("https://", StringComparison.OrdinalIgnoreCase));
