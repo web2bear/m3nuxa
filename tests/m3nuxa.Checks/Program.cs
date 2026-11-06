@@ -54,6 +54,31 @@ try
     next.Config.Items.Add(new MenuNode { Name = "Other", Kind = MenuNodeKind.Group });
     Check(store.Apply(next).Success, "second apply");
     Check(!store.Apply(stale).Success, "stale draft blocked");
+    var saveAsRoot = Path.Combine(root, "save-as");
+    Directory.CreateDirectory(saveAsRoot);
+    var selectionFile = Path.Combine(saveAsRoot, "active-config.txt");
+    var originalFile = Path.Combine(saveAsRoot, "original.json");
+    var alternateFile = Path.Combine(saveAsRoot, "other.json");
+    var saveAsStore = new ConfigStore(originalFile, selectionFile);
+    Check(saveAsStore.Apply(saveAsStore.CreateDraft()).Success, "save-as initial configuration");
+    var staleSaveAs = saveAsStore.CreateDraft();
+    var saveAsDraft = saveAsStore.CreateDraft();
+    saveAsDraft.Config.Items.Add(new MenuNode { Name = "Saved as", Kind = MenuNodeKind.Group });
+    Check(saveAsStore.SaveAs(saveAsDraft, alternateFile).Success, "save as succeeds");
+    Check(saveAsStore.FilePath == alternateFile && ConfigStore.StartupPath(selectionFile) == alternateFile, "save as selects persistent active file");
+    Check(new ConfigStore(selectionFile: selectionFile).Current.Items.Single().Name == "Saved as", "save as survives restart");
+    Check(!saveAsStore.SaveAs(staleSaveAs, Path.Combine(saveAsRoot, "stale.json")).Success, "save as rejects stale draft");
+    var followingDraft = saveAsStore.CreateDraft();
+    followingDraft.Config.Items.Add(new MenuNode { Name = "Next save", Kind = MenuNodeKind.Group });
+    Check(saveAsStore.Apply(followingDraft).Success && new ConfigStore(alternateFile).Current.Items.Count == 2, "subsequent save uses new file");
+    Check(new ConfigStore(originalFile).Current.Items.Count == 0, "save as leaves original file unchanged");
+    var existingTarget = Path.Combine(saveAsRoot, "existing.json");
+    File.WriteAllText(existingTarget, "previous contents");
+    var brokenSelection = new ConfigStore(originalFile, Path.Combine(saveAsRoot, "missing-directory", "active-config.txt"));
+    Check(!brokenSelection.SaveAs(brokenSelection.CreateDraft(), existingTarget).Success, "selection persistence error blocks save as");
+    Check(File.ReadAllText(existingTarget) == "previous contents" && brokenSelection.FilePath == originalFile, "failed save as restores existing target and active path");
+    var newTarget = Path.Combine(saveAsRoot, "failed-new.json");
+    Check(!brokenSelection.SaveAs(brokenSelection.CreateDraft(), newTarget).Success && !File.Exists(newTarget), "failed save as removes newly created target");
     Check(Directory.GetFiles(Path.Combine(root, "backups"), "*.json").Length == 1, "backup created");
     var invalid = store.CreateDraft();
     invalid.Config.Items.Add(new MenuNode { Kind = MenuNodeKind.Separator, Hotkey = "Ctrl+Alt+X" });
@@ -84,6 +109,26 @@ try
     var iconNode = new MenuNode { IconPath = customIcon, Action = new MenuAction { Path = root } };
     using (var loaded = ItemIcon.Load(iconNode))
         Check(loaded?.GetPixel(0, 0).ToArgb() == System.Drawing.Color.Magenta.ToArgb(), "custom image overrides shell icon");
+    iconNode.IconColor = "#00FF00";
+    using (var loaded = ItemIcon.Load(iconNode))
+        Check(loaded?.GetPixel(0, 0).ToArgb() == System.Drawing.Color.Magenta.ToArgb(), "external image keeps its original color");
+    var colored = new MenuNode { IconPath = Path.Combine("icon-packs", "Boxicons", "bx-home.png"), IconColor = "#F04020" };
+    using (var source = ItemIcon.Load(new MenuNode { IconPath = colored.IconPath }))
+    using (var result = ItemIcon.Load(colored))
+    {
+        Check(source is not null && result is not null, "bundled colored icon loads");
+        var points = from y in Enumerable.Range(0, result!.Height) from x in Enumerable.Range(0, result.Width) select (x, y);
+        var opaque = points.First(p => source!.GetPixel(p.x, p.y).A == 255);
+        var pixel = result!.GetPixel(opaque.x, opaque.y);
+        Check(pixel.R == 240 && pixel.G == 64 && pixel.B == 32 && pixel.A == 255, "bundled icon uses selected color");
+        Check(points.All(p => source!.GetPixel(p.x, p.y).A == result.GetPixel(p.x, p.y).A), "color preserves transparency");
+    }
+    var redBytes = ItemIcon.PngAsync(colored).GetAwaiter().GetResult();
+    colored.IconColor = "#20C040";
+    var greenBytes = ItemIcon.PngAsync(colored).GetAwaiter().GetResult();
+    Check(redBytes is not null && greenBytes is not null && !redBytes.SequenceEqual(greenBytes), "icon cache distinguishes colors");
+    var roundTrip = System.Text.Json.JsonSerializer.Deserialize<MenuNode>(System.Text.Json.JsonSerializer.Serialize(colored));
+    Check(roundTrip?.IconColor == "#20C040", "icon color survives configuration serialization");
     File.WriteAllText(customIcon, "broken image");
     using (var fallback = ItemIcon.Load(iconNode))
         Check(fallback is { Width: > 0 }, "corrupt custom icon falls back to Explorer");

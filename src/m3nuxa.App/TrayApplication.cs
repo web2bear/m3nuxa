@@ -40,7 +40,7 @@ internal sealed class TrayApplication : IDisposable
     {
         DevLog.Write("app", "TrayApplication starting");
         _store = store;
-        _settings = new SettingsStore(Path.Combine(Path.GetDirectoryName(store.FilePath)!, "settings.json"), store.Current.MainHotkey, L.Get);
+        _settings = new SettingsStore(Path.Combine(store.SettingsDirectory, "settings.json"), store.Current.MainHotkey, L.Get);
         _store.GlobalHotkey = () => _settings.Current.MainHotkey;
         _foreground = new ForegroundTracker();
         _window.Content = _root;

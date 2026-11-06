@@ -153,9 +153,9 @@ internal sealed class AgentPipe : IDisposable
         }
         var items = draft.Config.Items;
         if (operation == "validate") return JsonSerializer.SerializeToNode(_store.Validate(draft.Config), JsonOptions)!;
-        if (operation == "apply")
+        if (operation is "apply" or "saveAs")
         {
-            var result = _store.Apply(draft);
+            var result = operation == "saveAs" ? _store.SaveAs(draft, args["path"]?.GetValue<string>() ?? throw new ArgumentException("Path is required.")) : _store.Apply(draft);
             if (result.Success) { _drafts.Remove(session); _applied(); }
             var response = JsonSerializer.SerializeToNode(result, JsonOptions)!;
             response["unavailableHotkeys"] = JsonSerializer.SerializeToNode(_hotkeyStatus?.Invoke(), JsonOptions);

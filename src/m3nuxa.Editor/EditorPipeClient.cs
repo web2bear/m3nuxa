@@ -17,6 +17,7 @@ public sealed class EditorPipeClient
         Converters = { new JsonStringEnumConverter() }
     };
     private readonly string _session = Guid.NewGuid().ToString("N");
+    internal string? TrayDirectory { get; private set; }
 
     public async Task<EditorResponse> BeginAsync()
     {
@@ -51,6 +52,7 @@ public sealed class EditorPipeClient
         SendAsync("replaceDraft", new JsonObject { ["config"] = JsonSerializer.SerializeToNode(config, JsonOptions) });
     public Task<EditorResponse> ValidateAsync() => SendAsync("validate");
     public Task<EditorResponse> ApplyAsync() => SendAsync("apply");
+    public Task<EditorResponse> SaveAsAsync(string path) => SendAsync("saveAs", new JsonObject { ["path"] = path });
     public Task<EditorResponse> ReloadAsync() => SendAsync("reload");
 
     public static ConfigDraft? ReadDraft(EditorResponse response)
@@ -89,6 +91,8 @@ public sealed class EditorPipeClient
                     var response = await reader.ReadLineAsync(timeout.Token);
                     if (response is null) return new(false, L.Get("Editor_TheTrayApplicationClosedThe_20a486"), null);
                     var data = JsonNode.Parse(response);
+                    try { TrayDirectory = Path.GetDirectoryName(process.MainModule?.FileName); }
+                    catch (System.ComponentModel.Win32Exception) { TrayDirectory = null; }
                     DevLog.Write("editor-pipe", $"Received {operation} response");
                     var error = data?["error"]?.GetValue<string>();
                     if (error is not null) return new(false, error, data);

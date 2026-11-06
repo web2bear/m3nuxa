@@ -44,10 +44,10 @@
     <value>Нельзя вложить пункт в самого себя или его дочернюю группу.</value>
   </data>
   <data name="Editor_ApplyChangesBeforeClosing_c969f8" xml:space="preserve">
-    <value>Применить изменения перед закрытием?</value>
+    <value>Сохранить изменения перед закрытием?</value>
   </data>
   <data name="Editor_Apply_768af6" xml:space="preserve">
-    <value>Применить</value>
+    <value>Сохранить</value>
   </data>
   <data name="Editor_Arguments_3c3a07" xml:space="preserve">
     <value>Аргументы</value>
@@ -101,7 +101,7 @@
     <value> (копия)</value>
   </data>
   <data name="Editor_CouldNotApplyTheConfiguration_9f63ee" xml:space="preserve">
-    <value>Не удалось применить конфигурацию.</value>
+    <value>Не удалось сохранить конфигурацию.</value>
   </data>
   <data name="Editor_CouldNotConfirmHotkeysWere_c43cf6" xml:space="preserve">
     <value>Не удалось подтвердить восстановление горячих клавиш: </value>
@@ -224,7 +224,7 @@
     <value>Загрузить другой файл?</value>
   </data>
   <data name="Editor_LoadConfiguration_0439e7" xml:space="preserve">
-    <value>Загрузить конфигурацию…</value>
+    <value>Загрузить из файла…</value>
   </data>
   <data name="Editor_Load_f909c7" xml:space="preserve">
     <value>Загрузить</value>
@@ -260,7 +260,7 @@
     <value>Новый сниппет</value>
   </data>
   <data name="Editor_NoChangesToApply_fefed9" xml:space="preserve">
-    <value>Нет изменений для применения</value>
+    <value>Нет изменений для сохранения</value>
   </data>
   <data name="Editor_NotAssigned_bd9326" xml:space="preserve">
     <value>Не назначено</value>
@@ -329,7 +329,7 @@
     <value>Выполняет это действие из любого приложения.</value>
   </data>
   <data name="Editor_SaveDraftSeparately_23cefc" xml:space="preserve">
-    <value>Сохранить черновик отдельно…</value>
+    <value>Сохранить как…</value>
   </data>
   <data name="Editor_SelectAnItemOnThe_2c92bb" xml:space="preserve">
     <value>Выберите пункт слева</value>
@@ -386,7 +386,7 @@
     <value>Узел дерева не связан с пунктом меню.</value>
   </data>
   <data name="Editor_ThereAreUnsavedChangesApply_226d2b" xml:space="preserve">
-    <value>Есть несохранённые изменения. Применить их.</value>
+    <value>Сохранить изменения и обновить меню.</value>
   </data>
   <data name="Editor_ThereIsNoTextOn_7811eb" xml:space="preserve">
     <value>В буфере обмена нет текста.</value>
@@ -476,5 +476,12 @@
   <data name="Workflow_TypeText" xml:space="preserve"><value>Ввести текст</value></data>
   <data name="Workflow_ItemSettings" xml:space="preserve"><value>Свойства пункта</value></data>
   <data name="Workflow_StepSettings" xml:space="preserve"><value>Шаг {0} · {1}</value></data>
-  <data name="Editor_ApplyDestination" xml:space="preserve"><value>(Применить → {0})</value></data>
+  <data name="Editor_ApplyDestination" xml:space="preserve"><value>(Сохранить → {0})</value></data>
+  <data name="Icon_ChooseBundled" xml:space="preserve"><value>Выбрать значок</value></data>
+  <data name="Icon_ChooseFile" xml:space="preserve"><value>Из файла…</value></data>
+  <data name="Icon_Search" xml:space="preserve"><value>Поиск по названию значка</value></data>
+  <data name="Icon_PackMissing" xml:space="preserve"><value>Комплект значков не найден.</value></data>
+  <data name="Icon_Color" xml:space="preserve"><value>Цвет значка</value></data>
+  <data name="Icon_CustomColor" xml:space="preserve"><value>Другой цвет…</value></data>
+  <data name="Editor_SaveAsHint" xml:space="preserve"><value>Сохранить в новый файл и сделать его активной конфигурацией.</value></data>
 </root>

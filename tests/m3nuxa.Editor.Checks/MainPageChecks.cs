@@ -25,12 +25,19 @@ public sealed partial class MainPage
     {
         var expectedLanguage = Environment.GetEnvironmentVariable("m3nuxa_CHECK_LANGUAGE") ?? "en-US";
         if (L.Language != expectedLanguage) throw new Exception($"Expected language {expectedLanguage}, got {L.Language}.");
-        var expectedApply = expectedLanguage == "ru-RU" ? "Применить" : "Apply";
+        var expectedApply = expectedLanguage == "ru-RU" ? "Сохранить" : "Save";
         var expectedPath = expectedLanguage == "ru-RU" ? "Путь" : "Path";
         if (L.Get("Editor_Apply_768af6") != expectedApply || ApplyButton.Label != expectedApply)
             throw new Exception("The localized Apply resource was not loaded into XAML.");
         if (L.Get("Editor_Path_1b46c6") != expectedPath)
             throw new Exception("The localized Path resource was not loaded from the editor PRI.");
+        var commands = MainCommandBar.PrimaryCommands.OfType<Microsoft.UI.Xaml.Controls.AppBarButton>().ToArray();
+        var expected = expectedLanguage == "ru-RU" ? new[] { "Сохранить", "Сохранить как…", "Загрузить из файла…" } : new[] { "Save", "Save as…", "Load from file…" };
+        if (!commands.Take(3).Select(command => command.Label).SequenceEqual(expected)) throw new Exception("File command labels or order are wrong.");
+        if (commands[0].Icon is not Microsoft.UI.Xaml.Controls.SymbolIcon { Symbol: Microsoft.UI.Xaml.Controls.Symbol.Save } ||
+            commands[1].Icon is not Microsoft.UI.Xaml.Controls.FontIcon { Glyph: "\uE792" } ||
+            commands[2].Icon is not Microsoft.UI.Xaml.Controls.SymbolIcon { Symbol: Microsoft.UI.Xaml.Controls.Symbol.OpenFile }) throw new Exception("File command icons are wrong.");
+        if (commands.Any(command => Microsoft.UI.Xaml.Automation.AutomationProperties.GetAutomationId(command) == "ReloadConfiguration")) throw new Exception("Reload command still exists.");
     }
 
     internal void SetupDropChecks()

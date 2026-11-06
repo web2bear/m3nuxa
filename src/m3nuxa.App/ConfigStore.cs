@@ -15,14 +15,18 @@ public sealed class ConfigStore
     };
 
     private readonly object gate = new();
-    private readonly string path;
+    private string path;
+    private readonly string? selectionFile;
     private string? diskFingerprint;
     private AppConfig current = new();
     private long version = 1;
 
-    public ConfigStore(string? path = null)
+    public ConfigStore(string? path = null, string? selectionFile = null)
     {
-        this.path = path ?? Path.Combine(AppContext.BaseDirectory, "config.json");
+        this.selectionFile = selectionFile;
+        this.path = path ?? StartupPath(selectionFile);
+        if (path is null && selectionFile is not null && File.Exists(selectionFile) && !File.Exists(this.path))
+            throw new InvalidDataException($"Configuration file not found: {this.path}");
         if (File.Exists(this.path))
         {
             current = ReadConfig(this.path);
@@ -34,7 +38,16 @@ public sealed class ConfigStore
     }
 
     public Func<string>? GlobalHotkey { get; set; }
-    public string FilePath => path;
+    public string FilePath { get { lock (gate) return path; } }
+    public string SettingsDirectory => selectionFile is null ? Path.GetDirectoryName(Path.GetFullPath(path))! : Path.GetDirectoryName(Path.GetFullPath(selectionFile))!;
+
+    public static string StartupPath(string? selectionFile)
+    {
+        if (selectionFile is null || !File.Exists(selectionFile)) return Path.Combine(AppContext.BaseDirectory, "config.json");
+        var selected = File.ReadAllText(selectionFile).Trim();
+        if (string.IsNullOrWhiteSpace(selected)) throw new InvalidDataException($"Empty configuration selection: {selectionFile}");
+        return Path.GetFullPath(selected, Path.GetDirectoryName(Path.GetFullPath(selectionFile))!);
+    }
     public AppConfig Current { get { lock (gate) return Clone(current); } }
     public long Version { get { lock (gate) return version; } }
 
@@ -75,7 +88,10 @@ public sealed class ConfigStore
         }
     }
 
-    public ApplyResult Apply(ConfigDraft draft)
+    public ApplyResult Apply(ConfigDraft draft) => ApplyTo(draft, null);
+    public ApplyResult SaveAs(ConfigDraft draft, string destinationPath) => ApplyTo(draft, destinationPath);
+
+    private ApplyResult ApplyTo(ConfigDraft draft, string? destinationPath)
     {
         lock (gate)
         {
@@ -85,42 +101,73 @@ public sealed class ConfigStore
                 return ApplyResult.Failed(L.Get("ConfigDraftStale"), check);
 
             string? temporary = null;
+            string? savedTarget = null;
+            string? targetBackup = null;
+            bool targetWasCreated = false;
+            bool switched = false;
             try
             {
                 var actualFingerprint = File.Exists(path) ? Fingerprint(path) : null;
                 if (actualFingerprint != diskFingerprint)
                     return ApplyResult.Failed(L.Get("ConfigChangedOutside"), check);
 
-                var directory = Path.GetDirectoryName(Path.GetFullPath(path))!;
+                var target = destinationPath is null ? Path.GetFullPath(path) : Path.GetFullPath(destinationPath);
+                savedTarget = target;
+                var directory = Path.GetDirectoryName(target)!;
                 Directory.CreateDirectory(directory);
-                temporary = Path.Combine(directory, $".{Path.GetFileName(path)}.{Guid.NewGuid():N}.tmp");
+                temporary = Path.Combine(directory, $".{Path.GetFileName(target)}.{Guid.NewGuid():N}.tmp");
                 File.WriteAllText(temporary, JsonSerializer.Serialize(draft.Config, JsonOptions));
                 var replacementFingerprint = Fingerprint(temporary);
                 var replacementConfig = Clone(draft.Config);
 
-                if (File.Exists(path))
+                if (File.Exists(target))
                 {
                     var backupDirectory = Path.Combine(directory, "backups");
                     Directory.CreateDirectory(backupDirectory);
                     var backup = Path.Combine(backupDirectory,
                         $"config-{DateTime.UtcNow:yyyyMMdd-HHmmss-fffffff}-{Guid.NewGuid():N}.json");
-                    File.Copy(path, backup);
-                    File.Replace(temporary, path, null);
+                    File.Copy(target, backup);
+                    targetBackup = backup;
+                    File.Replace(temporary, target, null);
                     temporary = null;
                     try { PruneBackups(backupDirectory); } catch { /* Retention cleanup cannot undo a successful apply. */ }
                 }
                 else
                 {
-                    File.Move(temporary, path);
+                    File.Move(temporary, target);
+                    targetWasCreated = true;
                     temporary = null;
                 }
 
+                if (destinationPath is not null && selectionFile is not null)
+                {
+                    var selectionDirectory = Path.GetDirectoryName(Path.GetFullPath(selectionFile))!;
+                    var relative = Path.GetRelativePath(selectionDirectory, target);
+                    var selected = relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal) || Path.IsPathRooted(relative) ? target : relative;
+                    var selectionTemp = selectionFile + "." + Guid.NewGuid().ToString("N") + ".tmp";
+                    try { File.WriteAllText(selectionTemp, selected); File.Move(selectionTemp, selectionFile, true); }
+                    finally { if (File.Exists(selectionTemp)) File.Delete(selectionTemp); }
+                }
+                path = target;
+                switched = true;
                 current = replacementConfig;
                 diskFingerprint = replacementFingerprint;
                 version++;
                 return new(true, null, check);
             }
-            catch (Exception ex) { return ApplyResult.Failed(ex.Message, check); }
+            catch (Exception ex)
+            {
+                if (destinationPath is not null && !switched && savedTarget is not null)
+                {
+                    try
+                    {
+                        if (targetBackup is not null) File.Copy(targetBackup, savedTarget, true);
+                        else if (targetWasCreated) File.Delete(savedTarget);
+                    }
+                    catch (Exception rollback) { return ApplyResult.Failed($"{ex.Message} (rollback: {rollback.Message})", check); }
+                }
+                return ApplyResult.Failed(ex.Message, check);
+            }
             finally { if (temporary is not null) try { File.Delete(temporary); } catch { } }
         }
     }
@@ -136,7 +183,7 @@ public sealed class ConfigStore
         }
     }
 
-    public static ConfigStore CreateDefaultAfterInvalid(string? configPath = null)
+    public static ConfigStore CreateDefaultAfterInvalid(string? configPath = null, string? selectionFile = null)
     {
         var target = configPath ?? Path.Combine(AppContext.BaseDirectory, "config.json");
         if (File.Exists(target))
@@ -145,7 +192,7 @@ public sealed class ConfigStore
             File.Copy(target, copy);
             File.Delete(target);
         }
-        return new ConfigStore(target);
+        return new ConfigStore(target, selectionFile);
     }
 
     private static AppConfig ReadConfig(string file)

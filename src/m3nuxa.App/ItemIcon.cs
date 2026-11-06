@@ -22,7 +22,7 @@ public static class ItemIcon
     }
     private static long cacheSequence;
     private readonly record struct FileStamp(string Path, long Length, long LastWriteTicks);
-    private readonly record struct IconCacheKey(MenuNodeKind Kind, FileStamp Custom, FileStamp Action);
+    private readonly record struct IconCacheKey(MenuNodeKind Kind, FileStamp Custom, FileStamp Action, string Color);
 
     static ItemIcon()
     {
@@ -43,7 +43,7 @@ public static class ItemIcon
     {
         var result = new TaskCompletionSource<byte[]?>(TaskCreationOptions.RunContinuationsAsynchronously);
         // Capture only the values used for the icon, so later edits cannot change a queued request.
-        var snapshot = new MenuNode { Kind = node.Kind, IconPath = node.IconPath,
+        var snapshot = new MenuNode { Kind = node.Kind, IconPath = node.IconPath, IconColor = node.IconColor,
             Action = node.Action is null ? null : new MenuAction { Path = node.Action.Path } };
         Requests.Add((snapshot, result));
         return result.Task;
@@ -60,7 +60,11 @@ public static class ItemIcon
                 {
                     using var image = System.Drawing.Image.FromFile(custom);
                     if (image.Width <= MaximumIconDimension && image.Height <= MaximumIconDimension)
-                        return new Bitmap(image);
+                    {
+                        var result = new Bitmap(image);
+                        ApplyBundledColor(result, node);
+                        return result;
+                    }
                     var scale = Math.Min((double)MaximumIconDimension / image.Width, (double)MaximumIconDimension / image.Height);
                     var width = Math.Max(1, (int)Math.Round(image.Width * scale));
                     var height = Math.Max(1, (int)Math.Round(image.Height * scale));
@@ -90,7 +94,7 @@ public static class ItemIcon
 
     private static byte[]? CachedPng(MenuNode node)
     {
-        var key = new IconCacheKey(node.Kind, Stamp(node.IconPath), Stamp(node.Action?.Path ?? ""));
+        var key = new IconCacheKey(node.Kind, Stamp(node.IconPath), Stamp(node.Action?.Path ?? ""), node.IconColor ?? "");
         var now = DateTime.UtcNow;
         if (Cache.TryGetValue(key, out var cached) && cached.ExpiresAt > now)
         {
@@ -125,6 +129,20 @@ public static class ItemIcon
     {
         path = Environment.ExpandEnvironmentVariables(path);
         return string.IsNullOrWhiteSpace(path) || Path.IsPathRooted(path) ? path : Path.Combine(AppContext.BaseDirectory, path);
+    }
+
+    private static void ApplyBundledColor(Bitmap bitmap, MenuNode node)
+    {
+        var prefix = Path.Combine("icon-packs", "Boxicons") + Path.DirectorySeparatorChar;
+        if (!node.IconPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) ||
+            node.IconColor is not { Length: 7 } color || color[0] != '#' ||
+            !int.TryParse(color.AsSpan(1), System.Globalization.NumberStyles.HexNumber, null, out var rgb)) return;
+        for (var y = 0; y < bitmap.Height; y++)
+            for (var x = 0; x < bitmap.Width; x++)
+            {
+                var pixel = bitmap.GetPixel(x, y);
+                bitmap.SetPixel(x, y, Color.FromArgb(pixel.A, (rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255));
+            }
     }
 
     public static byte[]? Png(MenuNode node)

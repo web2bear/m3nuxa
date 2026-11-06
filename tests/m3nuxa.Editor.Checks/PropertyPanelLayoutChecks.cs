@@ -15,7 +15,7 @@ public sealed partial class MainPage
         var originalSize = App.MainWindow.AppWindow.Size;
         try
         {
-            foreach (var width in new[] { 1160, 900 })
+            foreach (var width in new[] { 900, 1160, 1600 })
             {
                 App.MainWindow.AppWindow.Resize(new SizeInt32(width, 780));
                 double? left = null;
@@ -23,15 +23,21 @@ public sealed partial class MainPage
                 {
                     RefreshTree(node.Id);
                     await Task.Delay(200);
+                    foreach (var tab in node.Kind == MenuNodeKind.Action ? new[] { 0, 1 } : new[] { 0 })
+                    {
+                    if (node.Kind == MenuNodeKind.Action) DetailsTabs.SelectedIndex = tab;
                     DetailsPanel.UpdateLayout();
-                    foreach (var section in PropertiesPanel.Children.OfType<Border>())
+                    foreach (var section in PropertiesPanel.Children.OfType<Border>().Where(section => section.Visibility == Microsoft.UI.Xaml.Visibility.Visible))
                     {
                         var rect = section.TransformToVisual(DetailsPanel).TransformBounds(new Rect(0, 0, section.ActualWidth, section.ActualHeight));
                         if (rect.Left < 0 || rect.Right > DetailsPanel.ActualWidth + 1)
                             throw new Exception($"Properties panel is outside viewport: node={node.Name}, width={width}, left={rect.Left:F1}, right={rect.Right:F1}, viewport={DetailsPanel.ActualWidth:F1}");
                         if (left.HasValue && Math.Abs(left.Value - rect.Left) > 1)
                             throw new Exception($"Properties panel shifted between nodes: width={width}, before={left:F1}, after={rect.Left:F1}");
+                        if (DetailsPanel.ActualWidth - rect.Right > 35)
+                            throw new Exception($"Properties panel does not stretch: node={node.Name}, tab={tab}, width={width}, right gap={DetailsPanel.ActualWidth - rect.Right:F1}");
                         left = rect.Left;
+                    }
                     }
                 }
             }
