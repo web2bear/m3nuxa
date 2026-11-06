@@ -26,6 +26,7 @@ public sealed class MenuNode
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string Name { get; set; } = "";
     public string IconPath { get; set; } = "";
+    public string IconColor { get; set; } = "";
     public string Hotkey { get; set; } = "";
     public MenuNodeKind Kind { get; set; }
     public List<MenuAction> Steps { get; set; } = [];

@@ -11,6 +11,7 @@
   <ItemGroup><Compile Include="../../src/m3nuxa.App/AgentPipe.cs" Link="AgentPipe.cs" /><Compile Include="../../src/m3nuxa.App/DevLog.cs" Link="DevLog.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../../src/m3nuxa.Editor/EditorDraft.cs" Link="EditorDraft.cs" /></ItemGroup>
   <ItemGroup>
+    <Content Include="../../assets/icon-packs/Boxicons/bx-home.png" Link="icon-packs/Boxicons/bx-home.png" CopyToOutputDirectory="PreserveNewest" />
     <EmbeddedResource Include="../../src/m3nuxa.App/Strings/ru-RU/Resources.resw" LogicalName="Localization.App.ru-RU.Resources.resw" />
     <EmbeddedResource Include="../../src/m3nuxa.App/Strings/ru-RU/Settings.resw" LogicalName="Localization.App.ru-RU.Settings.resw" />
     <EmbeddedResource Include="../../src/m3nuxa.Editor/Strings/en-US/Resources.resw" LogicalName="Localization.Editor.en-US.Resources.resw" />

@@ -46,6 +46,11 @@ internal static class AgentPipeWorkflowChecks
             Check(saved["configPath"]?.GetValue<string>() == Path.GetFullPath(path), "saved configuration path returned to editor");
             var node = new ConfigStore(path).Current.Items.Single().Children.Single();
             Check(node.Name == "Changed" && node.Steps.Count == 2 && node.Steps[0].DelayMilliseconds == 25 && node.Steps[1].Text == "second", "updated ordered sequence survives restart");
+            var otherPath = Path.Combine(directory, "saved-as.json");
+            var saveAs = await pipe.ExecuteAsync("test", "saveAs", new JsonObject { ["path"] = otherPath });
+            Check(saveAs["Success"]!.GetValue<bool>(), "save as through agent pipe succeeds");
+            var reopened = await pipe.ExecuteAsync("test", "begin");
+            Check(reopened["configPath"]!.GetValue<string>() == otherPath && File.Exists(otherPath), "save as reports new active file");
         }
     }
 

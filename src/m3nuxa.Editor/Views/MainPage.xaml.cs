@@ -125,6 +125,8 @@ public sealed partial class MainPage : Page
         if (draft is null) { ShowNotice(response.Message ?? L.Get("Editor_CouldNotReadTheConfiguration_d3f938"), InfoBarSeverity.Error); return; }
         UpdateConfigurationTitle(response);
         draftState.Reset(draft.Config);
+        try { EnsureBundledIconsAvailable(draft.Config.Items); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { ShowNotice(ex.Message, InfoBarSeverity.Warning); }
         draftReady = true;
         RefreshTree();
         if (pendingSelection is not null) { SelectMenuItem(pendingSelection); pendingSelection = null; }
@@ -223,9 +225,14 @@ public sealed partial class MainPage : Page
         {
             selected = MenuTree.SelectedNode?.Content is NodeDisplay display ? display.Model : null;
             UpdateSelectionCommands();
+            if (selected?.Kind == MenuNodeKind.Action && stepNodeId != selected.Id) DetailsTabs.SelectedIndex = 0;
+            PropertiesIcon.Content = selected is not null && selected.Kind != MenuNodeKind.Separator ? CreateItemIcon(selected, 24) : null;
+            PropertiesIcon.Visibility = selected is not null && selected.Kind != MenuNodeKind.Separator ? Visibility.Visible : Visibility.Collapsed;
             foreach (var field in globalShortcuts.Keys.ToArray()) globalShortcuts.Remove(field);
             PropertiesPanel.Children.Clear();
+            DetailsTabs.Visibility = selected?.Kind == MenuNodeKind.Action ? Visibility.Visible : Visibility.Collapsed;
             PropertiesHint.Text = selected is null ? L.Get("Editor_SelectAnItemOnThe_2c92bb") : selected.Kind == MenuNodeKind.Group ? L.Get("Editor_MenuGroup_30ae35") : selected.Kind == MenuNodeKind.Separator ? L.Get("Editor_Separator_afb9a7") : L.Get("Editor_Action_4fe9c0");
+            if (selected is not null && selected.Kind != MenuNodeKind.Separator) PropertiesHint.Text += " · " + selected.Name;
             if (selected is null)
             {
                 PropertiesPanel.Children.Add(new TextBlock { Text = L.Get("Editor_AddAFolderFileOr_029745"), TextWrapping = TextWrapping.Wrap, Opacity = .65, Margin = new Thickness(0, 20, 0, 0) });
@@ -236,6 +243,7 @@ public sealed partial class MainPage : Page
             AddText(L.Get("Editor_Name_aee78f"), item.Name, value =>
             {
                 item.Name = value;
+                PropertiesHint.Text = (item.Kind == MenuNodeKind.Group ? L.Get("Editor_MenuGroup_30ae35") : L.Get("Editor_Action_4fe9c0")) + " · " + value;
                 // Selection can change while a TextChanged callback is still pending.
                 if (FindTreeNode(MenuTree.RootNodes, item.Id) is { } itemNode)
                     itemNode.Content = new NodeDisplay(item);
@@ -284,7 +292,16 @@ public sealed partial class MainPage : Page
             var stepName = ActionChoices().FirstOrDefault(choice => choice.Kind == action.Kind)?.Label ?? action.Kind.ToString();
             WrapPropertiesSection(settingsStart, L.Format("Workflow_StepSettings", selectedStepIndex + 1, stepName));
         }
-        finally { rendering = false; }
+        finally { rendering = false; UpdateDetailsTab(); }
+    }
+
+    private void DetailsTabsSelectionChanged(object sender, SelectionChangedEventArgs args) => UpdateDetailsTab();
+
+    private void UpdateDetailsTab()
+    {
+        if (PropertiesPanel is null || DetailsTabs is null || selected?.Kind != MenuNodeKind.Action) return;
+        for (var i = 0; i < PropertiesPanel.Children.Count; i++)
+            PropertiesPanel.Children[i].Visibility = (i == 0) == (DetailsTabs.SelectedIndex == 0) ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private IEnumerable<UIElement> CurrentPropertyElements() => PropertiesPanel.Children.SelectMany(child =>
@@ -301,8 +318,7 @@ public sealed partial class MainPage : Page
             PropertiesPanel.Children.RemoveAt(start);
             section.Children.Add(child);
         }
-        PropertiesPanel.Children.Add(new Border { Style = (Style)Resources["WorkflowSectionStyle"], Child = section,
-            Shadow = new ThemeShadow(), Translation = new System.Numerics.Vector3(0, 0, 8) });
+        PropertiesPanel.Children.Add(new Border { Style = (Style)Resources["WorkflowSectionStyle"], Child = section });
     }
 
     private void AddStepControls(MenuNode item)
@@ -332,8 +348,9 @@ public sealed partial class MainPage : Page
             selectedStepIndex = Math.Max(0, list.SelectedIndex); MarkDirty(); RenderProperties();
         };
         PropertiesPanel.Children.Add(list);
-        var commands = new CommandBar { DefaultLabelPosition = CommandBarDefaultLabelPosition.Right, IsOpen = false };
+        var commands = new CommandBar { HorizontalAlignment = HorizontalAlignment.Left, DefaultLabelPosition = CommandBarDefaultLabelPosition.Collapsed, IsDynamicOverflowEnabled = false, OverflowButtonVisibility = CommandBarOverflowButtonVisibility.Collapsed, IsOpen = false };
         var add = new AppBarButton { Label = L.Get("Workflow_Add"), Icon = new SymbolIcon(Symbol.Add) };
+        ToolTipService.SetToolTip(add, add.Label);
         var flyout = new MenuFlyout();
         foreach (var choice in choices)
         {
@@ -350,6 +367,7 @@ public sealed partial class MainPage : Page
         void Command(string label, IconElement icon, bool enabled, Action action)
         {
             var button = new AppBarButton { Label = L.Get(label), Icon = icon, IsEnabled = enabled };
+            ToolTipService.SetToolTip(button, button.Label);
             button.Click += (_, _) => { Remember(); action(); MarkDirty(); RenderProperties(); };
             commands.PrimaryCommands.Add(button);
         }
@@ -564,13 +582,21 @@ public sealed partial class MainPage : Page
         return (dialog, list);
     }
 
+    private async void PropertiesIconClicked(object sender, RoutedEventArgs args)
+    {
+        if (selected is { Kind: not MenuNodeKind.Separator } item) await ChooseBundledIconAsync(item);
+    }
+
     private void AddIconPicker(MenuNode item)
     {
         var row = new StackPanel { Spacing = 8 };
         row.Children.Add(new TextBlock { Text = L.Get("Editor_Icon_25b8ac") });
         var controls = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
-        controls.Children.Add(CreateItemIcon(item, 32));
-        var button = new Button { Content = L.Get("Editor_Choose_6279dd") };
+        var iconButton = new Button { Content = CreateItemIcon(item, 40) };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(iconButton, L.Get("Icon_ChooseBundled"));
+        iconButton.Click += async (_, _) => await ChooseBundledIconAsync(item);
+        controls.Children.Add(iconButton);
+        var button = new Button { Content = L.Get("Icon_ChooseFile") };
         button.Click += (_, _) =>
         {
             try
@@ -579,21 +605,102 @@ public sealed partial class MainPage : Page
                 if (path is null) return;
                 if (Path.GetExtension(path).ToLowerInvariant() is not (".exe" or ".dll"))
                 {
-                    var resources = Path.Combine(AppContext.BaseDirectory, "resources"); Directory.CreateDirectory(resources);
+                    var resources = Path.Combine(client.TrayDirectory ?? AppContext.BaseDirectory, "resources"); Directory.CreateDirectory(resources);
                     var copy = Path.Combine(resources, Guid.NewGuid().ToString("N") + Path.GetExtension(path));
                     File.Copy(path, copy); path = copy;
                 }
-                Remember(); item.IconPath = path; MarkDirty(); RefreshTree(item.Id);
+                Remember(); item.IconPath = path; item.IconColor = ""; MarkDirty(); RefreshTree(item.Id);
             }
             catch (Exception ex) { ShowNotice(ex.Message, InfoBarSeverity.Error); }
         };
         controls.Children.Add(button);
         var reset = new Button { Content = L.Get("Editor_UseExplorerIcon_838f6d") };
-        reset.Click += (_, _) => { Remember(); item.IconPath = ""; MarkDirty(); RefreshTree(item.Id); };
+        reset.Click += (_, _) => { Remember(); item.IconPath = ""; item.IconColor = ""; MarkDirty(); RefreshTree(item.Id); };
         controls.Children.Add(reset);
         row.Children.Add(controls);
         if (!string.IsNullOrWhiteSpace(item.IconPath)) row.Children.Add(new TextBlock { Text = item.IconPath, FontSize = 12, Opacity = .6, TextWrapping = TextWrapping.Wrap });
         PropertiesPanel.Children.Add(row);
+    }
+
+    private async Task ChooseBundledIconAsync(MenuNode item)
+    {
+        var folder = Path.Combine(AppContext.BaseDirectory, "icon-packs", "Boxicons");
+        if (!Directory.Exists(folder)) { ShowNotice(L.Get("Icon_PackMissing"), InfoBarSeverity.Warning); return; }
+        var icons = Directory.GetFiles(folder, "*.png").OrderBy(Path.GetFileName).Select(path => new Uri(path).AbsoluteUri).ToArray();
+        var search = new TextBox { PlaceholderText = L.Get("Icon_Search"), Margin = new Thickness(0, 0, 0, 8) };
+        var grid = new GridView { Height = 360, IsItemClickEnabled = true, SelectionMode = ListViewSelectionMode.None };
+        var selectedColor = item.IconColor is { Length: 7 } saved && saved[0] == '#' && uint.TryParse(saved.AsSpan(1), System.Globalization.NumberStyles.HexNumber, null, out _) ? saved : "#60A5FA";
+        var palette = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2, Margin = new Thickness(0, 0, 0, 8) };
+        var swatches = new List<(Button Button, string Color)>();
+        void SetColor(string color)
+        {
+            selectedColor = color;
+            grid.ItemTemplate = (DataTemplate)Microsoft.UI.Xaml.Markup.XamlReader.Load($"<DataTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'><BitmapIcon UriSource='{{Binding}}' ShowAsMonochrome='True' Foreground='{color}' Width='40' Height='40' ToolTipService.ToolTip='{{Binding}}'/></DataTemplate>");
+            foreach (var swatch in swatches) swatch.Button.BorderThickness = new Thickness(string.Equals(swatch.Color, color, StringComparison.OrdinalIgnoreCase) ? 2 : 0);
+        }
+        foreach (var color in new[] { "#E5E7EB", "#EF4444", "#F59E0B", "#EAB308", "#84CC16", "#22C55E", "#14B8A6", "#06B6D4", "#60A5FA", "#6366F1", "#A855F7", "#EC4899" })
+        {
+            var rgb = Convert.ToUInt32(color[1..], 16);
+            var swatch = new Button { Width = 30, Height = 30, MinWidth = 0, MinHeight = 0, Padding = new Thickness(3),
+                Content = new Border { Width = 18, Height = 18, CornerRadius = new CornerRadius(4), Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, (byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb)) } };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(swatch, L.Get("Icon_Color") + " " + color);
+            ToolTipService.SetToolTip(swatch, color);
+            swatch.Click += (_, _) => SetColor(color);
+            swatches.Add((swatch, color)); palette.Children.Add(swatch);
+        }
+        var picker = new ColorPicker { IsAlphaEnabled = false, IsAlphaSliderVisible = false, IsAlphaTextInputVisible = false };
+        var initialRgb = Convert.ToUInt32(selectedColor[1..], 16);
+        picker.Color = Windows.UI.Color.FromArgb(255, (byte)(initialRgb >> 16), (byte)(initialRgb >> 8), (byte)initialRgb);
+        var colorFlyout = new Flyout { Content = picker };
+        colorFlyout.Opening += (_, _) =>
+        {
+            var rgb = Convert.ToUInt32(selectedColor[1..], 16);
+            picker.Color = Windows.UI.Color.FromArgb(255, (byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb);
+        };
+        var customColor = new Button { Content = L.Get("Icon_CustomColor"), Flyout = colorFlyout };
+        picker.ColorChanged += (_, args) => SetColor($"#{args.NewColor.R:X2}{args.NewColor.G:X2}{args.NewColor.B:X2}");
+        palette.Children.Add(customColor);
+        SetColor(selectedColor);
+        grid.ItemsSource = icons;
+        search.TextChanged += (_, _) => grid.ItemsSource = icons.Where(path => Path.GetFileNameWithoutExtension(path).Contains(search.Text.Trim(), StringComparison.OrdinalIgnoreCase)).ToArray();
+        var content = new StackPanel(); content.Children.Add(search); content.Children.Add(new ScrollViewer { Content = palette, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled }); content.Children.Add(grid);
+        var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = L.Get("Icon_ChooseBundled"), Content = content, CloseButtonText = L.Get("Editor_Cancel_0ec753") };
+        grid.ItemClick += (_, args) =>
+        {
+            if (args.ClickedItem is not string path) return;
+            try
+            {
+                var relative = Path.GetRelativePath(AppContext.BaseDirectory, new Uri(path).LocalPath);
+                EnsureBundledIconAvailable(relative);
+                Remember(); item.IconPath = relative; item.IconColor = selectedColor; MarkDirty();
+                dialog.Hide(); RefreshTree(item.Id);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { dialog.Hide(); ShowNotice(ex.Message, InfoBarSeverity.Error); }
+        };
+        await dialog.ShowAsync();
+    }
+
+    private void EnsureBundledIconsAvailable(IEnumerable<MenuNode> items)
+    {
+        foreach (var item in items)
+        {
+            EnsureBundledIconAvailable(item.IconPath);
+            EnsureBundledIconsAvailable(item.Children);
+        }
+    }
+
+    private void EnsureBundledIconAvailable(string path)
+    {
+        var tray = client.TrayDirectory;
+        if (tray is null || Path.IsPathRooted(path)) return;
+        var prefix = Path.Combine("icon-packs", "Boxicons") + Path.DirectorySeparatorChar;
+        if (!path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) || Path.GetFileName(path) != path[prefix.Length..]) return;
+        var source = Path.Combine(AppContext.BaseDirectory, path);
+        var destination = Path.Combine(tray, path);
+        if (!File.Exists(source) || string.Equals(source, destination, StringComparison.OrdinalIgnoreCase)) return;
+        if (File.Exists(destination) && File.ReadAllBytes(source).AsSpan().SequenceEqual(File.ReadAllBytes(destination))) return;
+        Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+        File.Copy(source, destination, overwrite: true);
     }
 
     private List<MenuNode> SelectedSiblings() => MenuTree.SelectedNode?.Parent?.Content is NodeDisplay parent
@@ -612,6 +719,7 @@ public sealed partial class MainPage : Page
     private void RenameClicked(object sender, RoutedEventArgs args)
     {
         if (selected is null || selected.Kind == MenuNodeKind.Separator) return;
+        if (selected.Kind == MenuNodeKind.Action) DetailsTabs.SelectedIndex = 0;
         if (CurrentPropertyElements().OfType<TextBox>().FirstOrDefault() is TextBox name)
         {
             name.Focus(FocusState.Programmatic);
@@ -901,7 +1009,7 @@ public sealed partial class MainPage : Page
     { var id = selected?.Id; if (!draftState.Redo()) return; ShowConfigurationTitle(activeConfigurationPath); MarkDirty(); RefreshTree(id); }
 
     private async void ApplyClicked(object sender, RoutedEventArgs args) => await ApplyAsync();
-    private async Task<bool> ApplyAsync()
+    private async Task<bool> ApplyAsync(string? destinationPath = null)
     {
         if (activeShortcut is not null) await activeShortcut.StopAsync();
         if (!draftReady && !await RestoreDraftAsync()) return false;
@@ -913,7 +1021,7 @@ public sealed partial class MainPage : Page
             staged = await client.ReplaceDraftAsync(config);
         }
         if (!staged.Success) { ShowNotice(staged.Message ?? L.Get("Editor_CouldNotPrepareTheConfiguration_896ac2"), InfoBarSeverity.Error); return false; }
-        var response = await client.ApplyAsync();
+        var response = destinationPath is null ? await client.ApplyAsync() : await client.SaveAsAsync(destinationPath);
         ShowHotkeyAvailability(response);
         if (!response.Success) { ShowNotice(response.Message ?? L.Get("Editor_CouldNotApplyTheConfiguration_9f63ee"), InfoBarSeverity.Error); return false; }
         draftReady = false;
@@ -944,13 +1052,6 @@ public sealed partial class MainPage : Page
         draftReady = true;
         return true;
     }
-    private async void ReloadClicked(object sender, RoutedEventArgs args)
-    {
-        if (dirty && await ConfirmAsync(L.Get("Editor_ReloadConfiguration_c5b160"), L.Get("Editor_UnsavedChangesWillBeDiscarded_0fca95"), L.Get("Editor_Reload_942438")) != ContentDialogResult.Primary) return;
-        var response = await client.ReloadAsync();
-        if (!response.Success) { ShowNotice(response.Message ?? L.Get("Editor_CouldNotReload_075f1d"), InfoBarSeverity.Error); return; }
-        await LoadCurrentAsync();
-    }
     private async void LoadClicked(object sender, RoutedEventArgs args)
     {
         if (dirty && await ConfirmAsync(L.Get("Editor_LoadAnotherFile_f18ee0"), L.Get("Editor_UnsavedChangesWillBeDiscarded_0fca95"), L.Get("Editor_Load_f909c7")) != ContentDialogResult.Primary) return;
@@ -958,6 +1059,13 @@ public sealed partial class MainPage : Page
         try
         {
             var file = await picker.PickSingleFileAsync(); if (file is null) return;
+            if (activeConfigurationPath is not null && string.Equals(Path.GetFullPath(file.Path), Path.GetFullPath(activeConfigurationPath), StringComparison.OrdinalIgnoreCase))
+            {
+                var response = await client.ReloadAsync();
+                if (!response.Success) { ShowNotice(response.Message ?? L.Get("Editor_CouldNotReload_075f1d"), InfoBarSeverity.Error); return; }
+                await LoadCurrentAsync();
+                return;
+            }
             var loaded = JsonSerializer.Deserialize<AppConfig>(await File.ReadAllTextAsync(file.Path), JsonOptions) ?? throw new InvalidDataException(L.Get("Editor_TheFileDoesNotContain_2469d6"));
             Remember(); config = loaded; MarkDirty(); RefreshTree();
             ShowConfigurationTitle(file.Path);
@@ -966,11 +1074,16 @@ public sealed partial class MainPage : Page
     }
     private async void SaveClicked(object sender, RoutedEventArgs args)
     {
-        var picker = new FileSavePicker { SuggestedFileName = "m3nuxa-draft" }; picker.FileTypeChoices.Add(L.Get("Editor_JsonConfiguration_453120"), [".json"]); InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindow));
+        var picker = new Microsoft.Windows.Storage.Pickers.FileSavePicker(App.MainWindow.AppWindow.Id)
+        {
+            SuggestedFileName = Path.GetFileNameWithoutExtension(activeConfigurationPath) ?? "config",
+            DefaultFileExtension = ".json"
+        };
+        picker.FileTypeChoices.Add(L.Get("Editor_JsonConfiguration_453120"), [".json"]);
         try
         {
             var file = await picker.PickSaveFileAsync();
-            if (file is not null) { await File.WriteAllTextAsync(file.Path, Snapshot()); ShowConfigurationTitle(file.Path); }
+            if (file is not null) await ApplyAsync(file.Path);
         }
         catch (Exception ex) { ShowNotice(ex.Message, InfoBarSeverity.Error); }
     }
@@ -1205,7 +1318,7 @@ public sealed partial class MainPage : Page
         public NodeDisplay(MenuNode model)
         {
             Model = model; Orientation = Orientation.Horizontal; Spacing = 10;
-            Children.Add(CreateItemIcon(model, 18));
+            Children.Add(CreateItemIcon(model, 20));
             label = new TextBlock { VerticalAlignment = VerticalAlignment.Center }; Children.Add(label); Update();
         }
         public void Update() => label.Text = Model.Kind == MenuNodeKind.Separator ? "──────────" : string.IsNullOrWhiteSpace(Model.Name) ? L.Get("Editor_Unnamed_3f239e") : Model.Name;
