@@ -1,6 +1,15 @@
 using m3nuxa.App;
 using System.Reflection;
 
+if (args.Length == 2 && args[0] == "--open-folder")
+{
+    var result = await ActionExecutor.ExecuteAsync(
+        new MenuAction { Kind = ActionKind.OpenFolder, Path = args[1] },
+        new InvocationContext(IntPtr.Zero, [], null));
+    if (!result.Success) throw new Exception($"OpenFolder failed: {result.Error}");
+    return;
+}
+
 var root = Path.Combine(Path.GetTempPath(), "m3nuxa-checks-" + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(root);
 try

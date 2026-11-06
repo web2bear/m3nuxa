@@ -1,4 +1,4 @@
-param([string]$ProcessName = 'm3nuxa.Editor')
+param([string]$ProcessName = 'm3nuxa.Editor', [long]$WindowHandle = 0)
 $ErrorActionPreference = 'Stop'
 Add-Type -TypeDefinition @'
 using System;
@@ -31,7 +31,7 @@ public static class m3nuxaTestDisplay {
     }
 }
 '@
-$window = [IntPtr]::Zero
+$window = [IntPtr]$WindowHandle
 for ($attempt = 0; $attempt -lt 30 -and $window -eq [IntPtr]::Zero; $attempt++) {
     $process = Get-Process -Name $ProcessName -ErrorAction SilentlyContinue | Where-Object MainWindowHandle -ne 0 | Select-Object -First 1
     if ($process) { $window = $process.MainWindowHandle } else { Start-Sleep -Milliseconds 100 }
