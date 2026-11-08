@@ -22,6 +22,11 @@ public sealed partial class MainPage : Page
     private string? stepNodeId;
     private string? activeConfigurationPath;
     private int selectedStepIndex;
+    private ListView? stepList;
+    private Border? stepDropIndicator;
+    private MenuNode? stepDragItem;
+    private MenuAction? draggedStep;
+    private bool stepDropHandled;
     private bool rendering;
     private bool dirty => draftState.IsDirty;
     private bool allowClose;
@@ -48,6 +53,7 @@ public sealed partial class MainPage : Page
     {
         DevLog.Write("editor", "MainPage constructor started");
         InitializeComponent();
+        AddItemFlyout.Placement = Microsoft.UI.Xaml.Controls.Primitives.FlyoutPlacementMode.Bottom;
         dropAccent = DropIndicator.Background;
         dropIndicatorTimer = DispatcherQueue.CreateTimer();
         dropIndicatorTimer.Interval = TimeSpan.FromMilliseconds(40);
@@ -231,8 +237,9 @@ public sealed partial class MainPage : Page
             foreach (var field in globalShortcuts.Keys.ToArray()) globalShortcuts.Remove(field);
             PropertiesPanel.Children.Clear();
             DetailsTabs.Visibility = selected?.Kind == MenuNodeKind.Action ? Visibility.Visible : Visibility.Collapsed;
-            PropertiesHint.Text = selected is null ? L.Get("Editor_SelectAnItemOnThe_2c92bb") : selected.Kind == MenuNodeKind.Group ? L.Get("Editor_MenuGroup_30ae35") : selected.Kind == MenuNodeKind.Separator ? L.Get("Editor_Separator_afb9a7") : L.Get("Editor_Action_4fe9c0");
-            if (selected is not null && selected.Kind != MenuNodeKind.Separator) PropertiesHint.Text += " · " + selected.Name;
+            PropertiesHint.Text = selected is null ? L.Get("Editor_SelectAnItemOnThe_2c92bb") : selected.Kind == MenuNodeKind.Separator ? L.Get("Editor_Separator_afb9a7") : selected.Name;
+            PropertiesType.Text = selected is null || selected.Kind == MenuNodeKind.Separator ? "" : selected.Kind == MenuNodeKind.Group ? L.Get("Editor_MenuGroup_30ae35") : L.Get("Editor_Action_4fe9c0");
+            ToolTipService.SetToolTip(PropertiesHint, PropertiesHint.Text);
             if (selected is null)
             {
                 PropertiesPanel.Children.Add(new TextBlock { Text = L.Get("Editor_AddAFolderFileOr_029745"), TextWrapping = TextWrapping.Wrap, Opacity = .65, Margin = new Thickness(0, 20, 0, 0) });
@@ -243,7 +250,8 @@ public sealed partial class MainPage : Page
             AddText(L.Get("Editor_Name_aee78f"), item.Name, value =>
             {
                 item.Name = value;
-                PropertiesHint.Text = (item.Kind == MenuNodeKind.Group ? L.Get("Editor_MenuGroup_30ae35") : L.Get("Editor_Action_4fe9c0")) + " · " + value;
+                PropertiesHint.Text = value;
+                ToolTipService.SetToolTip(PropertiesHint, value);
                 // Selection can change while a TextChanged callback is still pending.
                 if (FindTreeNode(MenuTree.RootNodes, item.Id) is { } itemNode)
                     itemNode.Content = new NodeDisplay(item);
@@ -251,7 +259,6 @@ public sealed partial class MainPage : Page
             PropertiesPanel.Children.Add(CreateShortcutEditor("ItemHotkey", L.Get("Editor_ItemHotkey_77566f"),
                 item.Kind == MenuNodeKind.Group ? L.Get("Editor_OpensThisGroupFromAny_904c25") : L.Get("Editor_RunsThisActionFromAny_30cdee"),
                 () => item.Hotkey, value => item.Hotkey = value, item.Id));
-            AddIconPicker(item);
             WrapPropertiesSection(0, L.Get("Workflow_ItemSettings"));
             if (item.Kind != MenuNodeKind.Action) return;
             if (stepNodeId != item.Id) { stepNodeId = item.Id; selectedStepIndex = 0; }
@@ -259,9 +266,22 @@ public sealed partial class MainPage : Page
             selectedStepIndex = Math.Clamp(selectedStepIndex, 0, item.Steps.Count - 1);
             var stepsStart = PropertiesPanel.Children.Count;
             AddStepControls(item);
-            WrapPropertiesSection(stepsStart, L.Get("Workflow_Steps"));
+            WrapPropertiesSection(stepsStart, null);
             var action = item.Steps[selectedStepIndex];
             var settingsStart = PropertiesPanel.Children.Count;
+            AddText(L.Get("Workflow_StepName"), action.Name, value =>
+            {
+                action.Name = value;
+                if (stepList is null) return;
+                for (var index = 0; index < stepList.Items.Count; index++)
+                {
+                    var entry = (ListViewItem)stepList.Items[index];
+                    var name = StepDisplayName(item, index);
+                    if (entry.Content is StackPanel row && row.Children.LastOrDefault() is TextBlock label) label.Text = name;
+                    Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(entry, name);
+                    ToolTipService.SetToolTip(entry, name);
+                }
+            }, placeholder: StepDisplayName(item, selectedStepIndex));
             if (action.Kind is ActionKind.OpenItem or ActionKind.OpenFolder or ActionKind.RunProgram or ActionKind.RunScript or ActionKind.CopySelection or ActionKind.MoveSelection)
                 AddText(action.Kind is ActionKind.CopySelection or ActionKind.MoveSelection ? L.Get("Editor_DestinationFolder_40a307") : L.Get("Editor_Path_1b46c6"), action.Path, value => action.Path = value, variables: true, browse: action.Kind is ActionKind.OpenFolder or ActionKind.CopySelection or ActionKind.MoveSelection ? "folder" : "file", required: true);
             if (action.Kind is ActionKind.RunProgram or ActionKind.RunScript)
@@ -283,7 +303,7 @@ public sealed partial class MainPage : Page
                 AddText(L.Get("Editor_SnippetText_d7c024"), action.Text, value => action.Text = value, variables: true, multiline: true, required: action.Kind != ActionKind.SetClipboardText);
             if (action.Kind == ActionKind.PasteText)
             {
-                var restore = new ToggleSwitch { Header = L.Get("Workflow_RestoreClipboard"), IsOn = action.RestoreClipboard };
+                var restore = new ToggleSwitch { Header = L.Get("Workflow_RestoreClipboard"), OnContent = L.Get("Editor_On"), OffContent = L.Get("Editor_Off"), IsOn = action.RestoreClipboard };
                 restore.Toggled += (_, _) => { if (rendering) return; Remember(); action.RestoreClipboard = restore.IsOn; MarkDirty(); };
                 PropertiesPanel.Children.Add(restore);
             }
@@ -307,10 +327,10 @@ public sealed partial class MainPage : Page
     private IEnumerable<UIElement> CurrentPropertyElements() => PropertiesPanel.Children.SelectMany(child =>
         child is Border { Child: StackPanel section } ? section.Children.Cast<UIElement>() : Enumerable.Repeat(child, 1));
 
-    private void WrapPropertiesSection(int start, string title)
+    private void WrapPropertiesSection(int start, string? title)
     {
         var section = new StackPanel { Spacing = 10 };
-        section.Children.Add(new TextBlock { Text = title, FontSize = 16,
+        if (title is not null) section.Children.Add(new TextBlock { Text = title, FontSize = 16,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
         while (PropertiesPanel.Children.Count > start)
         {
@@ -329,8 +349,22 @@ public sealed partial class MainPage : Page
             CanDragItems = true, CanReorderItems = true, AllowDrop = true };
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(list, L.Get("Workflow_Steps"));
         // Each displayed entry holds the actual step, so native list reordering retains all settings.
+        stepList = list;
         foreach (var step in items)
-            list.Items.Add(new ListViewItem { Style = (Style)Resources["WorkflowStepStyle"], Tag = step, Content = choices.FirstOrDefault(c => c.Kind == step.Kind)?.Label ?? step.Kind.ToString() });
+        {
+            var name = StepDisplayName(item, list.Items.Count);
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
+            var handle = new FontIcon { Glyph = "\uE76F", FontSize = 14, Opacity = .65 };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAccessibilityView(handle, Microsoft.UI.Xaml.Automation.Peers.AccessibilityView.Raw);
+            row.Children.Add(handle);
+            row.Children.Add(new SymbolIcon(Symbol.Play));
+            var stepLabel = new TextBlock { Text = name, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+            row.Children.Add(stepLabel);
+            var entry = new ListViewItem { Style = (Style)Resources["WorkflowStepStyle"], Tag = step, Content = row, HorizontalContentAlignment = HorizontalAlignment.Stretch };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(entry, name);
+            ToolTipService.SetToolTip(entry, name);
+            list.Items.Add(entry);
+        }
         list.SelectedIndex = selectedStepIndex;
         var reordering = false;
         list.SelectionChanged += (_, _) =>
@@ -338,32 +372,43 @@ public sealed partial class MainPage : Page
             if (rendering || reordering || list.SelectedIndex < 0 || list.SelectedIndex == selectedStepIndex) return;
             selectedStepIndex = list.SelectedIndex; RenderProperties();
         };
-        list.DragItemsStarting += (_, _) => { if (!rendering) { Remember(); reordering = true; } };
+        list.DragItemsStarting += (_, args) =>
+        {
+            if (rendering) return;
+            var dragged = args.Items.FirstOrDefault();
+            var entry = list.Items.OfType<ListViewItem>().FirstOrDefault(row => ReferenceEquals(row, dragged) || ReferenceEquals(row.Content, dragged));
+            if (entry?.Tag is not MenuAction step) return;
+            Remember(); reordering = true; stepDragItem = item; draggedStep = step; stepDropHandled = false;
+            dropIndicatorTimer.Start();
+        };
         list.DragItemsCompleted += (_, _) =>
         {
             reordering = false;
+            dropIndicatorTimer.Stop();
+            if (stepDropIndicator is not null) stepDropIndicator.Visibility = Visibility.Collapsed;
+            stepDragItem = null; draggedStep = null;
+            if (stepDropHandled) { stepDropHandled = false; RenderProperties(); return; }
             var reordered = list.Items.Cast<ListViewItem>().Select(entry => (MenuAction)entry.Tag).ToList();
             if (reordered.Count != item.Steps.Count) return;
             item.Steps.Clear(); item.Steps.AddRange(reordered);
             selectedStepIndex = Math.Max(0, list.SelectedIndex); MarkDirty(); RenderProperties();
         };
-        PropertiesPanel.Children.Add(list);
         var commands = new CommandBar { HorizontalAlignment = HorizontalAlignment.Left, DefaultLabelPosition = CommandBarDefaultLabelPosition.Collapsed, IsDynamicOverflowEnabled = false, OverflowButtonVisibility = CommandBarOverflowButtonVisibility.Collapsed, IsOpen = false };
-        var add = new AppBarButton { Label = L.Get("Workflow_Add"), Icon = new SymbolIcon(Symbol.Add) };
-        ToolTipService.SetToolTip(add, add.Label);
-        var flyout = new MenuFlyout();
+        var add = new Button { Content = L.Get("Workflow_AddStep") };
+        ToolTipService.SetToolTip(add, L.Get("Workflow_AddStep"));
+        var flyout = new MenuFlyout { Placement = Microsoft.UI.Xaml.Controls.Primitives.FlyoutPlacementMode.Bottom };
         foreach (var choice in choices)
         {
             var option = new MenuFlyoutItem { Text = choice.Label };
             option.Click += (_, _) =>
             {
                 Remember(); var index = Math.Min(selectedStepIndex + 1, item.Steps.Count);
-                item.Steps.Insert(index, new MenuAction { Kind = choice.Kind }); selectedStepIndex = index;
+                item.Steps.Insert(index, new MenuAction { Kind = choice.Kind, Name = UniqueStepName(item, choice.Label) }); selectedStepIndex = index;
                 MarkDirty(); RenderProperties();
             };
             flyout.Items.Add(option);
         }
-        add.Flyout = flyout; commands.PrimaryCommands.Add(add);
+        add.Flyout = flyout;
         void Command(string label, IconElement icon, bool enabled, Action action)
         {
             var button = new AppBarButton { Label = L.Get(label), Icon = icon, IsEnabled = enabled };
@@ -374,6 +419,7 @@ public sealed partial class MainPage : Page
         Command("Workflow_Duplicate", new SymbolIcon(Symbol.Copy), true, () =>
         {
             var copy = JsonSerializer.Deserialize<MenuAction>(JsonSerializer.Serialize(item.Steps[selectedStepIndex], JsonOptions), JsonOptions)!;
+            copy.Name = UniqueStepName(item, StepDisplayName(item, selectedStepIndex));
             item.Steps.Insert(++selectedStepIndex, copy);
         });
         Command("Workflow_Delete", new SymbolIcon(Symbol.Delete), item.Steps.Count > 1, () =>
@@ -386,7 +432,50 @@ public sealed partial class MainPage : Page
         }
         Command("Workflow_MoveUp", new FontIcon { Glyph = "\uE70E" }, selectedStepIndex > 0, () => Move(-1));
         Command("Workflow_MoveDown", new FontIcon { Glyph = "\uE70D" }, selectedStepIndex < item.Steps.Count - 1, () => Move(1));
+        var heading = new Grid { ColumnSpacing = 8 };
+        heading.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        heading.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var headingText = new TextBlock { Text = L.Get("Workflow_Sequence"), FontSize = 16,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap };
+        heading.Children.Add(headingText); Grid.SetColumn(add, 1); heading.Children.Add(add);
+        var listHost = new Grid();
+        listHost.Children.Add(list);
+        var overlay = new Canvas { IsHitTestVisible = false };
+        stepDropIndicator = new Border { Height = 3, CornerRadius = new CornerRadius(2), Background = dropAccent, Visibility = Visibility.Collapsed };
+        overlay.Children.Add(stepDropIndicator);
+        listHost.Children.Add(overlay);
+        PropertiesPanel.Children.Add(heading);
+        PropertiesPanel.Children.Add(listHost);
         PropertiesPanel.Children.Add(commands);
+    }
+
+    private string StepDisplayName(MenuNode item, int index)
+    {
+        var step = item.Steps[index];
+        if (!string.IsNullOrWhiteSpace(step.Name)) return step.Name;
+        var used = item.Steps.Where(other => !string.IsNullOrWhiteSpace(other.Name))
+            .Select(other => other.Name).ToHashSet(StringComparer.CurrentCultureIgnoreCase);
+        for (var current = 0; current <= index; current++)
+        {
+            var candidateStep = item.Steps[current];
+            if (!string.IsNullOrWhiteSpace(candidateStep.Name)) continue;
+            var label = ActionChoices().FirstOrDefault(choice => choice.Kind == candidateStep.Kind)?.Label ?? candidateStep.Kind.ToString();
+            var candidate = label;
+            for (var number = 2; !used.Add(candidate); number++) candidate = $"{label} ({number})";
+            if (current == index) return candidate;
+        }
+        return "";
+    }
+
+    private string UniqueStepName(MenuNode item, string baseName)
+    {
+        var names = Enumerable.Range(0, item.Steps.Count).Select(index => StepDisplayName(item, index)).ToHashSet(StringComparer.CurrentCultureIgnoreCase);
+        if (!names.Contains(baseName)) return baseName;
+        for (var number = 2; ; number++)
+        {
+            var candidate = $"{baseName} ({number})";
+            if (!names.Contains(candidate)) return candidate;
+        }
     }
 
     private void AddDuration(MenuAction action)
@@ -418,11 +507,11 @@ public sealed partial class MainPage : Page
 
     private void AddProcessWait(MenuAction action)
     {
-        var wait = new ToggleSwitch { Header = L.Get("Workflow_Wait"), IsOn = action.WaitForExit };
+        var wait = new ToggleSwitch { Header = L.Get("Workflow_Wait"), OnContent = L.Get("Editor_On"), OffContent = L.Get("Editor_Off"), IsOn = action.WaitForExit };
         wait.Toggled += (_, _) => { if (rendering) return; Remember(); action.WaitForExit = wait.IsOn; MarkDirty(); RenderProperties(); };
         PropertiesPanel.Children.Add(wait);
         if (!action.WaitForExit) return;
-        var enabled = new ToggleSwitch { Header = L.Get("Workflow_TimeoutEnabled"), IsOn = action.TimeoutMilliseconds.HasValue };
+        var enabled = new ToggleSwitch { Header = L.Get("Workflow_TimeoutEnabled"), OnContent = L.Get("Editor_On"), OffContent = L.Get("Editor_Off"), IsOn = action.TimeoutMilliseconds.HasValue };
         enabled.Toggled += (_, _) => { if (rendering) return; Remember(); action.TimeoutMilliseconds = enabled.IsOn ? 30000 : null; MarkDirty(); RenderProperties(); };
         PropertiesPanel.Children.Add(enabled);
         if (!action.TimeoutMilliseconds.HasValue) return;
@@ -587,46 +676,17 @@ public sealed partial class MainPage : Page
         if (selected is { Kind: not MenuNodeKind.Separator } item) await ChooseBundledIconAsync(item);
     }
 
-    private void AddIconPicker(MenuNode item)
-    {
-        var row = new StackPanel { Spacing = 8 };
-        row.Children.Add(new TextBlock { Text = L.Get("Editor_Icon_25b8ac") });
-        var controls = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
-        var iconButton = new Button { Content = CreateItemIcon(item, 40) };
-        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(iconButton, L.Get("Icon_ChooseBundled"));
-        iconButton.Click += async (_, _) => await ChooseBundledIconAsync(item);
-        controls.Children.Add(iconButton);
-        var button = new Button { Content = L.Get("Icon_ChooseFile") };
-        button.Click += (_, _) =>
-        {
-            try
-            {
-                var path = new IconFilePicker(AppContext.BaseDirectory).Pick(WindowNative.GetWindowHandle(App.MainWindow));
-                if (path is null) return;
-                if (Path.GetExtension(path).ToLowerInvariant() is not (".exe" or ".dll"))
-                {
-                    var resources = Path.Combine(client.TrayDirectory ?? AppContext.BaseDirectory, "resources"); Directory.CreateDirectory(resources);
-                    var copy = Path.Combine(resources, Guid.NewGuid().ToString("N") + Path.GetExtension(path));
-                    File.Copy(path, copy); path = copy;
-                }
-                Remember(); item.IconPath = path; item.IconColor = ""; MarkDirty(); RefreshTree(item.Id);
-            }
-            catch (Exception ex) { ShowNotice(ex.Message, InfoBarSeverity.Error); }
-        };
-        controls.Children.Add(button);
-        var reset = new Button { Content = L.Get("Editor_UseExplorerIcon_838f6d") };
-        reset.Click += (_, _) => { Remember(); item.IconPath = ""; item.IconColor = ""; MarkDirty(); RefreshTree(item.Id); };
-        controls.Children.Add(reset);
-        row.Children.Add(controls);
-        if (!string.IsNullOrWhiteSpace(item.IconPath)) row.Children.Add(new TextBlock { Text = item.IconPath, FontSize = 12, Opacity = .6, TextWrapping = TextWrapping.Wrap });
-        PropertiesPanel.Children.Add(row);
-    }
-
     private async Task ChooseBundledIconAsync(MenuNode item)
     {
         var folder = Path.Combine(AppContext.BaseDirectory, "icon-packs", "Boxicons");
-        if (!Directory.Exists(folder)) { ShowNotice(L.Get("Icon_PackMissing"), InfoBarSeverity.Warning); return; }
-        var icons = Directory.GetFiles(folder, "*.png").OrderBy(Path.GetFileName).Select(path => new Uri(path).AbsoluteUri).ToArray();
+        string[] icons;
+        try
+        {
+            icons = Directory.Exists(folder)
+                ? Directory.GetFiles(folder, "*.png").OrderBy(Path.GetFileName).Select(path => new Uri(path).AbsoluteUri).ToArray()
+                : [];
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { icons = []; }
         var search = new TextBox { PlaceholderText = L.Get("Icon_Search"), Margin = new Thickness(0, 0, 0, 8) };
         var grid = new GridView { Height = 360, IsItemClickEnabled = true, SelectionMode = ListViewSelectionMode.None };
         var selectedColor = item.IconColor is { Length: 7 } saved && saved[0] == '#' && uint.TryParse(saved.AsSpan(1), System.Globalization.NumberStyles.HexNumber, null, out _) ? saved : "#60A5FA";
@@ -663,8 +723,19 @@ public sealed partial class MainPage : Page
         SetColor(selectedColor);
         grid.ItemsSource = icons;
         search.TextChanged += (_, _) => grid.ItemsSource = icons.Where(path => Path.GetFileNameWithoutExtension(path).Contains(search.Text.Trim(), StringComparison.OrdinalIgnoreCase)).ToArray();
-        var content = new StackPanel(); content.Children.Add(search); content.Children.Add(new ScrollViewer { Content = palette, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled }); content.Children.Add(grid);
+        var content = new StackPanel { Spacing = 8 };
+        var sources = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        var fileButton = new Button { Content = L.Get("Icon_ChooseFile") };
+        var explorerButton = new Button { Content = L.Get("Editor_UseExplorerIcon_838f6d") };
+        sources.Children.Add(fileButton); sources.Children.Add(explorerButton);
+        content.Children.Add(new ScrollViewer { Content = sources, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled });
+        content.Children.Add(new TextBlock { Text = L.Get("Icon_BundledHeading"), FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+        if (icons.Length == 0) content.Children.Add(new TextBlock { Text = L.Get("Icon_PackMissing"), TextWrapping = TextWrapping.Wrap });
+        else { content.Children.Add(search); content.Children.Add(new ScrollViewer { Content = palette, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled }); content.Children.Add(grid); }
         var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = L.Get("Icon_ChooseBundled"), Content = content, CloseButtonText = L.Get("Editor_Cancel_0ec753") };
+        var sourceChoice = 0;
+        fileButton.Click += (_, _) => { sourceChoice = 1; dialog.Hide(); };
+        explorerButton.Click += (_, _) => { sourceChoice = 2; dialog.Hide(); };
         grid.ItemClick += (_, args) =>
         {
             if (args.ClickedItem is not string path) return;
@@ -678,6 +749,26 @@ public sealed partial class MainPage : Page
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { dialog.Hide(); ShowNotice(ex.Message, InfoBarSeverity.Error); }
         };
         await dialog.ShowAsync();
+        if (sourceChoice == 2)
+        {
+            Remember(); item.IconPath = ""; item.IconColor = ""; MarkDirty(); RefreshTree(item.Id);
+        }
+        else if (sourceChoice == 1)
+        {
+            try
+            {
+                var path = new IconFilePicker(AppContext.BaseDirectory).Pick(WindowNative.GetWindowHandle(App.MainWindow));
+                if (path is null) return;
+                if (Path.GetExtension(path).ToLowerInvariant() is not (".exe" or ".dll"))
+                {
+                    var resources = Path.Combine(client.TrayDirectory ?? AppContext.BaseDirectory, "resources"); Directory.CreateDirectory(resources);
+                    var copy = Path.Combine(resources, Guid.NewGuid().ToString("N") + Path.GetExtension(path));
+                    File.Copy(path, copy); path = copy;
+                }
+                Remember(); item.IconPath = path; item.IconColor = ""; MarkDirty(); RefreshTree(item.Id);
+            }
+            catch (Exception ex) { ShowNotice(ex.Message, InfoBarSeverity.Error); }
+        }
     }
 
     private void EnsureBundledIconsAvailable(IEnumerable<MenuNode> items)
@@ -1094,12 +1185,16 @@ public sealed partial class MainPage : Page
     }
 
     private void MenuTreeDragItemsStarting(TreeView sender, TreeViewDragItemsStartingEventArgs args) { dragEscapeMonitor?.Dispose(); dragEscapeMonitor = new DragEscapeMonitor(); draftState.CommitPending(); dragSnapshot = Snapshot(); dragNodeId = args.Items.FirstOrDefault() is TreeViewNode node ? Model(node).Id : null; sender.CanReorderItems = false; dropIndicatorTimer.Start(); }
-    internal bool InternalDragActive() => dragSnapshot is not null && dragNodeId is not null;
+    internal bool InternalDragActive() => (dragSnapshot is not null && dragNodeId is not null) || (stepDragItem is not null && draggedStep is not null);
     private void HideDropIndicator() { DropIndicator.Visibility = Visibility.Collapsed; dropIndicatorValid = false; }
     private void UpdateDropIndicator()
     {
         HideDropIndicator();
-        if (!InternalDragActive() || dragEscapeMonitor?.Cancelled == true || !EditorOleDropTarget.TryGetCursorPosition(App.MainWindow, out var x, out var y)) return;
+        if (stepDragItem is not null && draggedStep is not null &&
+            EditorOleDropTarget.TryGetCursorPosition(App.MainWindow, out var stepX, out var stepY))
+            UpdateStepDropIndicator(stepX, stepY);
+        else if (stepDropIndicator is not null) stepDropIndicator.Visibility = Visibility.Collapsed;
+        if (dragNodeId is null || dragSnapshot is null || dragEscapeMonitor?.Cancelled == true || !EditorOleDropTarget.TryGetCursorPosition(App.MainWindow, out var x, out var y)) return;
         var treeOrigin = MenuTree.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point());
         if (x < treeOrigin.X || x >= treeOrigin.X + MenuTree.ActualWidth || y < treeOrigin.Y || y >= treeOrigin.Y + MenuTree.ActualHeight) return;
         var overlayOrigin = DropOverlay.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point());
@@ -1153,6 +1248,8 @@ public sealed partial class MainPage : Page
     }
     internal bool CompleteInternalDrop(int x, int y)
     {
+        if (stepDragItem is { } item && draggedStep is { } step && stepList is { } list)
+            return CompleteStepDrop(item, step, list, x, y);
         if (dragNodeId is not { } id) return false;
         var origin = MenuTree.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point());
         if (x < origin.X || y < origin.Y || x >= origin.X + MenuTree.ActualWidth || y >= origin.Y + MenuTree.ActualHeight)
@@ -1175,6 +1272,54 @@ public sealed partial class MainPage : Page
         dragSnapshot = null; dragNodeId = null; MarkDirty(); RefreshTree(id);
         return moved;
     }
+    private void UpdateStepDropIndicator(int x, int y)
+    {
+        if (stepDropIndicator is not { } marker || stepList is not { } list) return;
+        marker.Visibility = Visibility.Collapsed;
+        if (!TryGetStepInsertion(list, x, y, out _, out var lineY)) return;
+        marker.Width = Math.Max(0, list.ActualWidth - 8);
+        Canvas.SetLeft(marker, 4);
+        Canvas.SetTop(marker, Math.Clamp(lineY - 1.5, 0, Math.Max(0, list.ActualHeight - 3)));
+        marker.Visibility = Visibility.Visible;
+    }
+
+    private static bool TryGetStepInsertion(ListView list, int x, int y, out int target, out double lineY)
+    {
+        target = 0; lineY = 0;
+        var origin = list.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point());
+        if (x < origin.X || x >= origin.X + list.ActualWidth || y < origin.Y || y >= origin.Y + list.ActualHeight) return false;
+        var found = false;
+        for (var index = 0; index < list.Items.Count; index++)
+        {
+            if (list.Items[index] is not FrameworkElement row || row.ActualHeight <= 0) continue;
+            var position = row.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point());
+            if (position.Y + row.ActualHeight <= origin.Y || position.Y >= origin.Y + list.ActualHeight) continue;
+            found = true;
+            if (y < position.Y + row.ActualHeight / 2)
+            {
+                target = index; lineY = Math.Max(0, position.Y - origin.Y); return true;
+            }
+            target = index + 1;
+            lineY = Math.Min(list.ActualHeight, position.Y + row.ActualHeight - origin.Y);
+        }
+        return found;
+    }
+
+    private bool CompleteStepDrop(MenuNode item, MenuAction step, ListView list, int x, int y)
+    {
+        if (!TryGetStepInsertion(list, x, y, out var target, out _)) return false;
+        var source = item.Steps.IndexOf(step);
+        if (source < 0) return false;
+        if (target > source) target--;
+        target = Math.Clamp(target, 0, item.Steps.Count - 1);
+        stepDropHandled = true;
+        if (target != source)
+        {
+            item.Steps.RemoveAt(source); item.Steps.Insert(target, step); selectedStepIndex = target; MarkDirty();
+        }
+        return true;
+    }
+
     private void MenuTreeDragItemsCompleted(TreeView sender, TreeViewDragItemsCompletedEventArgs args)
     {
         dropIndicatorTimer.Stop(); DropIndicator.Visibility = Visibility.Collapsed;
@@ -1319,9 +1464,13 @@ public sealed partial class MainPage : Page
         {
             Model = model; Orientation = Orientation.Horizontal; Spacing = 10;
             Children.Add(CreateItemIcon(model, 20));
-            label = new TextBlock { VerticalAlignment = VerticalAlignment.Center }; Children.Add(label); Update();
+            label = new TextBlock { VerticalAlignment = VerticalAlignment.Center, MaxWidth = 190, TextTrimming = TextTrimming.CharacterEllipsis }; Children.Add(label); Update();
         }
-        public void Update() => label.Text = Model.Kind == MenuNodeKind.Separator ? "──────────" : string.IsNullOrWhiteSpace(Model.Name) ? L.Get("Editor_Unnamed_3f239e") : Model.Name;
+        public void Update()
+        {
+            label.Text = Model.Kind == MenuNodeKind.Separator ? "──────────" : string.IsNullOrWhiteSpace(Model.Name) ? L.Get("Editor_Unnamed_3f239e") : Model.Name;
+            ToolTipService.SetToolTip(label, label.Text);
+        }
         public override string ToString() => Model.Kind == MenuNodeKind.Separator ? "──────────" :
             (Model.Kind == MenuNodeKind.Group ? "📁 " : Model.Action?.Kind == ActionKind.InsertText ? "📋 " : "📄 ") +
             (string.IsNullOrWhiteSpace(Model.Name) ? L.Get("Editor_Unnamed_3f239e") : Model.Name);

@@ -76,7 +76,7 @@ public sealed partial class MainPage
             if (!Descendants(row).OfType<Image>().Any(image => image.Source is not null))
                 throw new Exception("Tree kept its placeholder while properties show the application icon: " + Model(node).Name);
         }
-        var properties = Descendants(PropertiesPanel).OfType<Image>().Single();
+        var properties = Descendants(PropertiesIcon).OfType<Image>().Single();
         if (properties.Source is null) throw new Exception("Properties application icon missing.");
     }
 

@@ -7,6 +7,7 @@ public enum ActionKind { OpenFolder, RunProgram, RunScript, SendShortcut, CopySe
 
 public sealed class MenuAction
 {
+    public string Name { get; set; } = "";
     public ActionKind Kind { get; set; }
     public string Path { get; set; } = "";
     public string Arguments { get; set; } = "";

@@ -236,7 +236,7 @@ or select an existing item.</value>
     <value>m3nuxa is not running in the tray or is not responding.</value>
   </data>
   <data name="Editor_M3nuxaMenuEditor_652d6b" xml:space="preserve">
-    <value>m3nuxa — menu editor</value>
+    <value>m3nuxa</value>
   </data>
   <data name="Editor_MenuGroup_30ae35" xml:space="preserve">
     <value>Menu group</value>
@@ -484,4 +484,10 @@ or select an existing item.</value>
   <data name="Icon_Color" xml:space="preserve"><value>Icon color</value></data>
   <data name="Icon_CustomColor" xml:space="preserve"><value>Custom color…</value></data>
   <data name="Editor_SaveAsHint" xml:space="preserve"><value>Save to another file and make it the active configuration.</value></data>
+  <data name="Workflow_AddStep" xml:space="preserve"><value>Add step</value></data>
+  <data name="Editor_On" xml:space="preserve"><value>On</value></data>
+  <data name="Editor_Off" xml:space="preserve"><value>Off</value></data>
+  <data name="Icon_BundledHeading" xml:space="preserve"><value>Built-in icons</value></data>
+  <data name="Workflow_Sequence" xml:space="preserve"><value>Action sequence</value></data>
+  <data name="Workflow_StepName" xml:space="preserve"><value>Step name</value></data>
 </root>
