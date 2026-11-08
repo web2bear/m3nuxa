@@ -12,9 +12,25 @@ public sealed partial class MainPage
         var node = new MenuNode { Name = "Workflow", Kind = MenuNodeKind.Action,
             Steps = [new MenuAction { Kind = ActionKind.Delay, DelayMilliseconds = 100 }, new MenuAction { Kind = ActionKind.Delay, DelayMilliseconds = 200 }] };
         config = new AppConfig { Items = [node] };
+        node.Steps[1].Name = L.Get("Workflow_Delay");
+        if (StepDisplayName(node, 0) == StepDisplayName(node, 1)) throw new Exception("Unnamed and named steps must have distinct automatic labels");
+        node.Steps[1].Name = "";
         draftState.SetBaseline();
         RefreshTree(node.Id);
+        DetailsTabs.SelectedIndex = 1;
         await Task.Delay(100);
+        var list = stepList ?? throw new Exception("Step list missing");
+        list.UpdateLayout();
+        var row = (ListViewItem)list.Items[0];
+        var point = row.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point());
+        var x = (int)(point.X + row.ActualWidth / 2);
+        var y = (int)(point.Y + row.ActualHeight / 4);
+        if (!TryGetStepInsertion(list, x, y, out var target, out var lineY) || target != 0) throw new Exception("First insertion target incorrect");
+        UpdateStepDropIndicator(x, y);
+        if (stepDropIndicator?.Visibility != Microsoft.UI.Xaml.Visibility.Visible || Math.Abs(Canvas.GetTop(stepDropIndicator) - Math.Max(0, lineY - 1.5)) > 1)
+            throw new Exception("Insertion indicator does not match target");
+        UpdateStepDropIndicator(-10000, -10000);
+        if (stepDropIndicator.Visibility != Microsoft.UI.Xaml.Visibility.Collapsed) throw new Exception("Insertion indicator remains visible outside list");
         void Invoke(string key)
         {
             var bar = PropertyElements().OfType<CommandBar>().Single();

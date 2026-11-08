@@ -6,13 +6,12 @@
         <ResourceDictionary>
             <ResourceDictionary.ThemeDictionaries>
                 <ResourceDictionary x:Key="Dark">
-                    <LinearGradientBrush x:Key="EditorBackgroundBrush" StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#111225" Offset="0" /><GradientStop Color="#17132E" Offset="0.55" /><GradientStop Color="#101426" Offset="1" /></LinearGradientBrush>
-                    <LinearGradientBrush x:Key="WorkspacePanelBrush" StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#35314E" Offset="0" /><GradientStop Color="#202035" Offset="0.48" /><GradientStop Color="#30214E" Offset="1" /></LinearGradientBrush>
-                    <LinearGradientBrush x:Key="ToolbarSurfaceBrush" StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#45415D" Offset="0" /><GradientStop Color="#252338" Offset="1" /></LinearGradientBrush>
-                    <LinearGradientBrush x:Key="TabViewItemHeaderBackgroundSelected" StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#7558AF" Offset="0" /><GradientStop Color="#493671" Offset="1" /></LinearGradientBrush>
-                    <SolidColorBrush x:Key="WorkspaceStrokeBrush" Color="#71698E" />
-                    <LinearGradientBrush x:Key="SectionBackgroundBrush" StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#504B65" Offset="0" /><GradientStop Color="#29283E" Offset="0.55" /><GradientStop Color="#343052" Offset="1" /></LinearGradientBrush>
-                    <SolidColorBrush x:Key="SectionStrokeBrush" Color="#59546F" />
+                    <LinearGradientBrush x:Key="EditorBackgroundBrush" StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#171B22" Offset="0" /><GradientStop Color="#1B2028" Offset="0.55" /><GradientStop Color="#151A21" Offset="1" /></LinearGradientBrush>
+                    <LinearGradientBrush x:Key="WorkspacePanelBrush" StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#1D222A" Offset="0" /><GradientStop Color="#1B2027" Offset="0.48" /><GradientStop Color="#1D222A" Offset="1" /></LinearGradientBrush>
+                    <LinearGradientBrush x:Key="ToolbarSurfaceBrush" StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#292F37" Offset="0" /><GradientStop Color="#222830" Offset="1" /></LinearGradientBrush>
+                    <SolidColorBrush x:Key="WorkspaceStrokeBrush" Color="#3C444D" />
+                    <LinearGradientBrush x:Key="SectionBackgroundBrush" StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#242A32" Offset="0" /><GradientStop Color="#20262D" Offset="0.55" /><GradientStop Color="#242A32" Offset="1" /></LinearGradientBrush>
+                    <SolidColorBrush x:Key="SectionStrokeBrush" Color="#3C444D" />
                     <SolidColorBrush x:Key="ToolbarGoldBrush" Color="#EAB84C" />
                     <SolidColorBrush x:Key="ToolbarBlueBrush" Color="#70BCEC" />
                     <SolidColorBrush x:Key="ToolbarGreenBrush" Color="#70C98C" />
@@ -21,13 +20,12 @@
                     <SolidColorBrush x:Key="ToolbarRedBrush" Color="#EC7777" />
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Light">
-                    <LinearGradientBrush x:Key="EditorBackgroundBrush" StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#F4F2FC" Offset="0" /><GradientStop Color="#EAEAF7" Offset="1" /></LinearGradientBrush>
-                    <LinearGradientBrush x:Key="WorkspacePanelBrush" StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#FAF9FF" Offset="0" /><GradientStop Color="#F0EFFA" Offset="1" /></LinearGradientBrush>
-                    <LinearGradientBrush x:Key="ToolbarSurfaceBrush" StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#FFFFFF" Offset="0" /><GradientStop Color="#E3DEF2" Offset="1" /></LinearGradientBrush>
-                    <LinearGradientBrush x:Key="TabViewItemHeaderBackgroundSelected" StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#DDD2F6" Offset="0" /><GradientStop Color="#BBA8E4" Offset="1" /></LinearGradientBrush>
-                    <SolidColorBrush x:Key="WorkspaceStrokeBrush" Color="#C5C1D7" />
-                    <LinearGradientBrush x:Key="SectionBackgroundBrush" StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#FFFFFF" Offset="0" /><GradientStop Color="#E7E1F4" Offset="1" /></LinearGradientBrush>
-                    <SolidColorBrush x:Key="SectionStrokeBrush" Color="#D4D0E3" />
+                    <LinearGradientBrush x:Key="EditorBackgroundBrush" StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#F5F7F7" Offset="0" /><GradientStop Color="#E9EEEE" Offset="1" /></LinearGradientBrush>
+                    <LinearGradientBrush x:Key="WorkspacePanelBrush" StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#FFFFFF" Offset="0" /><GradientStop Color="#F5F8F8" Offset="1" /></LinearGradientBrush>
+                    <LinearGradientBrush x:Key="ToolbarSurfaceBrush" StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#FFFFFF" Offset="0" /><GradientStop Color="#E8EEEE" Offset="1" /></LinearGradientBrush>
+                    <SolidColorBrush x:Key="WorkspaceStrokeBrush" Color="#C5D1D1" />
+                    <LinearGradientBrush x:Key="SectionBackgroundBrush" StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#FFFFFF" Offset="0" /><GradientStop Color="#F1F6F6" Offset="1" /></LinearGradientBrush>
+                    <SolidColorBrush x:Key="SectionStrokeBrush" Color="#D4DEDE" />
                     <SolidColorBrush x:Key="ToolbarGoldBrush" Color="#8B5900" />
                     <SolidColorBrush x:Key="ToolbarBlueBrush" Color="#00629B" />
                     <SolidColorBrush x:Key="ToolbarGreenBrush" Color="#147038" />
@@ -39,7 +37,6 @@
                     <SolidColorBrush x:Key="EditorBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
                     <SolidColorBrush x:Key="WorkspacePanelBrush" Color="{ThemeResource SystemColorWindowColor}" />
                     <SolidColorBrush x:Key="ToolbarSurfaceBrush" Color="{ThemeResource SystemColorWindowColor}" />
-                    <SolidColorBrush x:Key="TabViewItemHeaderBackgroundSelected" Color="{ThemeResource SystemColorHighlightColor}" />
                     <SolidColorBrush x:Key="WorkspaceStrokeBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
                     <SolidColorBrush x:Key="SectionBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
                     <SolidColorBrush x:Key="SectionStrokeBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
@@ -70,8 +67,8 @@
         </ResourceDictionary>
     </Page.Resources>
     <Grid Background="{ThemeResource EditorBackgroundBrush}" RowDefinitions="Auto,*,Auto">
-        <Border Grid.Row="0" Margin="56,8,16,10" Padding="6,2" HorizontalAlignment="Stretch" Background="{ThemeResource ToolbarSurfaceBrush}" BorderBrush="{ThemeResource WorkspaceStrokeBrush}" BorderThickness="1" CornerRadius="10">
-        <CommandBar x:Name="MainCommandBar" HorizontalAlignment="Left" Background="Transparent" DefaultLabelPosition="Bottom" IsDynamicOverflowEnabled="False" OverflowButtonVisibility="Collapsed">
+        <Border Grid.Row="0" Margin="16,8,16,10" Padding="6,2" HorizontalAlignment="Stretch" Background="{ThemeResource ToolbarSurfaceBrush}" BorderBrush="{ThemeResource WorkspaceStrokeBrush}" BorderThickness="1" CornerRadius="10">
+        <CommandBar x:Name="MainCommandBar" HorizontalAlignment="Left" Background="Transparent" DefaultLabelPosition="Right" IsDynamicOverflowEnabled="True">
             <AppBarButton x:Name="ApplyButton" MinWidth="40" Label="{x:Bind Localize('Editor_Apply_768af6')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_Apply_768af6')}" Click="ApplyClicked" IsEnabled="False">
                 <AppBarButton.Icon><SymbolIcon Symbol="Save" Foreground="{ThemeResource ToolbarGreenBrush}" /></AppBarButton.Icon>
             </AppBarButton>
@@ -97,36 +94,23 @@
 
         <Grid x:Name="WorkspaceGrid" Grid.Row="1" Padding="8,0,16,0" ColumnSpacing="8">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="380" />
+                <ColumnDefinition Width="0" />
+                <ColumnDefinition Width="320" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" VerticalAlignment="Stretch">
-                <StackPanel Spacing="2">
-                    <Button Style="{StaticResource SubtleButtonStyle}" AutomationProperties.AutomationId="CreateFolder" Width="40" Height="40" Padding="0" AutomationProperties.Name="{x:Bind Localize('Editor_Folder_72cf46')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_Folder_72cf46')}" Click="AddFolderClicked">
-                        <SymbolIcon Symbol="Folder" Foreground="{ThemeResource ToolbarGoldBrush}" />
-                    </Button>
-                    <Button Style="{StaticResource SubtleButtonStyle}" Width="40" Height="40" Padding="0" AutomationProperties.Name="{x:Bind Localize('Editor_File_c1973e')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_File_c1973e')}" Click="AddFileClicked">
-                        <SymbolIcon Symbol="Document" Foreground="{ThemeResource ToolbarBlueBrush}" />
-                    </Button>
-                    <Button Style="{StaticResource SubtleButtonStyle}" Width="40" Height="40" Padding="0" AutomationProperties.Name="{x:Bind Localize('Editor_Action_4fe9c0')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_Action_4fe9c0')}" Click="AddActionClicked">
-                        <SymbolIcon Symbol="Play" Foreground="{ThemeResource ToolbarPurpleBrush}" />
-                    </Button>
-                    <Button Style="{StaticResource SubtleButtonStyle}" Width="40" Height="40" Padding="0" AutomationProperties.Name="{x:Bind Localize('Editor_Snippet_720dc5')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_Snippet_720dc5')}" Click="AddSnippetClicked">
-                        <SymbolIcon Symbol="Edit" Foreground="{ThemeResource ToolbarBlueBrush}" />
-                    </Button>
-                    <Button Style="{StaticResource SubtleButtonStyle}" Width="40" Height="40" Padding="0" AutomationProperties.Name="{x:Bind Localize('Editor_Group_ae8ad7')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_Group_ae8ad7')}" Click="AddGroupClicked">
-                        <SymbolIcon Symbol="AllApps" Foreground="{ThemeResource ToolbarBlueBrush}" />
-                    </Button>
-                    <Button Style="{StaticResource SubtleButtonStyle}" Width="40" Height="40" Padding="0" AutomationProperties.Name="{x:Bind Localize('Editor_Separator_afb9a7')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_Separator_afb9a7')}" Click="AddSeparatorClicked">
-                        <SymbolIcon Symbol="Remove" Foreground="{ThemeResource ToolbarGrayBrush}" />
-                    </Button>
-                </StackPanel>
-            </ScrollViewer>
             <Grid x:Name="MenuPanel" Grid.Column="1" RowDefinitions="Auto,*,Auto" AllowDrop="True" Background="{ThemeResource WorkspacePanelBrush}" BorderBrush="{ThemeResource WorkspaceStrokeBrush}" BorderThickness="1" CornerRadius="12">
-                <StackPanel Padding="12,10,12,6" Spacing="4">
-                    <TextBlock Text="{x:Bind Localize('Editor_ItemOrderAndHierarchy_0718c3')}" Opacity="0.6" FontSize="12" />
-                </StackPanel>
+                <Grid Padding="12,10,12,6">
+                    <DropDownButton AutomationProperties.AutomationId="CreateFolder" Content="{x:Bind Localize('Workflow_Add')}" HorizontalAlignment="Left" AutomationProperties.Name="{x:Bind Localize('Workflow_Add')}">
+                        <DropDownButton.Flyout><MenuFlyout x:Name="AddItemFlyout">
+                            <MenuFlyoutItem Text="{x:Bind Localize('Editor_Folder_72cf46')}" Click="AddFolderClicked" />
+                            <MenuFlyoutItem Text="{x:Bind Localize('Editor_File_c1973e')}" Click="AddFileClicked" />
+                            <MenuFlyoutItem Text="{x:Bind Localize('Editor_Action_4fe9c0')}" Click="AddActionClicked" />
+                            <MenuFlyoutItem Text="{x:Bind Localize('Editor_Snippet_720dc5')}" Click="AddSnippetClicked" />
+                            <MenuFlyoutItem Text="{x:Bind Localize('Editor_Group_ae8ad7')}" Click="AddGroupClicked" />
+                            <MenuFlyoutItem Text="{x:Bind Localize('Editor_Separator_afb9a7')}" Click="AddSeparatorClicked" />
+                        </MenuFlyout></DropDownButton.Flyout>
+                    </DropDownButton>
+                </Grid>
                 <TreeView x:Name="MenuTree" Grid.Row="1" Margin="8,2,8,4" SelectionMode="Single"
                           CanDragItems="True" CanReorderItems="True" SelectionChanged="MenuTreeSelectionChanged"
                           DragItemsStarting="MenuTreeDragItemsStarting" DragItemsCompleted="MenuTreeDragItemsCompleted" AllowDrop="True">
@@ -153,16 +137,22 @@
                 </Canvas>
                 <TextBlock Grid.Row="2" x:Name="DropHint" Margin="12,6,12,10" Text="{x:Bind Localize('Editor_DragFilesFoldersOrText_2e21d1')}" FontSize="12" Opacity="0.6" TextWrapping="Wrap" />
             </Grid>
-            <Grid x:Name="DetailsPanel" Grid.Column="2" RowDefinitions="Auto,Auto,*" Background="{ThemeResource WorkspacePanelBrush}" BorderBrush="{ThemeResource WorkspaceStrokeBrush}" BorderThickness="1" CornerRadius="12">
-                <StackPanel Padding="14,10,14,6" Spacing="3">
-                    <StackPanel Orientation="Horizontal" Spacing="8"><Button x:Name="PropertiesIcon" VerticalAlignment="Center" Click="PropertiesIconClicked" AutomationProperties.Name="{x:Bind Localize('Icon_ChooseBundled')}" /><TextBlock x:Name="PropertiesHint" Text="{x:Bind Localize('Editor_SelectAnItemOnThe_2c92bb')}" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" /></StackPanel>
-                </StackPanel>
-                <TabView x:Name="DetailsTabs" Grid.Row="1" Margin="14,0,14,0" IsAddTabButtonVisible="False" TabWidthMode="Equal" Width="370" HorizontalAlignment="Left" SelectedIndex="0" SelectionChanged="DetailsTabsSelectionChanged" Visibility="Collapsed">
-                    <TabViewItem Header="{x:Bind Localize('Workflow_ItemSettings')}" FontSize="15" MinHeight="44" VerticalContentAlignment="Center" IsClosable="False"><TabViewItem.IconSource><SymbolIconSource Symbol="Setting" /></TabViewItem.IconSource></TabViewItem>
-                    <TabViewItem Header="{x:Bind Localize('Workflow_Steps')}" FontSize="15" MinHeight="44" VerticalContentAlignment="Center" IsClosable="False"><TabViewItem.IconSource><SymbolIconSource Symbol="List" /></TabViewItem.IconSource></TabViewItem>
-                </TabView>
-                <ScrollViewer Grid.Row="2" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
-                    <StackPanel x:Name="PropertiesPanel" Padding="14,2,14,14" Spacing="12" HorizontalAlignment="Stretch" />
+            <Grid x:Name="DetailsPanel" Grid.Column="2" RowDefinitions="Auto,*" Background="{ThemeResource WorkspacePanelBrush}" BorderBrush="{ThemeResource WorkspaceStrokeBrush}" BorderThickness="1" CornerRadius="12">
+                <Grid Padding="14,10,14,8" ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                    <Button x:Name="PropertiesIcon" VerticalAlignment="Center" Click="PropertiesIconClicked" AutomationProperties.Name="{x:Bind Localize('Icon_ChooseBundled')}" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                        <TextBlock x:Name="PropertiesHint" Text="{x:Bind Localize('Editor_SelectAnItemOnThe_2c92bb')}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Name="PropertiesType" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </Grid>
+                <ScrollViewer Grid.Row="1" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
+                    <StackPanel>
+                        <TabView x:Name="DetailsTabs" Margin="14,0,14,4" IsAddTabButtonVisible="False" TabWidthMode="Equal" Width="370" HorizontalAlignment="Left" SelectedIndex="0" SelectionChanged="DetailsTabsSelectionChanged" Visibility="Collapsed">
+                            <TabViewItem Header="{x:Bind Localize('Workflow_ItemSettings')}" IsClosable="False"><TabViewItem.IconSource><SymbolIconSource Symbol="Setting" /></TabViewItem.IconSource></TabViewItem>
+                            <TabViewItem Header="{x:Bind Localize('Workflow_Steps')}" IsClosable="False"><TabViewItem.IconSource><SymbolIconSource Symbol="List" /></TabViewItem.IconSource></TabViewItem>
+                        </TabView>
+                        <StackPanel x:Name="PropertiesPanel" Padding="14,2,14,14" Spacing="12" HorizontalAlignment="Stretch" />
+                    </StackPanel>
                 </ScrollViewer>
             </Grid>
         </Grid>

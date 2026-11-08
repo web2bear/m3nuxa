@@ -17,7 +17,7 @@ internal static class WorkflowModelChecks
         Check(store.Current.SchemaVersion == 2 && node.Steps.Count == 1 && node.Steps[0].Text == "old text", "legacy action migrates");
         Check(node.Hotkey == "Ctrl+Alt+F5" && node.IconPath == "icon.png", "legacy item metadata migrates");
         var draft = store.CreateDraft();
-        draft.Config.Items[0].Steps.Add(new MenuAction { Kind = ActionKind.Delay, DelayMilliseconds = 25 });
+        draft.Config.Items[0].Steps.Add(new MenuAction { Name = "Wait for editor", Kind = ActionKind.Delay, DelayMilliseconds = 25 });
         Check(store.Apply(draft).Success, "migrated sequence applies");
         var backup = Directory.GetFiles(Path.Combine(root, "backups"), "*.json").Single();
         Check(File.ReadAllText(backup) == legacy, "original configuration backed up before migration");
@@ -28,7 +28,7 @@ internal static class WorkflowModelChecks
             Check(!item.TryGetProperty("Action", out _), "new schema omits legacy action");
         }
         var restored = new ConfigStore(path).Current.Items.Single();
-        Check(restored.Steps.Count == 2 && restored.Steps[1].DelayMilliseconds == 25, "steps survive restart");
+        Check(restored.Steps.Count == 2 && restored.Steps[1].DelayMilliseconds == 25 && restored.Steps[1].Name == "Wait for editor", "steps survive restart");
         draft = store.CreateDraft();
         draft.Config.Items[0].Steps[1].DelayMilliseconds = -1;
         Check(!store.Validate(draft.Config).IsValid, "invalid subsequent step rejected");
