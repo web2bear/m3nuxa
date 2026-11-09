@@ -101,6 +101,16 @@ try
     Check(store.Current.Items.Count == 2, "live config preserved");
     using (var folderIcon = ItemIcon.Load(new MenuNode { Action = new MenuAction { Path = Environment.GetFolderPath(Environment.SpecialFolder.Windows) } }))
         Check(folderIcon is { Width: > 0 }, "Explorer folder icon");
+    Check(await ItemIcon.PngAsync(new MenuNode { Kind = MenuNodeKind.Action, Action = new MenuAction { Kind = ActionKind.OpenFolder, Path = "{knownFolder:Downloads}" } }) is { Length: > 0 }, "known folder menu icon");
+    Check(await ItemIcon.PngAsync(new MenuNode { Kind = MenuNodeKind.Action, Action = new MenuAction { Kind = ActionKind.SendShortcut, Shortcut = "F16" } }) is { Length: > 0 }, "shortcut menu icon");
+    var offlineIcon = ItemIcon.PngAsync(new MenuNode { Kind = MenuNodeKind.Action, Action = new MenuAction { Kind = ActionKind.OpenFolder, Path = @"\\m3nuxa-offline-test.invalid\share" } });
+    var followingIcon = ItemIcon.PngAsync(new MenuNode { Kind = MenuNodeKind.Action, Action = new MenuAction { Kind = ActionKind.SendShortcut, Shortcut = "F16" } });
+    await Task.WhenAny(Task.WhenAll(offlineIcon, followingIcon), Task.Delay(2000));
+    Check(offlineIcon.IsCompletedSuccessfully && followingIcon.IsCompletedSuccessfully && offlineIcon.Result is { Length: > 0 } && followingIcon.Result is { Length: > 0 }, "offline network icon does not block following icons");
+    _ = ItemIcon.PngAsync(new MenuNode { Kind = MenuNodeKind.Group, IconPath = @"\\m3nuxa-offline-test.invalid\share\icon.png" });
+    var afterRemoteCustom = ItemIcon.PngAsync(new MenuNode { Kind = MenuNodeKind.Action, Action = new MenuAction { Kind = ActionKind.SendShortcut, Shortcut = "F16" } });
+    await Task.WhenAny(afterRemoteCustom, Task.Delay(2000));
+    Check(afterRemoteCustom.IsCompletedSuccessfully && afterRemoteCustom.Result is { Length: > 0 }, "network custom icon does not block local icons");
     using (var programIcon = ItemIcon.Load(new MenuNode { IconPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe") }))
         Check(programIcon is { Width: > 0 }, "executable shell icon, not Image.FromFile");
     var customIcon = Path.Combine(root, "custom.png");
