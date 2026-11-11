@@ -46,8 +46,7 @@ public partial class App
             var before = File.ReadAllText(config.FilePath);
             var beforeVersion = config.Version;
             var beforeCount = config.Current.Items.Count;
-            var result = await pipe.ExecuteAsync(session, "apply");
-            if (result["Success"]?.GetValue<bool>() != false) throw new Exception("Occupied new shortcut was accepted");
+            await ExpectApplyRejection(pipe, session);
             if (config.Version != beforeVersion || config.Current.Items.Count != beforeCount || File.ReadAllText(config.FilePath) != before)
                 throw new Exception("Occupied shortcut changed config, tree or version");
             if (RegisterHotKey(0, 28500, 3, 0x79)) { UnregisterHotKey(0, 28500); throw new Exception("Previous binding not restored"); }
@@ -65,8 +64,8 @@ public partial class App
             await pipe.ExecuteAsync(session, "replaceDraft", new JsonObject { ["config"] = JsonSerializer.SerializeToNode(candidate) });
             var before = File.ReadAllText(config.FilePath);
             var version = config.Version;
-            var result = await pipe.ExecuteAsync(session, "apply");
-            if (result["Success"]?.GetValue<bool>() != false || File.ReadAllText(config.FilePath) != before || config.Version != version)
+            await ExpectApplyRejection(pipe, session);
+            if (File.ReadAllText(config.FilePath) != before || config.Version != version)
                 throw new Exception("Applying changed shortcuts while capturing changed configuration");
         }
         finally { suspended.SetValue(tray, false); Activate(); }
@@ -87,5 +86,12 @@ public partial class App
         LauncherMenu.Fill(items, [new MenuNode { Name = "Group", Kind = MenuNodeKind.Group, Children = [new MenuNode { Name = "Child", Kind = MenuNodeKind.Action }] }], _ => {}, _ => {}, config.Current.Settings.MenuFontSize);
         var group = (MenuFlyoutSubItem)items[0];
         if (group.FontSize != 18 || ((MenuFlyoutItem)group.Items[0]).FontSize != 18) throw new Exception("Font size not propagated to nested menus");
+    }
+
+    private static async Task ExpectApplyRejection(AgentPipe pipe, string session)
+    {
+        try { await pipe.ExecuteAsync(session, "apply"); }
+        catch (AgentPipe.ProtocolException ex) when (ex.Code == "operation_failed") { return; }
+        throw new Exception("Applying unavailable shortcuts must return operation_failed.");
     }
 }
