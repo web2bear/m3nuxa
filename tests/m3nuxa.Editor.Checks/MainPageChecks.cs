@@ -47,7 +47,7 @@ public sealed partial class MainPage
         RefreshTree();
     }
     internal string DropCheckSnapshot() => Snapshot();
-    internal void AddProbeText(string text, bool isUrl, int x, int y)
+    internal void AddProbeText(string text, bool isUrl, double x, double y)
     {
         var (destination, index) = NativeDropDestination(x, y);
         if (index < 0) index = destination.Count;
@@ -150,6 +150,33 @@ public sealed partial class MainPage
             var tooltip = ToolTipService.GetToolTip(ApplyButton) as string;
             if (tooltip != L.Get(expected ? "Editor_ThereAreUnsavedChangesApply_226d2b" : "Editor_NoChangesToApply_fefed9"))
                 throw new Exception($"Apply tooltip is wrong {stage}: {tooltip}.");
+        }
+    }
+
+    internal void CheckDropAtRelease(bool showPreview)
+    {
+        var source = new MenuNode { Name = "Source" };
+        var first = new MenuNode { Name = "Preview group", Kind = MenuNodeKind.Group };
+        var second = new MenuNode { Name = "Release group", Kind = MenuNodeKind.Group };
+        draftState.Reset(new AppConfig { Items = [source, first, second] });
+        RefreshTree(source.Id);
+        MenuTree.UpdateLayout();
+        dragSnapshot = Snapshot();
+        dragNodeId = source.Id;
+
+        var preview = Center(first);
+        var release = Center(second);
+        if (showPreview) ShowMenuDropIndicator(source.Id, MenuHit(preview.X, preview.Y));
+        if (!CompleteInternalDrop(release.X, release.Y) || second.Children.Single().Id != source.Id || first.Children.Count != 0)
+            throw new Exception("Tree drop did not use release coordinates.");
+        MenuTreeDragItemsCompleted(MenuTree, null!);
+        if (draftState.UndoCount != 1 || !draftState.Undo() || config.Items[0].Id != source.Id)
+            throw new Exception("Tree drop must produce one undoable move.");
+
+        (int X, int Y) Center(MenuNode node)
+        {
+            var bounds = MenuDropRows().Single(row => row.Id == node.Id).Bounds;
+            return ((int)(bounds.X + bounds.Width / 2), (int)(bounds.Y + bounds.Height / 2));
         }
     }
 

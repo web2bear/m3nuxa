@@ -25,6 +25,7 @@
     <Compile Include="../../src/m3nuxa.Editor/EditorOleDropTarget.cs" Link="EditorOleDropTarget.cs" />
     <Compile Include="../../src/m3nuxa.Editor/ExplorerFileDropHook.cs" Link="ExplorerFileDropHook.cs" />
     <Compile Include="../../src/m3nuxa.Editor/Imports.cs" Link="Imports.cs" />
+    <Compile Include="../../src/m3nuxa.Editor/DropGeometry.cs" Link="DropGeometry.cs" />
     <Compile Include="../../src/m3nuxa.Editor/EditorDraft.cs" Link="EditorDraft.cs" />
     <Compile Include="../../src/m3nuxa.Editor/DragEscapeMonitor.cs" Link="DragEscapeMonitor.cs" />
     <Compile Include="../../src/m3nuxa.Editor/EditorPipeClient.cs" Link="EditorPipeClient.cs" />
@@ -33,6 +34,8 @@
     <Compile Include="../../src/m3nuxa.Editor/KeyboardCapture.cs" Link="KeyboardCapture.cs" />
     <Compile Include="../../src/m3nuxa.Editor/HotkeyCaptureConnection.cs" Link="HotkeyCaptureConnection.cs" />
     <Compile Include="../../src/m3nuxa.App/HotkeyParser.cs" Link="HotkeyParser.cs" />
+    <Compile Include="../../src/m3nuxa.Editor/IconSelectionDialog.cs" Link="IconSelectionDialog.cs" />
+    <Content Include="../../assets/icon-packs/Boxicons/**/*.png" Link="icon-packs/Boxicons/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Compile Include="../../src/m3nuxa.Editor/IconFilePicker.cs" Link="IconFilePicker.cs" />
     <Compile Include="../../src/m3nuxa.App/ConfigModels.cs" Link="ConfigModels.cs" />
     <Compile Include="../../src/m3nuxa.App/DevLog.cs" Link="DevLog.cs" />

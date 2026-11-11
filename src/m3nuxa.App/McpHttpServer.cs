@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -87,7 +87,7 @@ internal sealed class McpHttpTools
     [McpServerTool(Name = "begin"), Description("Start an independent draft and return its draftId. Pass draftId to later editing tools.")]
     public static async Task<string> Begin(AgentPipe pipe)
     {
-        var draftId = Guid.NewGuid().ToString("N");
+        var draftId = "mcp-" + Guid.NewGuid().ToString("N");
         var response = (await pipe.ExecuteAsync(draftId, "begin")).AsObject();
         response["draftId"] = draftId;
         return response.ToJsonString();
@@ -124,6 +124,10 @@ internal sealed class McpHttpTools
     [McpServerTool(Name = "delete"), Description("Remove an item from a draft.")]
     public static async Task<string> Delete(AgentPipe pipe, string draftId, string id) =>
         (await pipe.ExecuteAsync(draftId, "delete", new JsonObject { ["id"] = id })).ToJsonString();
+
+    [McpServerTool(Name = "discard"), Description("Release an unused draft.")]
+    public static async Task<string> Discard(AgentPipe pipe, string draftId) =>
+        (await pipe.ExecuteAsync(draftId, "discard")).ToJsonString();
 
     [McpServerTool(Name = "validate"), Description("Validate a draft without saving it.")]
     public static async Task<string> Validate(AgentPipe pipe, string draftId) =>

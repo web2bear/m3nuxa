@@ -1,4 +1,4 @@
-using m3nuxa.App;
+﻿using m3nuxa.App;
 using System.Reflection;
 
 if (args.Length == 2 && args[0] == "--open-folder")
@@ -19,6 +19,7 @@ try
     WorkflowExecutionChecks.Run(root);
     AgentPipeWorkflowChecks.Run(root);
     LocalizationChecks.Run();
+    DropGeometryChecks.Run();
     EditorDraftChecks.Run();
     var path = Path.Combine(root, "config.json");
     var store = new ConfigStore(path);
@@ -53,6 +54,10 @@ try
     var first = store.CreateDraft();
     first.Config.Items.Add(new MenuNode { Name = "Work", Kind = MenuNodeKind.Group });
     Check(store.Apply(first).Success, "first apply");
+    var preservedVersion = store.Version;
+    File.Move(path, path + ".moved");
+    Check(!store.Reload().Success && store.Version == preservedVersion && store.Current.Items.Count == 1, "missing reload preserves active configuration");
+    File.Move(path + ".moved", path);
     var stale = store.CreateDraft();
     var next = store.CreateDraft();
     next.Config.Items.Add(new MenuNode { Name = "Other", Kind = MenuNodeKind.Group });

@@ -1,4 +1,4 @@
-<?xml version='1.0' encoding='utf-8'?>
+﻿<?xml version='1.0' encoding='utf-8'?>
 <root>
   <resheader name="resmimetype">
     <value>text/microsoft-resx</value>
@@ -304,4 +304,5 @@
   <data name="PanelActionDetails" xml:space="preserve"><value>Действие · шагов: {0}</value></data>
   <data name="PanelPath" xml:space="preserve"><value>Путь: {0}</value></data>
   <data name="LegacySettingsReadFailed" xml:space="preserve"><value>Не удалось перенести прежние настройки из файла {0}: {1}. Исправьте или восстановите этот файл и перезапустите приложение. Конфигурация не изменена.</value></data>
+  <data name="ConfigPathUnchecked" xml:space="preserve"><value>{0}: доступность пути будет проверена при выполнении действия: {1}</value></data>
 </root>

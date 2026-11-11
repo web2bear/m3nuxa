@@ -68,13 +68,16 @@ public partial class App : Application
             finally { Directory.Delete(pickerRoot, true); }
             await page.CheckPropertyPanelLayoutAsync();
             await page.CheckContextVariablesAsync();
+            await page.CheckIconSelectionAsync();
             await page.CheckWorkflowStepsAsync();
             await page.CheckTreeIconConsistencyAsync();
             await page.CheckExplorerIconsAsync();
+            page.CheckDropAtRelease(showPreview: false);
+            page.CheckDropAtRelease(showPreview: true);
             await page.CheckTreeReorderAsync();
             page.CheckApplyAvailability();
             await page.CheckShortcutRecordingAsync();
-            await File.WriteAllTextAsync(resultPath, "PASS: context variables and button order, icons, tree reorder, apply availability; real shortcut recording, release-to-commit, Undo/Redo, Esc, duplicate conflict, sent shortcut, selection cancellation, clear.");
+            await File.WriteAllTextAsync(resultPath, "PASS: icon dialog preview, color-only confirmation, cancellation, Explorer, file errors and Undo; context variables and button order, icons, tree reorder, apply availability; real shortcut recording, release-to-commit, Undo/Redo, Esc, duplicate conflict, sent shortcut, selection cancellation, clear.");
             Environment.Exit(0);
         }
         catch (Exception ex)
