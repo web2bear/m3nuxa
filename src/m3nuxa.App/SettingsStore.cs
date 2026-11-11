@@ -2,13 +2,6 @@ using System.Text.Json;
 
 namespace m3nuxa.App;
 
-public sealed record AppSettings
-{
-    public string MainHotkey { get; init; } = "Ctrl+Alt+Space";
-    public double MenuFontSize { get; init; } = 12;
-    public string Language { get; init; } = "en-US";
-}
-
 public sealed class SettingsStore
 {
     private readonly string path;
@@ -33,6 +26,8 @@ public sealed class SettingsStore
     {
         "Settings/EmptyFile" => "The settings file is empty.",
         "Settings/InvalidShortcut" => "The menu shortcut is invalid.",
+        "Settings/InvalidPanelShortcut" => "The panel shortcut is invalid.",
+        "Settings/InvalidPanelPosition" => "The panel position is invalid.",
         "Settings/InvalidFontSize" => "The font size must be between 10 and 24.",
         _ => throw new ArgumentOutOfRangeException(nameof(key))
     };
@@ -41,6 +36,10 @@ public sealed class SettingsStore
         localize ??= DefaultMessage;
         if (value.MainHotkey is null || (value.MainHotkey.Length > 0 && !HotkeyParser.TryParse(value.MainHotkey, out _, out _)))
             throw new InvalidDataException(localize("Settings/InvalidShortcut"));
+        if (value.PanelHotkey is null || (value.PanelHotkey.Length > 0 && !HotkeyParser.TryParse(value.PanelHotkey, out _, out _)))
+            throw new InvalidDataException(localize("Settings/InvalidPanelShortcut"));
+        if (value.PanelPosition is not ("Center" or "Cursor"))
+            throw new InvalidDataException(localize("Settings/InvalidPanelPosition"));
         if (!double.IsFinite(value.MenuFontSize) || value.MenuFontSize < 10 || value.MenuFontSize > 24)
             throw new InvalidDataException(localize("Settings/InvalidFontSize"));
     }

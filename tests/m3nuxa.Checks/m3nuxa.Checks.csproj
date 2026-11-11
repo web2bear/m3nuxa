@@ -8,7 +8,7 @@
   </PropertyGroup>
   <ItemGroup><EmbeddedResource Include="../../src/m3nuxa.App/Strings/en-US/Resources.resw" LogicalName="Test.Resources.resw" /><EmbeddedResource Include="../../src/m3nuxa.App/Strings/en-US/Settings.resw" LogicalName="Test.Settings.resw" /><Compile Include="../../src/m3nuxa.App/SettingsStore.cs" Link="SettingsStore.cs" /><Compile Include="../../src/m3nuxa.App/ConfigModels.cs" Link="ConfigModels.cs" /><Compile Include="../../src/m3nuxa.App/ConfigStore.cs" Link="ConfigStore.cs" /><Compile Include="../../src/m3nuxa.App/ItemIcon.cs" Link="ItemIcon.cs" /><Compile Include="../../src/m3nuxa.App/HotkeyParser.cs" Link="HotkeyParser.cs" /><PackageReference Include="System.Drawing.Common" Version="9.0.6" /></ItemGroup>
   <ItemGroup><Compile Include="../../src/m3nuxa.App/Actions/**/*.cs" Exclude="../../src/m3nuxa.App/Actions/Files/FileOperationProgressDialog.cs" Link="Actions/%(RecursiveDir)%(Filename)%(Extension)" /><Compile Include="../../src/m3nuxa.App/WorkflowExecutor.cs" Link="WorkflowExecutor.cs" /></ItemGroup>
-  <ItemGroup><Compile Include="../../src/m3nuxa.App/AgentPipe.cs" Link="AgentPipe.cs" /><Compile Include="../../src/m3nuxa.App/DevLog.cs" Link="DevLog.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../../src/m3nuxa.App/AgentPipe.cs" Link="AgentPipe.cs" /><Compile Include="../../src/m3nuxa.App/AgentPipeProtocol.cs" Link="AgentPipeProtocol.cs" /><Compile Include="../../src/m3nuxa.App/DevLog.cs" Link="DevLog.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../../src/m3nuxa.Editor/EditorDraft.cs" Link="EditorDraft.cs" /></ItemGroup>
   <ItemGroup>
     <Content Include="../../assets/icon-packs/Boxicons/bx-home.png" Link="icon-packs/Boxicons/bx-home.png" CopyToOutputDirectory="PreserveNewest" />

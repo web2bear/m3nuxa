@@ -10,13 +10,13 @@ internal sealed class ShellIntegration : IDisposable
     private readonly nint hwnd;
     private readonly SubclassProc callback;
     private readonly Action<bool> clicked;
-    private readonly Action<MenuNode?> hotkey;
-    private readonly Dictionary<int, MenuNode?> bindings = [];
+    private readonly Action<MenuNode?, bool> hotkey;
+    private readonly Dictionary<int, (MenuNode? Node, bool Panel)> bindings = [];
     private readonly uint taskbarCreated = RegisterWindowMessage("TaskbarCreated");
     private NotifyData data;
     private Action? balloonClicked;
     private readonly System.Drawing.Icon trayIcon;
-    public ShellIntegration(Window window, Action<bool> clicked, Action<MenuNode?> hotkey)
+    public ShellIntegration(Window window, Action<bool> clicked, Action<MenuNode?, bool> hotkey)
     {
         hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
         // Keep the flyout owner invisible; popup windows have their own surfaces.
@@ -41,20 +41,20 @@ internal sealed class ShellIntegration : IDisposable
             if (message == taskbarCreated) AddIcon();
             if (message == 0x8001 && (int)lparam is 0x202 or 0x205) clicked((int)lparam == 0x205);
             if (message == 0x8001 && (int)lparam == 0x405) balloonClicked?.Invoke();
-            if (message == 0x312 && bindings.TryGetValue((int)wparam, out var node)) hotkey(node);
+            if (message == 0x312 && bindings.TryGetValue((int)wparam, out var node)) hotkey(node.Node, node.Panel);
         }
         catch (Exception ex) { DevLog.Write("shell", "Callback failed", ex); }
         return DefSubclassProc(window, message, wparam, lparam);
     }
-    public List<string> Register(IEnumerable<(string Hotkey, MenuNode? Node)> items)
+    public List<string> Register(IEnumerable<(string Hotkey, MenuNode? Node, bool Panel)> items)
     {
         foreach (var id in bindings.Keys) UnregisterHotKey(hwnd, id);
         bindings.Clear();
         var unavailable = new List<string>(); int next = 0;
-        foreach (var (text, node) in items)
+        foreach (var (text, node, panel) in items)
         {
             if (!HotkeyParser.TryParse(text, out var modifiers, out var key) || !RegisterHotKey(hwnd, ++next, modifiers | 0x4000, key)) unavailable.Add(text);
-            else bindings.Add(next, node);
+            else bindings.Add(next, (node, panel));
         }
         return unavailable;
     }

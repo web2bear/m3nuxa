@@ -300,4 +300,8 @@ Cancel — exit.</value>
   <data name="WorkflowKindDelay" xml:space="preserve"><value>Delay</value></data>
   <data name="WorkflowKindSetClipboardText" xml:space="preserve"><value>Set clipboard text</value></data>
   <data name="WorkflowKindPasteText" xml:space="preserve"><value>Paste text</value></data>
+  <data name="PanelGroupDetails" xml:space="preserve"><value>Group · items: {0}</value></data>
+  <data name="PanelActionDetails" xml:space="preserve"><value>Action · steps: {0}</value></data>
+  <data name="PanelPath" xml:space="preserve"><value>Path: {0}</value></data>
+  <data name="LegacySettingsReadFailed" xml:space="preserve"><value>Could not migrate the previous settings file {0}: {1}. Repair or restore this file and restart the application. The configuration was not changed.</value></data>
 </root>

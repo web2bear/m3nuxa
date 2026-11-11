@@ -30,9 +30,12 @@ internal sealed class HotkeyCaptureConnection : IDisposable
                     using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
                     await pipe.ConnectAsync(timeout.Token);
                     connection = new HotkeyCaptureConnection(pipe);
-                    await connection.writer.WriteLineAsync("{\"operation\":\"captureHotkeys\"}");
+                    await connection.writer.WriteLineAsync(AgentPipeProtocol.CreateRequest("capture", "captureHotkeys").ToJsonString());
                     var response = await connection.reader.ReadLineAsync(timeout.Token);
-                    if (response != "{}") throw new IOException(L.Get("Editor_TheTrayApplicationDoesNot_3ebdc0"));
+                    var envelope = response is null ? null : System.Text.Json.Nodes.JsonNode.Parse(response)?.AsObject();
+                    if (envelope?["protocolVersion"]?.GetValue<int>() != AgentPipeProtocol.Version ||
+                        envelope["success"]?.GetValue<bool>() != true)
+                        throw new IOException(envelope?["error"]?["message"]?.GetValue<string>() ?? L.Get("Editor_TheTrayApplicationDoesNot_3ebdc0"));
                     return connection;
                 }
                 catch (Exception ex) when (ex is IOException or OperationCanceledException)
@@ -44,8 +47,12 @@ internal sealed class HotkeyCaptureConnection : IDisposable
     public async Task CompleteAsync()
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-        await writer.WriteLineAsync("stop");
-        if (await reader.ReadLineAsync(timeout.Token) is null) throw new IOException(L.Get("Editor_TheConnectionToTheTray_0e8bf1"));
+        await writer.WriteLineAsync(AgentPipeProtocol.CreateRequest("capture", "stopCapture").ToJsonString());
+        var response = await reader.ReadLineAsync(timeout.Token);
+        var envelope = response is null ? null : System.Text.Json.Nodes.JsonNode.Parse(response)?.AsObject();
+        if (envelope?["protocolVersion"]?.GetValue<int>() != AgentPipeProtocol.Version ||
+            envelope["success"]?.GetValue<bool>() != true)
+            throw new IOException(envelope?["error"]?["message"]?.GetValue<string>() ?? L.Get("Editor_TheConnectionToTheTray_0e8bf1"));
     }
     public void Dispose()
     {

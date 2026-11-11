@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Nodes;
 using m3nuxa.App;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
@@ -45,7 +46,6 @@ public sealed partial class MainPage : Page
     private string? copiedNode;
     private string? cutNodeId;
     private ShortcutEditor? activeShortcut;
-    private string currentMainHotkey = "";
     private readonly Dictionary<ShortcutEditor, Func<string>> globalShortcuts = [];
     private readonly HashSet<string> unavailableHotkeys = [];
 
@@ -70,6 +70,12 @@ public sealed partial class MainPage : Page
         AddTreeAccelerator(Windows.System.VirtualKey.V, Windows.System.VirtualKeyModifiers.Control | Windows.System.VirtualKeyModifiers.Shift, PasteClicked);
         AddTreeAccelerator(Windows.System.VirtualKey.F2, Windows.System.VirtualKeyModifiers.None, RenameClicked);
         AddTreeAccelerator(Windows.System.VirtualKey.Delete, Windows.System.VirtualKeyModifiers.None, DeleteClicked);
+        foreach (var (key, handler) in new (Windows.System.VirtualKey, RoutedEventHandler)[] { (Windows.System.VirtualKey.Z, UndoClicked), (Windows.System.VirtualKey.Y, RedoClicked) })
+        {
+            var accelerator = new KeyboardAccelerator { Key = key, Modifiers = Windows.System.VirtualKeyModifiers.Control, ScopeOwner = SettingsPage };
+            accelerator.Invoked += (_, args) => { handler(SettingsPage, null!); args.Handled = true; };
+            SettingsPage.KeyboardAccelerators.Add(accelerator);
+        }
         MenuTree.AddHandler(RightTappedEvent, new RightTappedEventHandler(MenuTreeRightTapped), true);
         MenuPanel.AddHandler(DragOverEvent, new DragEventHandler(MenuTreeDragOver), true);
         MenuPanel.AddHandler(DropEvent, new DragEventHandler(MenuTreeDrop), true);
@@ -113,10 +119,77 @@ public sealed partial class MainPage : Page
         }
     }
 
-    private async void SettingsClicked(object sender, RoutedEventArgs args)
+    private void SettingsClicked(object sender, RoutedEventArgs args) => ShowSettings();
+    private void MenuSectionClicked(object sender, RoutedEventArgs args) => ShowMenuSection();
+
+    public void ShowSettings()
     {
-        var response = await client.SendAsync("openSettings");
-        if (!response.Success) ShowNotice(response.Message ?? L.Get("Editor_CouldNotOpenSettings_4fcb94"), InfoBarSeverity.Error);
+        if (activeShortcut is not null) { _ = activeShortcut.StopAsync(); activeShortcut = null; }
+        WorkspaceGrid.Visibility = Visibility.Collapsed;
+        SettingsPage.Visibility = Visibility.Visible;
+        OpenSettingsButton.Visibility = Visibility.Collapsed;
+        OpenMenuButton.Visibility = Visibility.Visible;
+        if (draftReady) RenderSettings();
+    }
+
+    private void ShowMenuSection()
+    {
+        if (activeShortcut is not null) { _ = activeShortcut.StopAsync(); activeShortcut = null; }
+        SettingsPage.Visibility = Visibility.Collapsed;
+        WorkspaceGrid.Visibility = Visibility.Visible;
+        OpenSettingsButton.Visibility = Visibility.Visible;
+        OpenMenuButton.Visibility = Visibility.Collapsed;
+        RenderProperties();
+    }
+
+    private void RenderSettings()
+    {
+        rendering = true;
+        try
+        {
+            globalShortcuts.Clear();
+            SettingsContents.Children.Clear();
+            SettingsContents.Children.Add(new TextBlock { Text = L.Get("Editor_Settings_7f17c7"), FontSize = 22, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+            SettingsContents.Children.Add(new TextBlock { Text = L.Get("Editor_SettingsDraftHint"), TextWrapping = TextWrapping.Wrap, Opacity = .7 });
+            var language = new ComboBox { Header = L.Get("Editor_SettingsLanguage"), HorizontalAlignment = HorizontalAlignment.Stretch };
+            language.Items.Add("English"); language.Items.Add("Русский");
+            language.SelectedIndex = config.Settings.Language == "ru-RU" ? 1 : 0;
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(language, "SettingsLanguage");
+            language.SelectionChanged += (_, _) =>
+            {
+                if (rendering || language.SelectedIndex < 0) return;
+                var value = language.SelectedIndex == 1 ? "ru-RU" : "en-US";
+                if (config.Settings.Language == value) return;
+                Remember(); config.Settings = config.Settings with { Language = value }; MarkDirty();
+            };
+            SettingsContents.Children.Add(language);
+            SettingsContents.Children.Add(CreateShortcutEditor("SettingsHotkey", L.Get("Editor_SettingsMenuShortcut"), "",
+                () => config.Settings.MainHotkey, value => config.Settings = config.Settings with { MainHotkey = value }, null, main: true));
+            SettingsContents.Children.Add(CreateShortcutEditor("SettingsPanelHotkey", L.Get("Editor_SettingsPanelShortcut"), "",
+                () => config.Settings.PanelHotkey, value => config.Settings = config.Settings with { PanelHotkey = value }, null, panel: true));
+            var position = new ComboBox { Header = L.Get("Editor_SettingsPanelPosition"), HorizontalAlignment = HorizontalAlignment.Stretch };
+            position.Items.Add(L.Get("Editor_SettingsPositionCenter")); position.Items.Add(L.Get("Editor_SettingsPositionCursor"));
+            position.SelectedIndex = config.Settings.PanelPosition == "Cursor" ? 1 : 0;
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(position, "SettingsPanelPosition");
+            position.SelectionChanged += (_, _) =>
+            {
+                if (rendering || position.SelectedIndex < 0) return;
+                var value = position.SelectedIndex == 1 ? "Cursor" : "Center";
+                if (config.Settings.PanelPosition == value) return;
+                Remember(); config.Settings = config.Settings with { PanelPosition = value }; MarkDirty();
+            };
+            SettingsContents.Children.Add(position);
+            var font = new NumberBox { Header = L.Get("Editor_SettingsFontSize"), Minimum = 10, Maximum = 24, SmallChange = 1,
+                SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact, Value = config.Settings.MenuFontSize };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(font, "MenuFontSize");
+            font.ValueChanged += (_, _) =>
+            {
+                if (rendering || !double.IsFinite(font.Value) || font.Value == config.Settings.MenuFontSize) return;
+                Remember(); config.Settings = config.Settings with { MenuFontSize = font.Value }; MarkDirty();
+            };
+            SettingsContents.Children.Add(font);
+        }
+        finally { rendering = false; }
     }
 
     private async void MainPageLoaded(object sender, RoutedEventArgs args) => await LoadCurrentAsync();
@@ -135,6 +208,7 @@ public sealed partial class MainPage : Page
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { ShowNotice(ex.Message, InfoBarSeverity.Warning); }
         draftReady = true;
         RefreshTree();
+        if (SettingsPage.Visibility == Visibility.Visible) RenderSettings();
         if (pendingSelection is not null) { SelectMenuItem(pendingSelection); pendingSelection = null; }
         UpdateApplyState();
         ShowHotkeyAvailability(await client.ReadAsync());
@@ -160,6 +234,7 @@ public sealed partial class MainPage : Page
     public void SelectMenuItem(string id)
     {
         if (!draftReady) { pendingSelection = id; return; }
+        ShowMenuSection();
         var node = FindTreeNode(MenuTree.RootNodes, id);
         if (node is null) { ShowNotice(L.Get("Editor_SelectionNotInDraft"), InfoBarSeverity.Warning); return; }
         for (var parent = node.Parent; parent is not null; parent = parent.Parent) parent.IsExpanded = true;
@@ -527,21 +602,16 @@ public sealed partial class MainPage : Page
     }
 
     private ShortcutEditor CreateShortcutEditor(string id, string label, string help, Func<string> getter, Action<string> setter,
-        string? itemId, bool main = false, bool sent = false)
+        string? itemId, bool main = false, bool sent = false, bool panel = false)
     {
         ShortcutEditor field = null!;
         field = new ShortcutEditor(id, label, help, getter, value =>
         {
             if (getter() == value) return;
             Remember(); setter(value); MarkDirty();
-        }, value => sent ? null : FindHotkeyConflict(value, itemId, main), async () =>
+        }, value => sent ? null : FindHotkeyConflict(value, itemId, main, panel), async () =>
         {
             if (activeShortcut is not null && activeShortcut != field) await activeShortcut.StopAsync();
-            if (!sent)
-            {
-                var response = await client.ReadAsync();
-                if (response.Success) currentMainHotkey = response.Data?["mainHotkey"]?.GetValue<string>() ?? "";
-            }
             activeShortcut = field;
         });
         if (!sent)
@@ -554,10 +624,11 @@ public sealed partial class MainPage : Page
 
     private static string CanonicalHotkey(string value) => HotkeyParser.TryParse(value, out var modifiers, out var key) ? $"{modifiers}:{key}" : value;
 
-    private string? FindHotkeyConflict(string value, string? itemId, bool main)
+    private string? FindHotkeyConflict(string value, string? itemId, bool main, bool panel = false)
     {
         var key = CanonicalHotkey(value);
-        if (!main && currentMainHotkey.Length > 0 && key == CanonicalHotkey(currentMainHotkey)) return L.Get("Editor_AlreadyAssignedToOpenThe_c893d7");
+        if (!main && config.Settings.MainHotkey.Length > 0 && key == CanonicalHotkey(config.Settings.MainHotkey)) return L.Get("Editor_AlreadyAssignedToOpenThe_c893d7");
+        if (!panel && config.Settings.PanelHotkey.Length > 0 && key == CanonicalHotkey(config.Settings.PanelHotkey)) return L.Get("Editor_SettingsPanelConflict");
         return Visit(config.Items, "");
         string? Visit(IEnumerable<MenuNode> nodes, string parent)
         {
@@ -1095,9 +1166,9 @@ public sealed partial class MainPage : Page
     private void DeleteClicked(object sender, RoutedEventArgs args)
     { if (selected is null || !draftState.Delete(selected.Id)) return; MarkDirty(); RefreshTree(); }
     private void UndoClicked(object sender, RoutedEventArgs args)
-    { var id = selected?.Id; if (!draftState.Undo()) return; ShowConfigurationTitle(activeConfigurationPath); MarkDirty(); RefreshTree(id); }
+    { var id = selected?.Id; if (!draftState.Undo()) return; ShowConfigurationTitle(activeConfigurationPath); MarkDirty(); RefreshTree(id); if (SettingsPage.Visibility == Visibility.Visible) RenderSettings(); }
     private void RedoClicked(object sender, RoutedEventArgs args)
-    { var id = selected?.Id; if (!draftState.Redo()) return; ShowConfigurationTitle(activeConfigurationPath); MarkDirty(); RefreshTree(id); }
+    { var id = selected?.Id; if (!draftState.Redo()) return; ShowConfigurationTitle(activeConfigurationPath); MarkDirty(); RefreshTree(id); if (SettingsPage.Visibility == Visibility.Visible) RenderSettings(); }
 
     private async void ApplyClicked(object sender, RoutedEventArgs args) => await ApplyAsync();
     private async Task<bool> ApplyAsync(string? destinationPath = null)
@@ -1105,7 +1176,7 @@ public sealed partial class MainPage : Page
         if (activeShortcut is not null) await activeShortcut.StopAsync();
         if (!draftReady && !await RestoreDraftAsync()) return false;
         var staged = await client.ReplaceDraftAsync(config);
-        if (!staged.Success && staged.Message == "Сначала вызовите begin.")
+        if (!staged.Success && staged.ErrorCode == "draft_not_started")
         {
             draftReady = false;
             if (!await RestoreDraftAsync()) return false;
@@ -1118,7 +1189,7 @@ public sealed partial class MainPage : Page
         draftReady = false;
         var begin = await client.BeginAsync();
         var draft = EditorPipeClient.ReadDraft(begin);
-        if (draft is not null) { UpdateConfigurationTitle(begin); draftState.Reset(draft.Config); draftReady = true; RefreshTree(selected?.Id); }
+        if (draft is not null) { UpdateConfigurationTitle(begin); draftState.Reset(draft.Config); draftReady = true; RefreshTree(selected?.Id); if (SettingsPage.Visibility == Visibility.Visible) RenderSettings(); }
         else draftState.SetBaseline();
         UpdateApplyState(); Notice.IsOpen = false;
         var warnings = response.Data?["Validation"]?["Warnings"]?.Deserialize<string[]>() ?? [];
@@ -1157,8 +1228,11 @@ public sealed partial class MainPage : Page
                 await LoadCurrentAsync();
                 return;
             }
-            var loaded = JsonSerializer.Deserialize<AppConfig>(await File.ReadAllTextAsync(file.Path), JsonOptions) ?? throw new InvalidDataException(L.Get("Editor_TheFileDoesNotContain_2469d6"));
+            var loadResponse = await client.SendAsync("loadConfig", new JsonObject { ["path"] = file.Path });
+            if (!loadResponse.Success) { ShowNotice(loadResponse.Message ?? L.Get("Editor_TheFileDoesNotContain_2469d6"), InfoBarSeverity.Error); return; }
+            var loaded = loadResponse.Data?["config"]?.Deserialize<AppConfig>(JsonOptions) ?? throw new InvalidDataException(L.Get("Editor_TheFileDoesNotContain_2469d6"));
             Remember(); config = loaded; MarkDirty(); RefreshTree();
+            if (SettingsPage.Visibility == Visibility.Visible) RenderSettings();
             ShowConfigurationTitle(file.Path);
         }
         catch (Exception ex) { ShowNotice(ex.Message, InfoBarSeverity.Error); }

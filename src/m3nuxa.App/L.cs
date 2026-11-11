@@ -52,17 +52,38 @@ public static class L
     {
         try
         {
-            var path = Path.Combine(AppContext.BaseDirectory, "settings.json");
-            if (!File.Exists(path)) return DefaultLanguage;
-            using var json = JsonDocument.Parse(File.ReadAllText(path));
-            if (json.RootElement.ValueKind == JsonValueKind.Object &&
-                json.RootElement.TryGetProperty("Language", out var language) && language.ValueKind == JsonValueKind.String &&
-                string.Equals(language.GetString(), "ru-RU", StringComparison.OrdinalIgnoreCase)) return "ru-RU";
+            // Both executables read the active configuration before their UI is created.
+            // Legacy installations retain settings.json until their first apply.
+            var selection = Path.Combine(AppContext.BaseDirectory, "active-config.txt");
+            var path = Path.Combine(AppContext.BaseDirectory, "config.json");
+            if (File.Exists(selection))
+            {
+                var selected = File.ReadAllText(selection).Trim();
+                if (!string.IsNullOrWhiteSpace(selected)) path = Path.GetFullPath(selected, AppContext.BaseDirectory);
+            }
+            if (File.Exists(path))
+            {
+                using var json = JsonDocument.Parse(File.ReadAllText(path));
+                if (json.RootElement.ValueKind == JsonValueKind.Object &&
+                    json.RootElement.TryGetProperty("Settings", out var settings))
+                    return LanguageFrom(settings);
+            }
+            var legacy = Path.Combine(AppContext.BaseDirectory, "settings.json");
+            if (File.Exists(legacy))
+            {
+                using var json = JsonDocument.Parse(File.ReadAllText(legacy));
+                return LanguageFrom(json.RootElement);
+            }
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException or NotSupportedException)
         {
             System.Diagnostics.Debug.WriteLine($"Could not read UI language: {ex.Message}");
         }
         return DefaultLanguage;
     }
+
+    private static string LanguageFrom(JsonElement settings) =>
+        settings.ValueKind == JsonValueKind.Object && settings.TryGetProperty("Language", out var language) &&
+        language.ValueKind == JsonValueKind.String && string.Equals(language.GetString(), "ru-RU", StringComparison.OrdinalIgnoreCase)
+            ? "ru-RU" : DefaultLanguage;
 }

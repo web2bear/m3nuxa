@@ -16,6 +16,11 @@ public partial class App : Microsoft.UI.Xaml.Application
         catch (Exception ex) { MessageBox.Show(ex.Message, "m3nuxa", MessageBoxButtons.OK, MessageBoxIcon.Error); Exit(); return; }
         ConfigStore store;
         try { store = new ConfigStore(selectionFile: selectionFile); }
+        catch (LegacySettingsException ex)
+        {
+            MessageBox.Show(ex.Message, "m3nuxa", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            Exit(); return;
+        }
         catch (Exception ex) when (ex is InvalidDataException or System.Text.Json.JsonException)
         {
             var choice = MessageBox.Show(L.Format("AppInvalidConfig", path, ex.Message),
@@ -44,6 +49,7 @@ public partial class App : Microsoft.UI.Xaml.Application
                 Exit(); return;
             }
         }
+        L.SetLanguage(store.Current.Settings.Language);
         try { tray = new TrayApplication(store); }
         catch (Exception ex) { DevLog.Write("app", "Fatal UI error", ex); throw; }
 
