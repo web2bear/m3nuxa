@@ -5,6 +5,10 @@
  New-Item -ItemType Directory -Path (Join-Path $fixture 'DropFolder') -Force | Out-Null
  Set-Content -LiteralPath (Join-Path $fixture 'DropFile.cmd') -Value '@exit /b 0'
  Set-Content -LiteralPath (Join-Path $fixture 'Document.txt') -Value 'test'
+ $previousState = $env:m3nuxa_DROP_CHECK
+ $previousLanguage = $env:m3nuxa_CHECK_LANGUAGE
+ $settings = Join-Path $out 'settings.json'
+ $originalSettings = if (Test-Path -LiteralPath $settings) { [IO.File]::ReadAllBytes($settings) } else { $null }
  $env:m3nuxa_DROP_CHECK = $state
  $editor = $null; $explorerWindow = $null
  Add-Type 'using System; using System.Runtime.InteropServices; public static class DropTestWindows { [DllImport("user32.dll")] public static extern bool MoveWindow(IntPtr h, int x, int y, int width, int height, bool repaint); [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h); [DllImport("user32.dll")] public static extern bool BringWindowToTop(IntPtr h); }'
@@ -21,6 +25,8 @@
  try {
      dotnet build (Join-Path $PSScriptRoot 'm3nuxa.Editor.Checks.csproj') -c Release -p:Platform=x64 -p:PublishReadyToRun=false -o $out
      if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
+     $env:m3nuxa_CHECK_LANGUAGE = 'en-US'
+     [IO.File]::WriteAllText($settings, '{"Language":"en-US"}')
      $editor = Start-Process (Join-Path $out 'm3nuxa.Editor.Checks.exe') -PassThru
      for ($i=0; $i -lt 50 -and (!(Test-Path $state) -or $editor.MainWindowHandle -eq 0); $i++) { Start-Sleep -Milliseconds 200; $editor.Refresh() }
      if (!(Test-Path $state) -or $editor.MainWindowHandle -eq 0) { throw 'Test editor did not start.' }
@@ -53,14 +59,17 @@
          for ($i=0; $i -lt 30; $i++) {
              Start-Sleep -Milliseconds 200
              try { $config = Get-Content -Raw -LiteralPath $state | ConvertFrom-Json } catch { continue }
-             if (@($config.Items[0].Children | Where-Object { $_.Action.Path -eq $expected }).Count -eq 1) { $found = $true; break }
+             if (@($config.Items[0].Children | Where-Object { $_.Steps -and $_.Steps[0].Path -eq $expected }).Count -eq 1) { $found = $true; break }
          }
          if (!$found) { throw "Drop failed: $name was not added to group with its original path." }
-        if ($name -eq "Document.txt" -and @($config.Items[0].Children | Where-Object { $_.Action.Path -eq $expected -and $_.Action.Kind -eq "OpenItem" }).Count -ne 1) { throw "Document was not assigned OpenItem." }
+         if ($name -eq "Document.txt" -and @($config.Items[0].Children | Where-Object { $_.Steps -and $_.Steps[0].Path -eq $expected -and $_.Steps[0].Kind -eq "OpenItem" }).Count -ne 1) { throw "Document was not assigned OpenItem." }
          Write-Host "PASS: Explorer drop $name into group"
      }
  } finally {
-     Remove-Item Env:m3nuxa_DROP_CHECK -ErrorAction SilentlyContinue
+     $env:m3nuxa_DROP_CHECK = $previousState
+     $env:m3nuxa_CHECK_LANGUAGE = $previousLanguage
+     if ($null -eq $originalSettings) { Remove-Item -LiteralPath $settings -Force -ErrorAction SilentlyContinue }
+     else { [IO.File]::WriteAllBytes($settings, $originalSettings) }
      if ($editor -and !$editor.HasExited) { Stop-Process -Id $editor.Id }
      if ($explorerWindow) { $shell = New-Object -ComObject Shell.Application; foreach ($window in $shell.Windows()) { if ($window.HWND -eq $explorerWindow.hwnd) { $window.Quit() } } }
      Remove-Item -LiteralPath $fixture -Recurse -Force -ErrorAction SilentlyContinue

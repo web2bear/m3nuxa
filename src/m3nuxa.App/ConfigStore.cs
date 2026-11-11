@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Keys = Windows.System.VirtualKey;
@@ -97,6 +97,8 @@ public sealed class ConfigStore
         {
             try
             {
+                if (!File.Exists(path) && diskFingerprint is not null)
+                    return new(false, $"Configuration file not found: {path}");
                 var candidate = File.Exists(path) ? ReadConfig(path, Path.Combine(SettingsDirectory, "settings.json")) : new AppConfig();
                 var check = Validate(candidate);
                 if (!check.IsValid) return new(false, $"{path}: {string.Join("; ", check.Errors)}");
@@ -357,11 +359,9 @@ public sealed class ConfigStore
             }
             if (string.IsNullOrWhiteSpace(action.Path)) { errors.Add(L.Format("ConfigPathRequired", label)); return; }
             if (action.Kind == ActionKind.OpenItem && Uri.TryCreate(action.Path, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https") return;
-            if (action.Kind is ActionKind.OpenItem or ActionKind.OpenFolder or ActionKind.RunProgram or ActionKind.RunScript or ActionKind.CopySelection or ActionKind.MoveSelection)
-            {
-                if (!action.Path.Contains('{') && !File.Exists(action.Path) && !Directory.Exists(action.Path))
-                    warnings.Add(L.Format("ConfigPathUnavailable", label, action.Path));
-            }
+            // Path checks can block on network I/O. Preserve a warning until execution verifies availability.
+            if (!action.Path.Contains('{'))
+                warnings.Add(L.Format("ConfigPathUnchecked", label, action.Path));
         }
     }
 

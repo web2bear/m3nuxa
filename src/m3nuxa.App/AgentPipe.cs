@@ -1,4 +1,4 @@
-using System.IO.Pipes;
+﻿using System.IO.Pipes;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -14,6 +14,7 @@ internal sealed class AgentPipe : IDisposable
     private readonly SynchronizationContext _ui;
     private readonly CancellationTokenSource _stop = new();
     private readonly Dictionary<string, ConfigDraft> _drafts = [];
+    private readonly Dictionary<string, DateTime> _draftActivity = [];
     private readonly Func<bool, IReadOnlyList<string>>? _captureHotkeys;
     private int _captureConnections;
     private readonly Func<IReadOnlyList<string>>? _hotkeyStatus;
@@ -213,6 +214,12 @@ internal sealed class AgentPipe : IDisposable
         var operation = request["operation"]?.GetValue<string>() ?? throw new ArgumentException("The operation field is required.");
         DevLog.Write("app-pipe", $"Handling {operation}");
         var args = request["arguments"] as JsonObject ?? new JsonObject();
+        foreach (var expired in _draftActivity.Where(pair => pair.Key.StartsWith("mcp-", StringComparison.Ordinal) && DateTime.UtcNow - pair.Value > TimeSpan.FromMinutes(30)).Select(pair => pair.Key).ToArray())
+        {
+            _drafts.Remove(expired);
+            _draftActivity.Remove(expired);
+        }
+        if (_drafts.ContainsKey(session)) _draftActivity[session] = DateTime.UtcNow;
         return operation switch
         {
             "openSettings" => OpenSettingsRequest(),
@@ -250,7 +257,11 @@ internal sealed class AgentPipe : IDisposable
     private JsonNode BeginDraft(string session)
     {
         var draft = _store.CreateDraft();
+        if (session.StartsWith("mcp-", StringComparison.Ordinal) && !_drafts.ContainsKey(session) &&
+            _drafts.Keys.Count(key => key.StartsWith("mcp-", StringComparison.Ordinal)) >= 32)
+            throw new ProtocolException("draft_limit", "Too many active drafts. Discard an unused draft first.");
         _drafts[session] = draft;
+        _draftActivity[session] = DateTime.UtcNow;
         return JsonSerializer.SerializeToNode(new
         {
             version = draft.BaseVersion,
@@ -262,7 +273,7 @@ internal sealed class AgentPipe : IDisposable
     private JsonNode ReloadConfiguration()
     {
         var result = _store.Reload();
-        if (result.Success) { _drafts.Clear(); _applied(); }
+        if (result.Success) { _drafts.Clear(); _draftActivity.Clear(); _applied(); }
         var response = JsonSerializer.SerializeToNode(result, JsonOptions)!;
         response["unavailableHotkeys"] = JsonSerializer.SerializeToNode(_hotkeyStatus?.Invoke(), JsonOptions);
         return response;
@@ -276,6 +287,7 @@ internal sealed class AgentPipe : IDisposable
         return operation switch
         {
             "replaceDraft" => ReplaceDraft(draft, args),
+            "discard" => DiscardDraft(session),
             "validate" => ValidateDraft(draft),
             "apply" => ApplyDraft(session, draft),
             "saveAs" => SaveDraftAs(session, draft, args),
@@ -286,6 +298,13 @@ internal sealed class AgentPipe : IDisposable
             "move" => MoveMenuItem(draft.Config.Items, args),
             _ => throw new ProtocolException("unknown_operation", $"Unknown operation: {operation}")
         };
+    }
+
+    private JsonNode DiscardDraft(string session)
+    {
+        _drafts.Remove(session);
+        _draftActivity.Remove(session);
+        return new JsonObject();
     }
 
     private static JsonNode ReplaceDraft(ConfigDraft draft, JsonObject args)
@@ -313,7 +332,7 @@ internal sealed class AgentPipe : IDisposable
             return JsonSerializer.SerializeToNode(ApplyResult.Failed(error, validation), JsonOptions)!;
 
         var result = destinationPath is null ? _store.Apply(draft) : _store.SaveAs(draft, destinationPath);
-        if (result.Success) { _drafts.Remove(session); _applied(); }
+        if (result.Success) { _drafts.Remove(session); _draftActivity.Remove(session); _applied(); }
         var response = JsonSerializer.SerializeToNode(result, JsonOptions)!;
         response["unavailableHotkeys"] = JsonSerializer.SerializeToNode(_hotkeyStatus?.Invoke(), JsonOptions);
         return response;

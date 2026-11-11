@@ -36,9 +36,6 @@ public sealed partial class MainPage : Page
     private DragEscapeMonitor? dragEscapeMonitor;
     private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer dropIndicatorTimer;
     private readonly Brush dropAccent;
-    private string? dropTargetId;
-    private int dropTargetZone;
-    private bool dropIndicatorValid;
     private bool dragOverLogged;
     private bool draftReady;
     private string? pendingSelection;
@@ -749,97 +746,33 @@ public sealed partial class MainPage : Page
 
     private async Task ChooseBundledIconAsync(MenuNode item)
     {
-        var folder = Path.Combine(AppContext.BaseDirectory, "icon-packs", "Boxicons");
-        string[] icons;
-        try
-        {
-            icons = Directory.Exists(folder)
-                ? Directory.GetFiles(folder, "*.png").OrderBy(Path.GetFileName).Select(path => new Uri(path).AbsoluteUri).ToArray()
-                : [];
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { icons = []; }
-        var search = new TextBox { PlaceholderText = L.Get("Icon_Search"), Margin = new Thickness(0, 0, 0, 8) };
-        var grid = new GridView { Height = 360, IsItemClickEnabled = true, SelectionMode = ListViewSelectionMode.None };
-        var selectedColor = item.IconColor is { Length: 7 } saved && saved[0] == '#' && uint.TryParse(saved.AsSpan(1), System.Globalization.NumberStyles.HexNumber, null, out _) ? saved : "#60A5FA";
-        var palette = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2, Margin = new Thickness(0, 0, 0, 8) };
-        var swatches = new List<(Button Button, string Color)>();
-        void SetColor(string color)
-        {
-            selectedColor = color;
-            grid.ItemTemplate = (DataTemplate)Microsoft.UI.Xaml.Markup.XamlReader.Load($"<DataTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'><BitmapIcon UriSource='{{Binding}}' ShowAsMonochrome='True' Foreground='{color}' Width='40' Height='40' ToolTipService.ToolTip='{{Binding}}'/></DataTemplate>");
-            foreach (var swatch in swatches) swatch.Button.BorderThickness = new Thickness(string.Equals(swatch.Color, color, StringComparison.OrdinalIgnoreCase) ? 2 : 0);
-        }
-        foreach (var color in new[] { "#E5E7EB", "#EF4444", "#F59E0B", "#EAB308", "#84CC16", "#22C55E", "#14B8A6", "#06B6D4", "#60A5FA", "#6366F1", "#A855F7", "#EC4899" })
-        {
-            var rgb = Convert.ToUInt32(color[1..], 16);
-            var swatch = new Button { Width = 30, Height = 30, MinWidth = 0, MinHeight = 0, Padding = new Thickness(3),
-                Content = new Border { Width = 18, Height = 18, CornerRadius = new CornerRadius(4), Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, (byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb)) } };
-            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(swatch, L.Get("Icon_Color") + " " + color);
-            ToolTipService.SetToolTip(swatch, color);
-            swatch.Click += (_, _) => SetColor(color);
-            swatches.Add((swatch, color)); palette.Children.Add(swatch);
-        }
-        var picker = new ColorPicker { IsAlphaEnabled = false, IsAlphaSliderVisible = false, IsAlphaTextInputVisible = false };
-        var initialRgb = Convert.ToUInt32(selectedColor[1..], 16);
-        picker.Color = Windows.UI.Color.FromArgb(255, (byte)(initialRgb >> 16), (byte)(initialRgb >> 8), (byte)initialRgb);
-        var colorFlyout = new Flyout { Content = picker };
-        colorFlyout.Opening += (_, _) =>
-        {
-            var rgb = Convert.ToUInt32(selectedColor[1..], 16);
-            picker.Color = Windows.UI.Color.FromArgb(255, (byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb);
-        };
-        var customColor = new Button { Content = L.Get("Icon_CustomColor"), Flyout = colorFlyout };
-        picker.ColorChanged += (_, args) => SetColor($"#{args.NewColor.R:X2}{args.NewColor.G:X2}{args.NewColor.B:X2}");
-        palette.Children.Add(customColor);
-        SetColor(selectedColor);
-        grid.ItemsSource = icons;
-        search.TextChanged += (_, _) => grid.ItemsSource = icons.Where(path => Path.GetFileNameWithoutExtension(path).Contains(search.Text.Trim(), StringComparison.OrdinalIgnoreCase)).ToArray();
-        var content = new StackPanel { Spacing = 8 };
-        var sources = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        var fileButton = new Button { Content = L.Get("Icon_ChooseFile") };
-        var explorerButton = new Button { Content = L.Get("Editor_UseExplorerIcon_838f6d") };
-        sources.Children.Add(fileButton); sources.Children.Add(explorerButton);
-        content.Children.Add(new ScrollViewer { Content = sources, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled });
-        content.Children.Add(new TextBlock { Text = L.Get("Icon_BundledHeading"), FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-        if (icons.Length == 0) content.Children.Add(new TextBlock { Text = L.Get("Icon_PackMissing"), TextWrapping = TextWrapping.Wrap });
-        else { content.Children.Add(search); content.Children.Add(new ScrollViewer { Content = palette, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled }); content.Children.Add(grid); }
-        var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = L.Get("Icon_ChooseBundled"), Content = content, CloseButtonText = L.Get("Editor_Cancel_0ec753") };
-        var sourceChoice = 0;
-        fileButton.Click += (_, _) => { sourceChoice = 1; dialog.Hide(); };
-        explorerButton.Click += (_, _) => { sourceChoice = 2; dialog.Hide(); };
-        grid.ItemClick += (_, args) =>
-        {
-            if (args.ClickedItem is not string path) return;
-            try
-            {
-                var relative = Path.GetRelativePath(AppContext.BaseDirectory, new Uri(path).LocalPath);
-                EnsureBundledIconAvailable(relative);
-                Remember(); item.IconPath = relative; item.IconColor = selectedColor; MarkDirty();
-                dialog.Hide(); RefreshTree(item.Id);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { dialog.Hide(); ShowNotice(ex.Message, InfoBarSeverity.Error); }
-        };
-        await dialog.ShowAsync();
-        if (sourceChoice == 2)
-        {
-            Remember(); item.IconPath = ""; item.IconColor = ""; MarkDirty(); RefreshTree(item.Id);
-        }
-        else if (sourceChoice == 1)
+        var selection = CreateIconSelectionDialog(item);
+        await selection.Dialog.ShowAsync();
+    }
+
+    private IconSelectionDialog CreateIconSelectionDialog(MenuNode item)
+    {
+        var selection = new IconSelectionDialog(item, XamlRoot, ActualHeight - 240, CreateItemIcon);
+        selection.Dialog.PrimaryButtonClick += (_, args) =>
         {
             try
             {
-                var path = new IconFilePicker(AppContext.BaseDirectory).Pick(WindowNative.GetWindowHandle(App.MainWindow));
-                if (path is null) return;
-                if (Path.GetExtension(path).ToLowerInvariant() is not (".exe" or ".dll"))
+                var path = selection.SelectedPath;
+                var color = selection.SelectedColor;
+                if (path == item.IconPath && color == item.IconColor) return;
+                if (selection.FileSelected && Path.GetExtension(path).ToLowerInvariant() is not (".exe" or ".dll"))
                 {
-                    var resources = Path.Combine(client.TrayDirectory ?? AppContext.BaseDirectory, "resources"); Directory.CreateDirectory(resources);
+                    var resources = Path.Combine(client.TrayDirectory ?? AppContext.BaseDirectory, "resources");
+                    Directory.CreateDirectory(resources);
                     var copy = Path.Combine(resources, Guid.NewGuid().ToString("N") + Path.GetExtension(path));
                     File.Copy(path, copy); path = copy;
                 }
-                Remember(); item.IconPath = path; item.IconColor = ""; MarkDirty(); RefreshTree(item.Id);
+                else if (!selection.FileSelected) EnsureBundledIconAvailable(path);
+                Remember(); item.IconPath = path; item.IconColor = color; MarkDirty(); RefreshTree(item.Id);
             }
-            catch (Exception ex) { ShowNotice(ex.Message, InfoBarSeverity.Error); }
-        }
+            catch (Exception ex) { args.Cancel = true; selection.ShowError(ex.Message); }
+        };
+        return selection;
     }
 
     private void EnsureBundledIconsAvailable(IEnumerable<MenuNode> items)
@@ -1093,7 +1026,7 @@ public sealed partial class MainPage : Page
         }
         if (errors.Count > 0) ShowNotice(string.Join("\n", errors), InfoBarSeverity.Warning);
     }
-    internal void AddExternalText(string text, bool isUrl, int x, int y)
+    internal void AddExternalText(string text, bool isUrl, double x, double y)
     {
         var (destination, index) = NativeDropDestination(x, y);
         if (index < 0) index = destination.Count;
@@ -1102,7 +1035,7 @@ public sealed partial class MainPage : Page
         draftState.Insert(destination, index, [node]); MarkDirty(); RefreshTree(node.Id);
     }
 
-    internal void AddDroppedPaths(IReadOnlyList<string> paths, int x, int y)
+    internal void AddDroppedPaths(IReadOnlyList<string> paths, double x, double y)
     {
         if (!DispatcherQueue.HasThreadAccess)
         {
@@ -1114,22 +1047,37 @@ public sealed partial class MainPage : Page
         ImportPaths(paths, destination, index);
     }
 
-    private (List<MenuNode>, int) NativeDropDestination(int x, int y, bool rootFallback = false)
+    private static DropBounds BoundsInWindow(FrameworkElement element)
+    {
+        var origin = element.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point());
+        return new(origin.X, origin.Y, element.ActualWidth, element.ActualHeight);
+    }
+
+    private IEnumerable<MenuDropRow> MenuDropRows()
     {
         foreach (var node in VisibleNodes(MenuTree.RootNodes))
         {
             if (MenuTree.ContainerFromNode(node) is not TreeViewItem container) continue;
-            var origin = container.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point());
-            if (x < origin.X || x > origin.X + container.ActualWidth || y < origin.Y || y > origin.Y + container.ActualHeight) continue;
             var model = Model(node);
-            var localY = y - origin.Y;
-            if (model.Kind == MenuNodeKind.Group && localY > container.ActualHeight / 3 && localY < container.ActualHeight * 2 / 3)
-                return (model.Children, model.Children.Count);
-            var siblings = node.Parent?.Content is NodeDisplay parent ? parent.Model.Children : config.Items;
-            return (siblings, siblings.IndexOf(model) + (localY >= container.ActualHeight / 2 ? 1 : 0));
+            yield return new(model.Id, model.Kind == MenuNodeKind.Group, BoundsInWindow(container));
         }
-        return (rootFallback ? config.Items : AddDestination(), -1);
     }
+
+    private MenuDropHit MenuHit(double x, double y) =>
+        DropGeometry.Menu(x, y, BoundsInWindow(MenuTree), MenuDropRows());
+
+    private (List<MenuNode> Items, int Index)? RowDestination(MenuDropHit hit)
+    {
+        if (hit.TargetId is not { } id || FindSiblings(config.Items, id) is not { } siblings) return null;
+        var index = siblings.FindIndex(node => node.Id == id);
+        var target = siblings[index];
+        return hit.Zone == MenuDropZone.Into
+            ? (target.Children, target.Children.Count)
+            : (siblings, index + (hit.Zone == MenuDropZone.After ? 1 : 0));
+    }
+
+    private (List<MenuNode>, int) NativeDropDestination(double x, double y) =>
+        RowDestination(MenuHit(x, y)) ?? (config.Items, config.Items.Count);
 
     private static IEnumerable<TreeViewNode> VisibleNodes(IEnumerable<TreeViewNode> nodes)
     {
@@ -1260,93 +1208,65 @@ public sealed partial class MainPage : Page
 
     private void MenuTreeDragItemsStarting(TreeView sender, TreeViewDragItemsStartingEventArgs args) { dragEscapeMonitor?.Dispose(); dragEscapeMonitor = new DragEscapeMonitor(); draftState.CommitPending(); dragSnapshot = Snapshot(); dragNodeId = args.Items.FirstOrDefault() is TreeViewNode node ? Model(node).Id : null; sender.CanReorderItems = false; dropIndicatorTimer.Start(); }
     internal bool InternalDragActive() => (dragSnapshot is not null && dragNodeId is not null) || (stepDragItem is not null && draggedStep is not null);
-    private void HideDropIndicator() { DropIndicator.Visibility = Visibility.Collapsed; dropIndicatorValid = false; }
     private void UpdateDropIndicator()
     {
-        HideDropIndicator();
+        DropIndicator.Visibility = Visibility.Collapsed;
         if (stepDragItem is not null && draggedStep is not null &&
             EditorOleDropTarget.TryGetCursorPosition(App.MainWindow, out var stepX, out var stepY))
             UpdateStepDropIndicator(stepX, stepY);
         else if (stepDropIndicator is not null) stepDropIndicator.Visibility = Visibility.Collapsed;
         if (dragNodeId is null || dragSnapshot is null || dragEscapeMonitor?.Cancelled == true || !EditorOleDropTarget.TryGetCursorPosition(App.MainWindow, out var x, out var y)) return;
-        var treeOrigin = MenuTree.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point());
-        if (x < treeOrigin.X || x >= treeOrigin.X + MenuTree.ActualWidth || y < treeOrigin.Y || y >= treeOrigin.Y + MenuTree.ActualHeight) return;
-        var overlayOrigin = DropOverlay.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point());
-        TreeViewItem? row = null;
-        TreeViewNode? target = null;
-        foreach (var node in VisibleNodes(MenuTree.RootNodes))
-        {
-            if (MenuTree.ContainerFromNode(node) is not TreeViewItem candidate) continue;
-            var p = candidate.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point());
-            if (x >= p.X && x < p.X + candidate.ActualWidth && y >= p.Y && y < p.Y + candidate.ActualHeight) { row = candidate; target = node; break; }
-        }
-        var source = dragNodeId is null ? null : FindModel(config.Items, dragNodeId);
-        if (source is null) return;
-        var (destination, _) = NativeDropDestination(x, y, rootFallback: true);
-        if (!draftState.CanMove(source.Id, destination)) return;
-        var accent = dropAccent;
-        if (row is not null && target is not null)
-        {
-            var model = Model(target);
-            var p = row.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point());
-            var inside = model.Kind == MenuNodeKind.Group && y - p.Y > row.ActualHeight / 3 && y - p.Y < row.ActualHeight * 2 / 3;
-            if (inside && (source.Id == model.Id || ContainsChild(source, model))) return;
-            if (inside)
-            {
-                dropTargetId = model.Id; dropTargetZone = 0;
-                DropIndicator.Background = null; DropIndicator.BorderBrush = accent; DropIndicator.BorderThickness = new Thickness(2);
-                DropIndicator.Width = Math.Max(0, row.ActualWidth - 4); DropIndicator.Height = Math.Max(0, row.ActualHeight - 4);
-                Canvas.SetLeft(DropIndicator, p.X - overlayOrigin.X + 2); Canvas.SetTop(DropIndicator, p.Y - overlayOrigin.Y + 2);
-            }
-            else
-            {
-                dropTargetId = model.Id; dropTargetZone = y - p.Y >= row.ActualHeight / 2 ? 1 : -1;
-                DropIndicator.Background = accent; DropIndicator.BorderThickness = new Thickness(0);
-                DropIndicator.Width = Math.Max(0, row.ActualWidth - 8); DropIndicator.Height = 3;
-                Canvas.SetLeft(DropIndicator, p.X - overlayOrigin.X + 4); Canvas.SetTop(DropIndicator, p.Y - overlayOrigin.Y + (y - p.Y >= row.ActualHeight / 2 ? row.ActualHeight : 0) - 1);
-            }
-        }
-        else
-        {
-            dropTargetId = null; dropTargetZone = 1;
-            var last = MenuTree.RootNodes.LastOrDefault();
-            var lastRow = last is null ? null : MenuTree.ContainerFromNode(last) as TreeViewItem;
-            var bottom = lastRow is null ? treeOrigin.Y : lastRow.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point()).Y + lastRow.ActualHeight;
-            foreach (var node in VisibleNodes(MenuTree.RootNodes))
-                if (MenuTree.ContainerFromNode(node) is TreeViewItem visible) { var p = visible.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point()); bottom = Math.Max(bottom, p.Y + visible.ActualHeight); }
-            DropIndicator.Background = accent; DropIndicator.BorderThickness = new Thickness(0); DropIndicator.Width = Math.Max(0, MenuTree.ActualWidth - 8); DropIndicator.Height = 3;
-            Canvas.SetLeft(DropIndicator, treeOrigin.X - overlayOrigin.X + 4); Canvas.SetTop(DropIndicator, Math.Min(treeOrigin.Y + MenuTree.ActualHeight - 3, bottom) - overlayOrigin.Y);
-        }
-        DropIndicator.Visibility = Visibility.Visible;
-        dropIndicatorValid = true;
+        ShowMenuDropIndicator(dragNodeId, MenuHit(x, y));
     }
-    internal bool CompleteInternalDrop(int x, int y)
+
+    private (List<MenuNode> Items, int Index)? InternalDestination(MenuDropHit hit) =>
+        hit.Zone == MenuDropZone.Empty ? (config.Items, config.Items.Count) : RowDestination(hit);
+
+    private void ShowMenuDropIndicator(string sourceId, MenuDropHit hit)
+    {
+        if (InternalDestination(hit) is not { } destination || !draftState.CanMove(sourceId, destination.Items)) return;
+        var overlay = BoundsInWindow(DropOverlay);
+        var anchor = hit.MarkerAnchor;
+        var inside = hit.Zone == MenuDropZone.Into;
+        DropIndicator.Background = inside ? null : dropAccent;
+        DropIndicator.BorderBrush = dropAccent;
+        DropIndicator.BorderThickness = new Thickness(inside ? 2 : 0);
+        DropIndicator.Width = Math.Max(0, anchor.Width - (inside ? 4 : 8));
+        DropIndicator.Height = inside ? Math.Max(0, anchor.Height - 4) : 3;
+        Canvas.SetLeft(DropIndicator, anchor.X - overlay.X + (inside ? 2 : 4));
+        var top = hit.Zone switch
+        {
+            MenuDropZone.Into => anchor.Y + 2,
+            MenuDropZone.Before => anchor.Y - 1,
+            MenuDropZone.After => anchor.Bottom - 1,
+            _ => anchor.Y
+        };
+        Canvas.SetTop(DropIndicator, top - overlay.Y);
+        DropIndicator.Visibility = Visibility.Visible;
+    }
+
+    internal bool CompleteInternalDrop(double x, double y)
     {
         if (stepDragItem is { } item && draggedStep is { } step && stepList is { } list)
             return CompleteStepDrop(item, step, list, x, y);
         if (dragNodeId is not { } id) return false;
-        var origin = MenuTree.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point());
-        if (x < origin.X || y < origin.Y || x >= origin.X + MenuTree.ActualWidth || y >= origin.Y + MenuTree.ActualHeight)
-        {
-            dragSnapshot = null; dragNodeId = null;
-            return false;
-        }
-        List<MenuNode> destination;
-        int index;
-        if (dropIndicatorValid && dropTargetId is { } targetId && FindModel(config.Items, targetId) is { } target)
-        {
-            destination = dropTargetZone == 0 ? target.Children : FindSiblings(config.Items, targetId)!;
-            index = dropTargetZone == 0 ? destination.Count : destination.IndexOf(target) + (dropTargetZone > 0 ? 1 : 0);
-        }
-        else if (dropIndicatorValid && dropTargetId is null) { destination = config.Items; index = destination.Count; }
-        else return false;
-        if (index < 0) index = destination.Count;
-        var moved = draftState.Move(id, destination, index);
-        if (!moved) ShowNotice(L.Get("Editor_AnItemCannotContainItself_756ab5"), InfoBarSeverity.Warning);
-        dragSnapshot = null; dragNodeId = null; MarkDirty(); RefreshTree(id);
-        return moved;
+        var hit = MenuHit(x, y);
+        dragSnapshot = null;
+        dragNodeId = null;
+        if (dragEscapeMonitor?.Cancelled == true || !MoveToHit(id, hit)) return false;
+        RefreshTree(id);
+        return true;
     }
-    private void UpdateStepDropIndicator(int x, int y)
+
+    private bool MoveToHit(string id, MenuDropHit hit)
+    {
+        if (InternalDestination(hit) is not { } destination || !draftState.Move(id, destination.Items, destination.Index))
+            return false;
+        MarkDirty();
+        return true;
+    }
+
+    private void UpdateStepDropIndicator(double x, double y)
     {
         if (stepDropIndicator is not { } marker || stepList is not { } list) return;
         marker.Visibility = Visibility.Collapsed;
@@ -1357,29 +1277,22 @@ public sealed partial class MainPage : Page
         marker.Visibility = Visibility.Visible;
     }
 
-    private static bool TryGetStepInsertion(ListView list, int x, int y, out int target, out double lineY)
+    private static bool TryGetStepInsertion(ListView list, double x, double y, out int target, out double lineY)
     {
-        target = 0; lineY = 0;
-        var origin = list.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point());
-        if (x < origin.X || x >= origin.X + list.ActualWidth || y < origin.Y || y >= origin.Y + list.ActualHeight) return false;
-        var found = false;
-        for (var index = 0; index < list.Items.Count; index++)
-        {
-            if (list.Items[index] is not FrameworkElement row || row.ActualHeight <= 0) continue;
-            var position = row.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point());
-            if (position.Y + row.ActualHeight <= origin.Y || position.Y >= origin.Y + list.ActualHeight) continue;
-            found = true;
-            if (y < position.Y + row.ActualHeight / 2)
-            {
-                target = index; lineY = Math.Max(0, position.Y - origin.Y); return true;
-            }
-            target = index + 1;
-            lineY = Math.Min(list.ActualHeight, position.Y + row.ActualHeight - origin.Y);
-        }
-        return found;
+        var insertion = DropGeometry.Steps(x, y, BoundsInWindow(list), StepRows(list));
+        target = insertion?.Index ?? 0;
+        lineY = insertion?.LineY ?? 0;
+        return insertion.HasValue;
     }
 
-    private bool CompleteStepDrop(MenuNode item, MenuAction step, ListView list, int x, int y)
+    private static IEnumerable<StepDropRow> StepRows(ListView list)
+    {
+        for (var index = 0; index < list.Items.Count; index++)
+            if (list.Items[index] is FrameworkElement row && row.ActualHeight > 0)
+                yield return new(index, BoundsInWindow(row));
+    }
+
+    private bool CompleteStepDrop(MenuNode item, MenuAction step, ListView list, double x, double y)
     {
         if (!TryGetStepInsertion(list, x, y, out var target, out _)) return false;
         var source = item.Steps.IndexOf(step);
@@ -1406,12 +1319,13 @@ public sealed partial class MainPage : Page
             if (dragNodeId is not null && dragEscapeMonitor is { Available: true } monitor)
             {
                 var id = dragNodeId;
-                var dropX = 0; var dropY = 0;
+                double dropX = 0, dropY = 0;
                 var canDrop = !monitor.Cancelled && !EditorOleDropTarget.IsDragButtonDown()
                     && EditorOleDropTarget.TryGetCursorPosition(App.MainWindow, out dropX, out dropY);
+                var hit = canDrop ? MenuHit(dropX, dropY) : default;
                 draftState.Restore(dragSnapshot);
+                if (canDrop) MoveToHit(id, hit);
                 RefreshTree(id);
-                if (canDrop) CompleteInternalDrop(dropX, dropY);
                 return;
             }
             List<MenuNode> Read(IEnumerable<TreeViewNode> nodes) => nodes.Select(node =>
@@ -1426,7 +1340,7 @@ public sealed partial class MainPage : Page
             DispatcherQueue.TryEnqueue(() => RefreshTree(selectedId));
         }
         catch (Exception ex) { draftState.Restore(dragSnapshot); RefreshTree(); ShowNotice(ex.Message, InfoBarSeverity.Warning); }
-        finally { dragSnapshot = null; dragNodeId = null; dropIndicatorValid = false; dragEscapeMonitor?.Dispose(); dragEscapeMonitor = null; }
+        finally { dragSnapshot = null; dragNodeId = null; dragEscapeMonitor?.Dispose(); dragEscapeMonitor = null; }
     }
 
     private void MenuTreeDragOver(object sender, DragEventArgs args)
@@ -1454,7 +1368,7 @@ public sealed partial class MainPage : Page
         {
             var point = args.GetPosition(null);
             args.Handled = true;
-            CompleteInternalDrop((int)point.X, (int)point.Y);
+            CompleteInternalDrop(point.X, point.Y);
             return;
         }
         DevLog.Write("editor", $"External Drop: storageItems={args.DataView.Contains(StandardDataFormats.StorageItems)}");
@@ -1492,14 +1406,8 @@ public sealed partial class MainPage : Page
 
     private (List<MenuNode>, int) DropDestination(DragEventArgs args)
     {
-        DependencyObject? current = args.OriginalSource as DependencyObject;
-        while (current is not null && current is not TreeViewItem) current = VisualTreeHelper.GetParent(current);
-        if (current is not TreeViewItem container) return (config.Items, config.Items.Count);
-        var node = MenuTree.NodeFromContainer(container); if (node is null) return (config.Items, config.Items.Count);
-        var model = Model(node); var y = args.GetPosition(container).Y;
-        if (model.Kind == MenuNodeKind.Group && y > container.ActualHeight / 3 && y < container.ActualHeight * 2 / 3) return (model.Children, model.Children.Count);
-        var siblings = node.Parent?.Content is NodeDisplay parent ? parent.Model.Children : config.Items;
-        return (siblings, siblings.IndexOf(model) + (y >= container.ActualHeight / 2 ? 1 : 0));
+        var point = args.GetPosition(null);
+        return RowDestination(MenuHit(point.X, point.Y)) ?? (config.Items, config.Items.Count);
     }
 
     private static ActionChoice[] ActionChoices() =>

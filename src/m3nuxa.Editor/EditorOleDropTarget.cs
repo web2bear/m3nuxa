@@ -19,13 +19,13 @@ public sealed class EditorOleDropTarget : IEditorDropTarget, IDisposable
 {
     private readonly List<nint> windows = [];
     private readonly nint root;
-    private readonly Action<IReadOnlyList<string>, int, int> onPaths;
-    private readonly Action<string, bool, int, int> onText;
+    private readonly Action<IReadOnlyList<string>, double, double> onPaths;
+    private readonly Action<string, bool, double, double> onText;
     private readonly string log;
     private readonly bool oleInitialized;
     private readonly Func<bool> internalDrag;
-    private readonly Func<int, int, bool> onInternalDrop;
-    public EditorOleDropTarget(Window window, Action<IReadOnlyList<string>, int, int> onPaths, Action<string, bool, int, int> onText, string log, Func<bool> internalDrag, Func<int, int, bool> onInternalDrop)
+    private readonly Func<double, double, bool> onInternalDrop;
+    public EditorOleDropTarget(Window window, Action<IReadOnlyList<string>, double, double> onPaths, Action<string, bool, double, double> onText, string log, Func<bool> internalDrag, Func<double, double, bool> onInternalDrop)
     {
         root = WindowNative.GetWindowHandle(window); this.onPaths = onPaths; this.onText = onText; this.log = log; this.internalDrag = internalDrag; this.onInternalDrop = onInternalDrop;
         var init = OleInitialize(0);
@@ -58,7 +58,8 @@ public sealed class EditorOleDropTarget : IEditorDropTarget, IDisposable
         {
             var location = point; ScreenToClient(root, ref location);
             var dpi = GetDpiForWindow(root) / 96.0;
-            int x = (int)(location.X / dpi), y = (int)(location.Y / dpi);
+            var x = location.X / dpi;
+            var y = location.Y / dpi;
             if (internalDrag()) { effect = onInternalDrop(x, y) ? 2u : 0u; return 0; }
             var url = ReadText(data, (short)RegisterClipboardFormat("UniformResourceLocatorW"));
             if (url is not null && Uri.TryCreate(url.Trim(), UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https") { Log("drop url"); onText(url.Trim(), true, x, y); return 0; }
@@ -74,10 +75,8 @@ public sealed class EditorOleDropTarget : IEditorDropTarget, IDisposable
             {
                 var count = DragQueryFile(medium.unionmember, uint.MaxValue, null, 0); var paths = new List<string>();
                 for (uint i = 0; i < count; i++) { var n = DragQueryFile(medium.unionmember, i, null, 0); var b = new char[n + 1]; var read = DragQueryFile(medium.unionmember, i, b, (uint)b.Length); if (read != 0) paths.Add(new string(b, 0, (int)read)); }
-                ScreenToClient(root, ref point);
-                var scale = GetDpiForWindow(root) / 96.0;
-                Log($"drop count={paths.Count} at={point.X},{point.Y} scale={scale}");
-                onPaths(paths, (int)(point.X / scale), (int)(point.Y / scale));
+                Log($"drop count={paths.Count} at={x},{y} scale={dpi}");
+                onPaths(paths, x, y);
             }
             finally { ReleaseStgMedium(ref medium); }
         }
@@ -95,13 +94,14 @@ public sealed class EditorOleDropTarget : IEditorDropTarget, IDisposable
     }
     public void Dispose() { foreach (var h in windows) RevokeDragDrop(h); if (oleInitialized) OleUninitialize(); }
     private delegate bool EnumProc(nint hwnd, nint param);
-    internal static bool TryGetCursorPosition(Window window, out int x, out int y)
+    internal static bool TryGetCursorPosition(Window window, out double x, out double y)
     {
         x = y = 0;
         var hwnd = WindowNative.GetWindowHandle(window);
         if (!GetCursorPos(out var point) || !ScreenToClient(hwnd, ref point)) return false;
         var scale = GetDpiForWindow(hwnd) / 96.0;
-        x = (int)(point.X / scale); y = (int)(point.Y / scale);
+        x = point.X / scale;
+        y = point.Y / scale;
         return true;
     }
     internal static bool IsDragButtonDown() => (GetAsyncKeyState(1) & 0x8000) != 0;

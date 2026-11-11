@@ -500,4 +500,7 @@
   <data name="Editor_SettingsPositionCursor" xml:space="preserve"><value>Рядом с курсором</value></data>
   <data name="Editor_SettingsFontSize" xml:space="preserve"><value>Размер шрифта меню</value></data>
   <data name="Editor_SettingsPanelConflict" xml:space="preserve"><value>Это сочетание назначено для вызова панели.</value></data>
+  <data name="Icon_Confirm" xml:space="preserve"><value>Выбрать</value></data>
+  <data name="Icon_Preview" xml:space="preserve"><value>Выбранная иконка</value></data>
+  <data name="Icon_ColorBundledOnly" xml:space="preserve"><value>Цвет доступен для встроенных иконок.</value></data>
 </root>

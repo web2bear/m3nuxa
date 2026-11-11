@@ -500,4 +500,7 @@ or select an existing item.</value>
   <data name="Editor_SettingsPositionCursor" xml:space="preserve"><value>Near the pointer</value></data>
   <data name="Editor_SettingsFontSize" xml:space="preserve"><value>Menu font size</value></data>
   <data name="Editor_SettingsPanelConflict" xml:space="preserve"><value>This shortcut is assigned to the launcher panel.</value></data>
+  <data name="Icon_Confirm" xml:space="preserve"><value>Select</value></data>
+  <data name="Icon_Preview" xml:space="preserve"><value>Selected icon</value></data>
+  <data name="Icon_ColorBundledOnly" xml:space="preserve"><value>Color is available for built-in icons.</value></data>
 </root>

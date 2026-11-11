@@ -67,6 +67,21 @@ internal static class AgentPipeWorkflowChecks
             Check(reopened["configPath"]!.GetValue<string>() == otherPath && File.Exists(otherPath), "save as reports new active file");
             await RejectCode(() => pipe.ExecuteAsync("session-without-begin", "validate"), "draft_not_started", "missing draft has stable error code");
         }
+        var limitedPipe = pipe;
+        for (var index = 0; index < 33; index++)
+            await limitedPipe.ExecuteAsync("editor-" + index, "begin");
+        for (var index = 0; index < 32; index++)
+            await limitedPipe.ExecuteAsync("mcp-" + index, "begin");
+        await RejectCode(() => limitedPipe.ExecuteAsync("mcp-over-limit", "begin"), "draft_limit", "MCP draft limit enforced");
+        await limitedPipe.ExecuteAsync("editor-with-full-mcp-pool", "begin");
+        await limitedPipe.ExecuteAsync("mcp-0", "discard");
+        await RejectCode(() => limitedPipe.ExecuteAsync("mcp-0", "validate"), "draft_not_started", "discard releases the draft");
+        await limitedPipe.ExecuteAsync("mcp-over-limit", "begin");
+        var activity = (Dictionary<string, DateTime>)typeof(AgentPipe).GetField("_draftActivity", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(limitedPipe)!;
+        activity["mcp-1"] = DateTime.UtcNow.AddMinutes(-31);
+        await limitedPipe.ExecuteAsync("mcp-after-expiry", "begin");
+        await RejectCode(() => limitedPipe.ExecuteAsync("mcp-1", "validate"), "draft_not_started", "expired MCP draft released");
+        await limitedPipe.ExecuteAsync("mcp-2", "validate");
     }
 
     private static async Task RejectCode(Func<Task<JsonNode>> operation, string expectedCode, string name)
