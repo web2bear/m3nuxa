@@ -86,8 +86,11 @@
             <AppBarToggleButton x:Name="PinButton" MinWidth="40" Label="{x:Bind Localize('Editor_AlwaysOnTop_1bee89')}" AutomationProperties.Name="{x:Bind Localize('Editor_KeepTheEditorOnTop_3e7cbb')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_KeepTheEditorAboveOther_eb06b1')}" Click="PinClicked">
                 <AppBarToggleButton.Icon><SymbolIcon Symbol="Pin" /></AppBarToggleButton.Icon>
             </AppBarToggleButton>
-            <AppBarButton AutomationProperties.AutomationId="OpenSettings" MinWidth="40" Label="{x:Bind Localize('Editor_Settings_7f17c7')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_Settings_7f17c7')}" Click="SettingsClicked">
+            <AppBarButton x:Name="OpenSettingsButton" AutomationProperties.AutomationId="OpenSettings" MinWidth="40" Label="{x:Bind Localize('Editor_Settings_7f17c7')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_Settings_7f17c7')}" Click="SettingsClicked">
                 <AppBarButton.Icon><SymbolIcon Symbol="Setting" Foreground="{ThemeResource ToolbarGrayBrush}" /></AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton x:Name="OpenMenuButton" AutomationProperties.AutomationId="OpenMenu" MinWidth="40" Label="{x:Bind Localize('Editor_MenuSection')}" Click="MenuSectionClicked" Visibility="Collapsed">
+                <AppBarButton.Icon><SymbolIcon Symbol="Back" /></AppBarButton.Icon>
             </AppBarButton>
         </CommandBar>
         </Border>
@@ -156,6 +159,9 @@
                 </ScrollViewer>
             </Grid>
         </Grid>
+        <ScrollViewer x:Name="SettingsPage" Grid.Row="1" Margin="16,0,16,0" Visibility="Collapsed" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="SettingsContents" Padding="22,16" Spacing="16" MaxWidth="680" HorizontalAlignment="Left" />
+        </ScrollViewer>
         <InfoBar x:Name="Notice" Grid.Row="2" IsOpen="False" IsClosable="True" Margin="20,12" Severity="Informational" />
     </Grid>
 </Page>

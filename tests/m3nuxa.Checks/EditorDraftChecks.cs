@@ -22,6 +22,14 @@ internal static class EditorDraftChecks
         Check(!draft.IsDirty, "manual restoration clears dirty");
         draft.SetBaseline();
         Check(!draft.Undo() && !draft.Redo(), "apply resets history");
+        draft.BeginChange();
+        draft.Config.Settings = draft.Config.Settings with { PanelPosition = "Cursor", MenuFontSize = 17 };
+        draft.CommitPending();
+        Check(draft.IsDirty && draft.Config.Settings.PanelPosition == "Cursor", "settings join the draft");
+        Check(draft.Undo() && draft.Config.Settings.PanelPosition == "Center" && !draft.IsDirty, "undo restores settings with the tree");
+        Check(draft.Redo() && draft.Config.Settings.MenuFontSize == 17 && draft.IsDirty, "redo restores settings changes");
+        draft.SetBaseline();
+        Check(!draft.IsDirty && !draft.Undo(), "applying the unified draft resets settings history");
         var initial = new EditorDraft();
         initial.Config.Items.Add(new MenuNode { Name = "Local" });
         Check(initial.IsDirty, "offline initial draft detects changes");

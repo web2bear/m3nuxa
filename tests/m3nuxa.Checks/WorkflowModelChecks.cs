@@ -14,7 +14,7 @@ internal static class WorkflowModelChecks
         File.WriteAllText(path, legacy);
         var store = new ConfigStore(path);
         var node = store.Current.Items.Single();
-        Check(store.Current.SchemaVersion == 2 && node.Steps.Count == 1 && node.Steps[0].Text == "old text", "legacy action migrates");
+        Check(store.Current.SchemaVersion == 3 && node.Steps.Count == 1 && node.Steps[0].Text == "old text", "legacy action migrates");
         Check(node.Hotkey == "Ctrl+Alt+F5" && node.IconPath == "icon.png", "legacy item metadata migrates");
         var draft = store.CreateDraft();
         draft.Config.Items[0].Steps.Add(new MenuAction { Name = "Wait for editor", Kind = ActionKind.Delay, DelayMilliseconds = 25 });
@@ -24,7 +24,7 @@ internal static class WorkflowModelChecks
         using (var json = JsonDocument.Parse(File.ReadAllText(path)))
         {
             var item = json.RootElement.GetProperty("Items")[0];
-            Check(json.RootElement.GetProperty("SchemaVersion").GetInt32() == 2 && item.GetProperty("Steps").GetArrayLength() == 2, "new schema stores ordered steps");
+            Check(json.RootElement.GetProperty("SchemaVersion").GetInt32() == 3 && item.GetProperty("Steps").GetArrayLength() == 2, "new schema stores ordered steps");
             Check(!item.TryGetProperty("Action", out _), "new schema omits legacy action");
         }
         var restored = new ConfigStore(path).Current.Items.Single();

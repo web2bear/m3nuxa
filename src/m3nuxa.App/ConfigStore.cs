@@ -5,6 +5,21 @@ using Keys = Windows.System.VirtualKey;
 
 namespace m3nuxa.App;
 
+public sealed class LegacySettingsException : IOException
+{
+    public string SettingsPath { get; } = "";
+
+    public LegacySettingsException() { }
+    public LegacySettingsException(string message) : base(message) { }
+    public LegacySettingsException(string message, Exception inner) : base(message, inner) { }
+    private LegacySettingsException(string path, string message, Exception inner) : base(message, inner)
+    {
+        SettingsPath = Path.GetFullPath(path);
+    }
+    public static LegacySettingsException ForFile(string path, Exception inner) =>
+        new(path, L.Format("LegacySettingsReadFailed", Path.GetFullPath(path), inner.Message), inner);
+}
+
 public sealed class ConfigStore
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -29,15 +44,21 @@ public sealed class ConfigStore
             throw new InvalidDataException($"Configuration file not found: {this.path}");
         if (File.Exists(this.path))
         {
-            current = ReadConfig(this.path);
+            current = ReadConfig(this.path, Path.Combine(SettingsDirectory, "settings.json"));
             var validation = Validate(current);
             if (!validation.IsValid)
                 throw new InvalidDataException($"{this.path}: {string.Join("; ", validation.Errors)}");
             diskFingerprint = Fingerprint(this.path);
         }
+        else
+        {
+            var legacySettings = Path.Combine(SettingsDirectory, "settings.json");
+            if (File.Exists(legacySettings)) current.Settings = ReadLegacySettings(legacySettings);
+        }
     }
 
     public Func<string>? GlobalHotkey { get; set; }
+    public Func<string>? PanelHotkey { get; set; }
     public string FilePath { get { lock (gate) return path; } }
     public string SettingsDirectory => selectionFile is null ? Path.GetDirectoryName(Path.GetFullPath(path))! : Path.GetDirectoryName(Path.GetFullPath(selectionFile))!;
 
@@ -76,7 +97,7 @@ public sealed class ConfigStore
         {
             try
             {
-                var candidate = File.Exists(path) ? ReadConfig(path) : new AppConfig();
+                var candidate = File.Exists(path) ? ReadConfig(path, Path.Combine(SettingsDirectory, "settings.json")) : new AppConfig();
                 var check = Validate(candidate);
                 if (!check.IsValid) return new(false, $"{path}: {string.Join("; ", check.Errors)}");
                 current = candidate;
@@ -186,6 +207,13 @@ public sealed class ConfigStore
     public static ConfigStore CreateDefaultAfterInvalid(string? configPath = null, string? selectionFile = null)
     {
         var target = configPath ?? Path.Combine(AppContext.BaseDirectory, "config.json");
+        // Do not replace even an invalid config if its separate legacy settings
+        // cannot be migrated; report that file first while preserving both inputs.
+        var settingsDirectory = selectionFile is null
+            ? Path.GetDirectoryName(Path.GetFullPath(target))!
+            : Path.GetDirectoryName(Path.GetFullPath(selectionFile))!;
+        var legacySettings = Path.Combine(settingsDirectory, "settings.json");
+        if (File.Exists(legacySettings)) _ = ReadLegacySettings(legacySettings);
         if (File.Exists(target))
         {
             var copy = $"{target}.invalid-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.bak";
@@ -195,17 +223,47 @@ public sealed class ConfigStore
         return new ConfigStore(target, selectionFile);
     }
 
-    private static AppConfig ReadConfig(string file)
+    private static AppConfig ReadConfig(string file, string? legacySettingsPath = null)
     {
-        var config = JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(file), JsonOptions)
+        var json = File.ReadAllText(file);
+        using var document = JsonDocument.Parse(json);
+        if (document.RootElement.ValueKind != JsonValueKind.Object) throw new InvalidDataException(L.Get("ConfigJsonEmpty"));
+        bool hasSettings = document.RootElement.EnumerateObject().Any(property => property.Name.Equals("Settings", StringComparison.OrdinalIgnoreCase));
+        bool hasSchema = document.RootElement.EnumerateObject().Any(property => property.Name.Equals("SchemaVersion", StringComparison.OrdinalIgnoreCase));
+        var config = JsonSerializer.Deserialize<AppConfig>(json, JsonOptions)
             ?? throw new InvalidDataException(L.Get("ConfigJsonEmpty"));
-        // Migration is in memory; Apply creates a backup before replacing the source file.
-        if (config.SchemaVersion == 1) config.SchemaVersion = 2;
+        // Legacy settings belong to the active installation only, never an imported file.
+        // Migration remains in memory until Apply creates a backup and saves the complete file.
+        if (!hasSettings && (!hasSchema || config.SchemaVersion is 1 or 2))
+        {
+            config.Settings = legacySettingsPath is not null && File.Exists(legacySettingsPath)
+                ? ReadLegacySettings(legacySettingsPath)
+                : new AppSettings { MainHotkey = config.MainHotkey };
+        }
+        else if (!hasSettings || config.Settings is null)
+            throw new InvalidDataException("Configuration settings are missing.");
+        if (config.SchemaVersion is 1 or 2) config.SchemaVersion = 3;
         return config;
     }
 
+    private static AppSettings ReadLegacySettings(string file)
+    {
+        try
+        {
+            var settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(file), JsonOptions)
+                ?? throw new InvalidDataException(L.Get("Settings/EmptyFile"));
+            settings = settings with { Language = SettingsStore.NormalizeLanguage(settings.Language) };
+            SettingsStore.Validate(settings, L.Get);
+            return settings;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidDataException)
+        {
+            throw LegacySettingsException.ForFile(file, ex);
+        }
+    }
+
     private static AppConfig Clone(AppConfig value) =>
-        new() { SchemaVersion = value.SchemaVersion, MainHotkey = value.MainHotkey, Items = JsonSerializer.Deserialize<List<MenuNode>>(JsonSerializer.Serialize(value.Items, JsonOptions), JsonOptions)! };
+        new() { SchemaVersion = value.SchemaVersion, MainHotkey = value.MainHotkey, Settings = value.Settings with { }, Items = JsonSerializer.Deserialize<List<MenuNode>>(JsonSerializer.Serialize(value.Items, JsonOptions), JsonOptions)! };
 
     private static string Fingerprint(string file)
     {
@@ -224,15 +282,20 @@ public sealed class ConfigStore
     {
         var errors = new List<string>();
         var warnings = new List<string>();
-        if (config.SchemaVersion != 2) errors.Add(L.Get("ConfigSchemaUnsupported"));
+        if (config.SchemaVersion != 3) errors.Add(L.Get("ConfigSchemaUnsupported"));
         if (config.Items is null) errors.Add(L.Get("ConfigTreeMissing"));
         var hotkeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var mainHotkey = GlobalHotkey?.Invoke() ?? "";
+        if (config.Settings is null) errors.Add("Configuration settings are missing.");
+        else try { SettingsStore.Validate(config.Settings, L.Get); } catch (InvalidDataException ex) { errors.Add(ex.Message); }
+        var mainHotkey = config.Settings?.MainHotkey ?? "";
         if (!string.IsNullOrWhiteSpace(mainHotkey))
         {
             if (TryNormalizeHotkey(mainHotkey, out var normalized)) hotkeys.Add(normalized);
             else errors.Add(L.Get("ConfigInvalidMainShortcut"));
         }
+        var panelHotkey = config.Settings?.PanelHotkey ?? "";
+        if (!string.IsNullOrWhiteSpace(panelHotkey) && TryNormalizeHotkey(panelHotkey, out var normalizedPanel) && !hotkeys.Add(normalizedPanel))
+            errors.Add(L.Format("ConfigDuplicateHotkey", L.Get("ConfigMenu")));
         var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (config.Items is not null) Visit(config.Items, L.Get("ConfigMenu"));
         return new(errors, warnings);

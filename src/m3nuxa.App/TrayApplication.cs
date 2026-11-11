@@ -15,9 +15,6 @@ internal sealed class TrayApplication : IDisposable
 {
     private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private readonly ConfigStore _store;
-    private readonly SettingsStore _settings;
-    private SettingsWindow? _settingsWindow;
-    private bool _settingsRecording;
     private readonly ShellIntegration _tray;
     private readonly Window _window = new() { Title = "m3nuxa" };
     private readonly Grid _root = new();
@@ -40,8 +37,7 @@ internal sealed class TrayApplication : IDisposable
     {
         DevLog.Write("app", "TrayApplication starting");
         _store = store;
-        _settings = new SettingsStore(Path.Combine(store.SettingsDirectory, "settings.json"), store.Current.MainHotkey, L.Get);
-        _store.GlobalHotkey = () => _settings.Current.MainHotkey;
+        L.SetLanguage(store.Current.Settings.Language);
         _foreground = new ForegroundTracker();
         _window.Content = _root;
         _window.AppWindow.IsShownInSwitchers = false;
@@ -54,13 +50,13 @@ internal sealed class TrayApplication : IDisposable
         _tray = new ShellIntegration(_window, service => _window.DispatcherQueue.TryEnqueue(() =>
         {
             if (service) ShowFlyout(BuildServiceMenu()); else ShowMenu(_store.Current.Items);
-        }), node => _window.DispatcherQueue.TryEnqueue(() => OnHotkey(node)));
+        }), (node, panel) => _window.DispatcherQueue.TryEnqueue(() => OnHotkey(node, panel)));
         RegisterHotkeys();
         _agentPipe = new AgentPipe(_store, RegisterHotkeys, suspended =>
         {
             _hotkeysSuspended = suspended;
             return RegisterHotkeyBindings();
-        }, () => _unavailableHotkeys);
+        }, () => _unavailableHotkeys, ProbeGlobalHotkeys);
         _agentPipe.OpenSettings = OpenSettings;
         if (ReadMcpEnabled()) _ = SetMcpEnabledAsync(true, false);
         _window.Closed += (_, _) => Dispose();
@@ -125,58 +121,11 @@ internal sealed class TrayApplication : IDisposable
         }
     }
 
-    private void OpenSettings()
-    {
-        if (_settingsWindow is null)
-        {
-            _settingsWindow = new SettingsWindow(_settings, SaveSettings, suspended =>
-            {
-                _settingsRecording = suspended; RegisterHotkeyBindings();
-            }, () => ShowMenu(_store.Current.Items));
-            _settingsWindow.Closed += (_, _) => _settingsWindow = null;
-            // Keep app and test windows on the additional screen when available.
-            var displays = DisplayArea.FindAll();
-            var display = DisplayArea.Primary;
-            for (var i = 0; i < displays.Count; i++) if (!displays[i].IsPrimary) { display = displays[i]; break; }
-            var work = display.WorkArea;
-            _settingsWindow.AppWindow.Move(new PointInt32(work.X + Math.Max(0, (work.Width - _settingsWindow.AppWindow.Size.Width) / 2), work.Y + Math.Max(0, (work.Height - _settingsWindow.AppWindow.Size.Height) / 2)));
-        }
-        _settingsWindow.Activate();
-    }
-
-    private string? SaveSettings(AppSettings candidate)
-    {
-        try
-        {
-            SettingsStore.Validate(candidate, L.Get);
-            if (candidate.MainHotkey == _settings.Current.MainHotkey) { _settings.Save(candidate); return null; }
-            if (_hotkeysSuspended) return L.Get("SettingsCaptureInEditor");
-            var config = _store.Current;
-            // Validate against the candidate without changing the running settings.
-            string Key(string text) => HotkeyParser.TryParse(text, out var modifiers, out var key) ? $"{modifiers}:{key}" : text;
-            bool Conflicts(IEnumerable<MenuNode> nodes) => nodes.Any(node =>
-                (node.Kind != MenuNodeKind.Separator && node.Hotkey.Length > 0 && Key(node.Hotkey) == Key(candidate.MainHotkey)) || Conflicts(node.Children));
-            if (candidate.MainHotkey.Length > 0 && Conflicts(config.Items)) return L.Get("SettingsHotkeyConflict");
-            var unavailable = RegisterHotkeyBindings(candidate.MainHotkey);
-            if (candidate.MainHotkey.Length > 0 && unavailable.Contains(candidate.MainHotkey))
-            {
-                RegisterHotkeyBindings();
-                return L.Get("SettingsHotkeyUnavailable");
-            }
-            _settings.Save(candidate);
-            return null;
-        }
-        catch (Exception ex)
-        {
-            RegisterHotkeyBindings();
-            DevLog.Write("settings", "Save failed", ex);
-            return ex.Message;
-        }
-    }
+    private void OpenSettings() => OpenEditor(null, showSettings: true);
 
     private void OpenEditor() => OpenEditor(null);
 
-    private async void OpenEditor(string? nodeId)
+    private async void OpenEditor(string? nodeId, bool showSettings = false)
     {
         DevLog.Write("app", "OpenEditor requested");
         var path = Path.Combine(AppContext.BaseDirectory, "m3nuxa.Editor.exe");
@@ -191,14 +140,14 @@ internal sealed class TrayApplication : IDisposable
         if (_editor is { HasExited: false })
         {
             DevLog.Write("app", $"Editor already running pid={_editor.Id} hwnd={_editor.MainWindowHandle}");
-            if (nodeId is not null)
+            if (nodeId is not null || showSettings)
             {
                 try
                 {
                     using var pipe = new NamedPipeClientStream(".", $"m3nuxa-editor-{Environment.UserName}-{_editor.Id}", PipeDirection.Out);
                     await pipe.ConnectAsync(1000);
                     using var writer = new StreamWriter(pipe) { AutoFlush = true };
-                    await writer.WriteLineAsync(nodeId);
+                    await writer.WriteLineAsync(showSettings ? "--settings" : nodeId);
                 }
                 catch (Exception ex) { DevLog.Write("app", "Could not select editor item", ex); }
             }
@@ -215,7 +164,8 @@ internal sealed class TrayApplication : IDisposable
         try
         {
             var start = new ProcessStartInfo(path) { UseShellExecute = true };
-            if (nodeId is not null) { start.ArgumentList.Add("--select"); start.ArgumentList.Add(nodeId); }
+            if (showSettings) start.ArgumentList.Add("--settings");
+            else if (nodeId is not null) { start.ArgumentList.Add("--select"); start.ArgumentList.Add(nodeId); }
             _editor = Process.Start(start);
             DevLog.Write("app", $"Editor process started pid={_editor?.Id}");
             if (_editor is not null)
@@ -239,11 +189,19 @@ internal sealed class TrayApplication : IDisposable
         else RegisterHotkeys();
     }
 
+    private void ShowLauncherPanel()
+    {
+        var invocation = InvocationContext.Capture(_foreground.LastWindow);
+        _menu?.Hide();
+        LauncherPanel.Show(_store.Current.Items, node => _ = Execute(node, invocation), OpenEditor,
+            _store.Current.Settings.PanelPosition == "Cursor");
+    }
+
     private void ShowMenu(IReadOnlyList<MenuNode> nodes)
     {
         var invocation = InvocationContext.Capture(_foreground.LastWindow);
         var menu = LauncherMenu.Create();
-        LauncherMenu.Fill(menu.Items, nodes, node => _ = Execute(node, invocation), node => { _menu?.Hide(); OpenEditor(node.Id); }, _settings.Current.MenuFontSize);
+        LauncherMenu.Fill(menu.Items, nodes, node => _ = Execute(node, invocation), node => { _menu?.Hide(); OpenEditor(node.Id); }, _store.Current.Settings.MenuFontSize);
         if (menu.Items.Count == 0) menu.Items.Add(new MenuFlyoutItem { Text = L.Get("TrayEmptyMenu"), IsEnabled = false });
         ShowFlyout(menu);
     }
@@ -337,36 +295,66 @@ internal sealed class TrayApplication : IDisposable
         }
     }
 
-    private void OnHotkey(MenuNode? node)
+    private void OnHotkey(MenuNode? node, bool panel)
     {
-        if (_hotkeysSuspended || _settingsRecording) return;
-        if (node is null) ShowMenu(_store.Current.Items);
+        if (_hotkeysSuspended) return;
+        if (panel) ShowLauncherPanel();
+        else if (node is null) ShowMenu(_store.Current.Items);
         else if (node.Kind == MenuNodeKind.Group) ShowMenu(node.Children);
         else _ = Execute(node, InvocationContext.Capture(_foreground.LastWindow));
     }
 
     private void RegisterHotkeys()
-        => RegisterHotkeyBindings();
-
-    private IReadOnlyList<string> RegisterHotkeyBindings(string? mainHotkey = null)
     {
-        if (_hotkeysSuspended || _settingsRecording) return _tray.Register([]);
-        var bindings = new List<(string Hotkey, MenuNode? Node)>();
-        mainHotkey ??= _settings.Current.MainHotkey;
-        if (!string.IsNullOrWhiteSpace(mainHotkey)) bindings.Add((mainHotkey, null));
+        L.SetLanguage(_store.Current.Settings.Language);
+        RegisterHotkeyBindings();
+    }
+
+    private IReadOnlyList<string> RegisterHotkeyBindings()
+    {
+        if (_hotkeysSuspended) return _tray.Register([]);
+        var unavailable = _tray.Register(HotkeyBindings(_store.Current));
+        _unavailableHotkeys = unavailable;
+        if (unavailable.Count > 0) _tray.ShowBalloonTip(5000, L.Get("TrayHotkeysUnavailable"), string.Join(", ", unavailable), ToolTipIcon.Warning);
+        return unavailable;
+    }
+
+    private string? ProbeGlobalHotkeys(AppConfig candidate)
+    {
+        static string Key(string text) => HotkeyParser.TryParse(text, out var modifiers, out var key) ? $"{modifiers}:{key}" : "";
+        var current = _store.Current.Settings;
+        var settings = candidate.Settings;
+        var mainChanged = Key(settings.MainHotkey) != Key(current.MainHotkey);
+        var panelChanged = Key(settings.PanelHotkey) != Key(current.PanelHotkey);
+        if (!mainChanged && !panelChanged) return null;
+        if (_hotkeysSuspended) return L.Get("SettingsCaptureInEditor");
+        try
+        {
+            var unavailable = _tray.Register(HotkeyBindings(candidate));
+            if ((mainChanged && unavailable.Contains(settings.MainHotkey)) || (panelChanged && unavailable.Contains(settings.PanelHotkey)))
+                return L.Get("SettingsHotkeyUnavailable");
+            return null;
+        }
+        finally { RegisterHotkeyBindings(); }
+    }
+
+    private static List<(string Hotkey, MenuNode? Node, bool Panel)> HotkeyBindings(AppConfig config)
+    {
+        var bindings = new List<(string Hotkey, MenuNode? Node, bool Panel)>();
+        var mainHotkey = config.Settings.MainHotkey;
+        if (!string.IsNullOrWhiteSpace(mainHotkey)) bindings.Add((mainHotkey, null, false));
+        var panelHotkey = config.Settings.PanelHotkey;
+        if (!string.IsNullOrWhiteSpace(panelHotkey)) bindings.Add((panelHotkey, null, true));
         void Walk(IEnumerable<MenuNode> nodes)
         {
             foreach (var node in nodes)
             {
-                if (node.Kind != MenuNodeKind.Separator && !string.IsNullOrWhiteSpace(node.Hotkey)) bindings.Add((node.Hotkey, node));
+                if (node.Kind != MenuNodeKind.Separator && !string.IsNullOrWhiteSpace(node.Hotkey)) bindings.Add((node.Hotkey, node, false));
                 Walk(node.Children);
             }
         }
-        Walk(_store.Current.Items);
-        var unavailable = _tray.Register(bindings);
-        _unavailableHotkeys = unavailable;
-        if (unavailable.Count > 0) _tray.ShowBalloonTip(5000, L.Get("TrayHotkeysUnavailable"), string.Join(", ", unavailable), ToolTipIcon.Warning);
-        return unavailable;
+        Walk(config.Items);
+        return bindings;
     }
 
     private static bool IsStartupEnabled()

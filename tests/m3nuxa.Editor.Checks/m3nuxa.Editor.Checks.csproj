@@ -28,6 +28,7 @@
     <Compile Include="../../src/m3nuxa.Editor/EditorDraft.cs" Link="EditorDraft.cs" />
     <Compile Include="../../src/m3nuxa.Editor/DragEscapeMonitor.cs" Link="DragEscapeMonitor.cs" />
     <Compile Include="../../src/m3nuxa.Editor/EditorPipeClient.cs" Link="EditorPipeClient.cs" />
+    <Compile Include="../../src/m3nuxa.App/AgentPipeProtocol.cs" Link="AgentPipeProtocol.cs" />
     <Compile Include="../../src/m3nuxa.Editor/ShortcutEditor.cs" Link="ShortcutEditor.cs" />
     <Compile Include="../../src/m3nuxa.Editor/KeyboardCapture.cs" Link="KeyboardCapture.cs" />
     <Compile Include="../../src/m3nuxa.Editor/HotkeyCaptureConnection.cs" Link="HotkeyCaptureConnection.cs" />

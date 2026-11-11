@@ -15,6 +15,7 @@ Directory.CreateDirectory(root);
 try
 {
     WorkflowModelChecks.Run(root);
+    UnifiedConfigurationChecks.Run(root);
     WorkflowExecutionChecks.Run(root);
     AgentPipeWorkflowChecks.Run(root);
     LocalizationChecks.Run();
@@ -34,14 +35,17 @@ try
     Check(new SettingsStore(settingsPath, "").Current.Language == "en-US", "unsupported language falls back to English");
     settings.Save(settings.Current with { MainHotkey = "Ctrl+Alt+F9", MenuFontSize = 16, Language = "ru-RU" });
     Check(new SettingsStore(settingsPath, "Ctrl+Shift+F8").Current == settings.Current, "settings survive restart and migration does not overwrite");
-    store.GlobalHotkey = () => settings.Current.MainHotkey;
     var settingsDraft = store.CreateDraft();
-    settingsDraft.Config.MainHotkey = "Ctrl+Alt+F1";
-    Check(store.Apply(settingsDraft).Success && settings.Current.MainHotkey == "Ctrl+Alt+F9", "menu draft cannot overwrite global settings");
-    Check(!File.ReadAllText(path).Contains("MainHotkey"), "new menu file excludes global shortcut");
+    settingsDraft.Config.Settings = settings.Current;
+    Check(store.Apply(settingsDraft).Success && store.Current.Settings.MainHotkey == "Ctrl+Alt+F9", "settings apply with menu draft");
+    Check(new ConfigStore(path).Current.Settings == settings.Current, "unified settings survive restart");
+    Check(File.ReadAllText(path).Contains("\"Settings\""), "new menu file includes settings");
     var conflictDraft = store.CreateDraft();
     conflictDraft.Config.Items.Add(new MenuNode { Name = "Conflict", Kind = MenuNodeKind.Group, Hotkey = "Control+Alt+F9" });
-    Check(!store.Validate(conflictDraft.Config).IsValid, "item shortcut validated against current settings");
+    Check(!store.Validate(conflictDraft.Config).IsValid, "item shortcut validated against draft settings");
+    var conflictingGlobals = store.CreateDraft();
+    conflictingGlobals.Config.Settings = conflictingGlobals.Config.Settings with { PanelHotkey = "Control+Alt+F9" };
+    Check(!store.Validate(conflictingGlobals.Config).IsValid, "global shortcuts cannot conflict");
     try { settings.Save(settings.Current with { MenuFontSize = double.NaN }); throw new Exception("invalid font accepted"); }
     catch (InvalidDataException) { Check(settings.Current.MenuFontSize == 16, "invalid settings preserve current state"); }
     File.Delete(path);

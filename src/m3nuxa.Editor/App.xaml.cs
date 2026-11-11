@@ -39,6 +39,7 @@ public partial class App : Application
         var page = new MainPage();
         var arguments = Environment.GetCommandLineArgs();
         if (arguments.Length >= 3 && arguments[1] == "--select") page.SelectMenuItem(arguments[2]);
+        else if (arguments.Length >= 2 && arguments[1] == "--settings") page.ShowSettings();
         _ = ListenForSelectionAsync(page);
         MainWindow.Content = page;
         page.Loaded += (_, _) =>
@@ -89,7 +90,7 @@ public partial class App : Application
                 await pipe.WaitForConnectionAsync(selectionStop.Token);
                 using var reader = new StreamReader(pipe);
                 var id = await reader.ReadLineAsync(selectionStop.Token);
-                if (!string.IsNullOrEmpty(id)) MainWindow.DispatcherQueue.TryEnqueue(() => { page.SelectMenuItem(id); MainWindow.Activate(); });
+                if (!string.IsNullOrEmpty(id)) MainWindow.DispatcherQueue.TryEnqueue(() => { if (id == "--settings") page.ShowSettings(); else page.SelectMenuItem(id); MainWindow.Activate(); });
             }
             catch (OperationCanceledException) { break; }
             catch (Exception ex) { DevLog.Write("editor", "Selection listener failed", ex); await Task.Delay(250); }

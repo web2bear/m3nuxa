@@ -75,4 +75,10 @@
   <data name="EditorRestartRequired" xml:space="preserve">
     <value>Язык изменён. Откройте редактор заново, чтобы обновить его язык.</value>
   </data>
+  <data name="PanelShortcut" xml:space="preserve"><value>Горячая клавиша панели</value></data>
+  <data name="PanelPosition" xml:space="preserve"><value>Расположение панели</value></data>
+  <data name="PanelPositionCenter" xml:space="preserve"><value>По центру экрана</value></data>
+  <data name="PanelPositionCursor" xml:space="preserve"><value>Рядом с курсором</value></data>
+  <data name="InvalidPanelShortcut" xml:space="preserve"><value>Некорректное сочетание клавиш панели.</value></data>
+  <data name="InvalidPanelPosition" xml:space="preserve"><value>Некорректное положение панели.</value></data>
 </root>

@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
-using Microsoft.UI.Xaml;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.UI.Xaml.Controls;
 
 namespace m3nuxa.App;
@@ -9,83 +10,81 @@ public partial class App
 {
     [DllImport("user32.dll")] private static extern bool RegisterHotKey(nint window, int id, uint modifiers, uint key);
     [DllImport("user32.dll")] private static extern bool UnregisterHotKey(nint window, int id);
+
     private static async Task CheckSettingsAsync(TrayApplication tray, ConfigStore config)
     {
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
-        var settings = (SettingsStore)typeof(TrayApplication).GetField("_settings", flags)!.GetValue(tray)!;
-        var save = typeof(TrayApplication).GetMethod("SaveSettings", flags)!;
-        string? Save(AppSettings candidate) => (string?)save.Invoke(tray, [candidate]);
+        var activate = typeof(TrayApplication).GetMethod("RegisterHotkeys", flags)!;
+        void Activate() => activate.Invoke(tray, null);
+        var originalLanguage = L.Language;
         var draft = config.CreateDraft();
-        if (Save(settings.Current with { MainHotkey = "Ctrl+Alt+F10", MenuFontSize = 18 }) is { } error) throw new Exception(error);
-        if (config.Version != draft.BaseVersion) throw new Exception("Settings invalidated menu draft");
-        if (!config.Apply(draft).Success || settings.Current.MainHotkey != "Ctrl+Alt+F10") throw new Exception("Menu apply changed settings");
-        if (RegisterHotKey(0, 28500, 3, 0x79)) { UnregisterHotKey(0, 28500); throw new Exception("New global shortcut not registered immediately"); }
-        if (!RegisterHotKey(0, 28501, 6, 0x7a)) throw new Exception("Cannot reserve test shortcut");
+        var stale = config.CreateDraft();
+        draft.Config.Settings = draft.Config.Settings with { MainHotkey = "Ctrl+Alt+F10", PanelHotkey = "Ctrl+Alt+F9", PanelPosition = "Cursor", MenuFontSize = 18 };
+        if (config.Current.Settings.PanelPosition == "Cursor") throw new Exception("Unapplied settings changed running config");
+        var invalid = config.CreateDraft();
+        invalid.Config.Settings = invalid.Config.Settings with { PanelHotkey = invalid.Config.Settings.MainHotkey };
+        if (config.Apply(invalid).Success) throw new Exception("Conflicting global shortcuts accepted");
+        if (!config.Apply(draft).Success) throw new Exception("Unified settings and tree did not apply");
+        Activate();
+        if (config.Current.Settings.PanelPosition != "Cursor" || config.Current.Settings.MenuFontSize != 18)
+            throw new Exception("Applied settings missing from active config");
+        using (var json = JsonDocument.Parse(File.ReadAllText(config.FilePath)))
+            if (json.RootElement.GetProperty("Settings").GetProperty("PanelPosition").GetString() != "Cursor")
+                throw new Exception("Settings were not persisted in the configuration file");
+        if (config.Apply(stale).Success) throw new Exception("Old draft overwrote newer settings");
+        if (RegisterHotKey(0, 28500, 3, 0x79)) { UnregisterHotKey(0, 28500); throw new Exception("Applied global shortcut not registered"); }
+        if (!RegisterHotKey(0, 28501, 6, 0x7A)) throw new Exception("Cannot reserve occupied test shortcut");
         try
         {
-            if (Save(settings.Current with { MainHotkey = "Ctrl+Shift+F11" }) is null) throw new Exception("Busy shortcut accepted");
-            if (settings.Current.MainHotkey != "Ctrl+Alt+F10") throw new Exception("Busy shortcut replaced previous setting");
-            if (RegisterHotKey(0, 28500, 3, 0x79)) { UnregisterHotKey(0, 28500); throw new Exception("Previous binding not restored after failure"); }
+            var pipe = (AgentPipe)typeof(TrayApplication).GetField("_agentPipe", flags)!.GetValue(tray)!;
+            const string session = "unified-settings-conflict-test";
+            await pipe.ExecuteAsync(session, "begin");
+            var candidate = config.CreateDraft().Config;
+            candidate.Settings = candidate.Settings with { MainHotkey = "Ctrl+Shift+F11" };
+            candidate.Items.Add(new MenuNode { Name = "Unapplied group", Kind = MenuNodeKind.Group });
+            await pipe.ExecuteAsync(session, "replaceDraft", new JsonObject { ["config"] = JsonSerializer.SerializeToNode(candidate) });
+            var before = File.ReadAllText(config.FilePath);
+            var beforeVersion = config.Version;
+            var beforeCount = config.Current.Items.Count;
+            var result = await pipe.ExecuteAsync(session, "apply");
+            if (result["Success"]?.GetValue<bool>() != false) throw new Exception("Occupied new shortcut was accepted");
+            if (config.Version != beforeVersion || config.Current.Items.Count != beforeCount || File.ReadAllText(config.FilePath) != before)
+                throw new Exception("Occupied shortcut changed config, tree or version");
+            if (RegisterHotKey(0, 28500, 3, 0x79)) { UnregisterHotKey(0, 28500); throw new Exception("Previous binding not restored"); }
         }
         finally { UnregisterHotKey(0, 28501); }
-        var open = typeof(TrayApplication).GetMethod("OpenSettings", flags)!;
-        open.Invoke(tray, null); await Task.Delay(180);
-        var window = (Window)typeof(TrayApplication).GetField("_settingsWindow", flags)!.GetValue(tray)!;
-        open.Invoke(tray, null);
-        if (!ReferenceEquals(window, typeof(TrayApplication).GetField("_settingsWindow", flags)!.GetValue(tray))) throw new Exception("Settings window duplicated");
-        var language = (ComboBox)typeof(SettingsWindow).GetField("language", flags)!.GetValue(window)!;
-        var status = (TextBlock)typeof(SettingsWindow).GetField("status", flags)!.GetValue(window)!;
-        var originalLanguage = L.Language;
-        var restartLanguage = L.Language == "ru-RU" ? "en-US" : "ru-RU";
-        var restartIndex = restartLanguage == "ru-RU" ? 1 : 0;
-        // Make sure the next assignment triggers SelectionChanged, regardless of process language.
-        language.SelectedIndex = 1 - restartIndex;
-        language.SelectedIndex = restartIndex;
-        if (settings.Current.Language != restartLanguage || language.SelectedIndex != restartIndex)
-            throw new Exception("Language selection was not saved");
-        var switchedMenu = (MenuFlyout)typeof(TrayApplication).GetMethod("BuildServiceMenu", flags)!.Invoke(tray, null)!;
-        var expectedExit = restartLanguage == "ru-RU" ? "Выход" : "Exit";
-        if (((MenuFlyoutItem)switchedMenu.Items.Last()).Text != expectedExit)
-            throw new Exception("Tray menu did not switch language after saving settings");
-        if (L.Language != restartLanguage || window.Title != L.Get("Settings/WindowTitle"))
-            throw new Exception("Settings window did not switch language");
-        var savedPath = Path.Combine(Path.GetDirectoryName(config.FilePath)!, "settings.json");
-        if (new SettingsStore(savedPath, "").Current.Language != restartLanguage)
-            throw new Exception("Language selection did not persist to the isolated settings file");
-        if (status.Visibility != Visibility.Visible || status.Text != L.Get("Settings/EditorRestartRequired"))
-            throw new Exception("Language change did not explain editor restart");
-        language.SelectedIndex = 1 - restartIndex;
-        if (settings.Current.Language != originalLanguage || L.Language != originalLanguage || status.Text != L.Get("Settings/EditorRestartRequired"))
-            throw new Exception("Switching back did not restore the original language");
-        typeof(SettingsWindow).GetMethod("Start", flags)!.Invoke(window, null);
-        if (!RegisterHotKey(0, 28500, 3, 0x79)) throw new Exception("Settings recording did not pause hotkeys");
-        UnregisterHotKey(0, 28500);
-        typeof(SettingsWindow).GetMethod("Stop", flags)!.Invoke(window, null);
-        if (RegisterHotKey(0, 28500, 3, 0x79)) { UnregisterHotKey(0, 28500); throw new Exception("Settings cancellation did not restore hotkeys"); }
-        window.Close();
-        var previousLanguage = settings.Current.Language;
-        var failureWindow = new SettingsWindow(settings, _ => "simulated save failure", _ => { }, () => { });
-        var displays = Microsoft.UI.Windowing.DisplayArea.FindAll();
-        var display = Microsoft.UI.Windowing.DisplayArea.Primary;
-        for (var i = 0; i < displays.Count; i++) if (!displays[i].IsPrimary) { display = displays[i]; break; }
-        var work = display.WorkArea;
-        failureWindow.AppWindow.Move(new Windows.Graphics.PointInt32(work.X + 40, work.Y + 40));
-        failureWindow.Activate();
+        var suspended = typeof(TrayApplication).GetField("_hotkeysSuspended", flags)!;
         try
         {
-            var failureLanguage = (ComboBox)typeof(SettingsWindow).GetField("language", flags)!.GetValue(failureWindow)!;
-            var failureStatus = (TextBlock)typeof(SettingsWindow).GetField("status", flags)!.GetValue(failureWindow)!;
-            var initialIndex = failureLanguage.SelectedIndex;
-            failureLanguage.SelectedIndex = 1 - initialIndex;
-            if (failureLanguage.SelectedIndex != initialIndex || settings.Current.Language != previousLanguage || L.Language != previousLanguage ||
-                new SettingsStore(savedPath, "").Current.Language != previousLanguage)
-                throw new Exception("Failed language save did not restore selection and saved settings");
-            if (failureStatus.Visibility != Visibility.Visible || failureStatus.Text != "simulated save failure")
-                throw new Exception("Failed language save was not shown");
+            suspended.SetValue(tray, true); Activate();
+            var pipe = (AgentPipe)typeof(TrayApplication).GetField("_agentPipe", flags)!.GetValue(tray)!;
+            const string session = "unified-settings-capture-test";
+            await pipe.ExecuteAsync(session, "begin");
+            var candidate = config.CreateDraft().Config;
+            candidate.Settings = candidate.Settings with { MainHotkey = "Ctrl+Shift+F11", PanelHotkey = "Ctrl+Shift+F12" };
+            await pipe.ExecuteAsync(session, "replaceDraft", new JsonObject { ["config"] = JsonSerializer.SerializeToNode(candidate) });
+            var before = File.ReadAllText(config.FilePath);
+            var version = config.Version;
+            var result = await pipe.ExecuteAsync(session, "apply");
+            if (result["Success"]?.GetValue<bool>() != false || File.ReadAllText(config.FilePath) != before || config.Version != version)
+                throw new Exception("Applying changed shortcuts while capturing changed configuration");
         }
-        finally { failureWindow.Close(); }
+        finally { suspended.SetValue(tray, false); Activate(); }
+        if (RegisterHotKey(0, 28500, 3, 0x79)) { UnregisterHotKey(0, 28500); throw new Exception("Hotkeys were not restored after capture"); }
+        var languageDraft = config.CreateDraft();
+        var changedLanguage = originalLanguage == "ru-RU" ? "en-US" : "ru-RU";
+        languageDraft.Config.Settings = languageDraft.Config.Settings with { Language = changedLanguage };
+        if (!config.Apply(languageDraft).Success) throw new Exception("Language change was not applied");
+        Activate();
+        var menu = (MenuFlyout)typeof(TrayApplication).GetMethod("BuildServiceMenu", flags)!.Invoke(tray, null)!;
+        if (((MenuFlyoutItem)menu.Items.Last()).Text != (changedLanguage == "ru-RU" ? "Выход" : "Exit"))
+            throw new Exception("Tray did not update its language after applying config");
+        var restore = config.CreateDraft();
+        restore.Config.Settings = restore.Config.Settings with { Language = originalLanguage };
+        if (!config.Apply(restore).Success) throw new Exception("Could not restore test language");
+        Activate();
         var items = new List<MenuFlyoutItemBase>();
-        LauncherMenu.Fill(items, [new MenuNode { Name = "Group", Kind = MenuNodeKind.Group, Children = [new MenuNode { Name = "Child", Kind = MenuNodeKind.Action }] }], _ => {}, _ => {}, settings.Current.MenuFontSize);
+        LauncherMenu.Fill(items, [new MenuNode { Name = "Group", Kind = MenuNodeKind.Group, Children = [new MenuNode { Name = "Child", Kind = MenuNodeKind.Action }] }], _ => {}, _ => {}, config.Current.Settings.MenuFontSize);
         var group = (MenuFlyoutSubItem)items[0];
         if (group.FontSize != 18 || ((MenuFlyoutItem)group.Items[0]).FontSize != 18) throw new Exception("Font size not propagated to nested menus");
     }

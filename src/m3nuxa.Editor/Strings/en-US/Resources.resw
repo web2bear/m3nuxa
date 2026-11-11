@@ -490,4 +490,14 @@ or select an existing item.</value>
   <data name="Icon_BundledHeading" xml:space="preserve"><value>Built-in icons</value></data>
   <data name="Workflow_Sequence" xml:space="preserve"><value>Action sequence</value></data>
   <data name="Workflow_StepName" xml:space="preserve"><value>Step name</value></data>
+  <data name="Editor_MenuSection" xml:space="preserve"><value>Menu</value></data>
+  <data name="Editor_SettingsDraftHint" xml:space="preserve"><value>Settings and the menu are saved together with Apply. Restart the editor to change its language.</value></data>
+  <data name="Editor_SettingsLanguage" xml:space="preserve"><value>Interface language</value></data>
+  <data name="Editor_SettingsMenuShortcut" xml:space="preserve"><value>Menu shortcut</value></data>
+  <data name="Editor_SettingsPanelShortcut" xml:space="preserve"><value>Launcher panel shortcut</value></data>
+  <data name="Editor_SettingsPanelPosition" xml:space="preserve"><value>Panel position</value></data>
+  <data name="Editor_SettingsPositionCenter" xml:space="preserve"><value>Remember position (initially centered)</value></data>
+  <data name="Editor_SettingsPositionCursor" xml:space="preserve"><value>Near the pointer</value></data>
+  <data name="Editor_SettingsFontSize" xml:space="preserve"><value>Menu font size</value></data>
+  <data name="Editor_SettingsPanelConflict" xml:space="preserve"><value>This shortcut is assigned to the launcher panel.</value></data>
 </root>

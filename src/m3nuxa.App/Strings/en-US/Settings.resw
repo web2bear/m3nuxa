@@ -75,4 +75,10 @@
   <data name="EditorRestartRequired" xml:space="preserve">
     <value>Language changed. Reopen the editor to update its language.</value>
   </data>
+  <data name="PanelShortcut" xml:space="preserve"><value>Launcher panel shortcut</value></data>
+  <data name="PanelPosition" xml:space="preserve"><value>Launcher panel position</value></data>
+  <data name="PanelPositionCenter" xml:space="preserve"><value>Center of screen</value></data>
+  <data name="PanelPositionCursor" xml:space="preserve"><value>Near pointer</value></data>
+  <data name="InvalidPanelShortcut" xml:space="preserve"><value>The panel shortcut is invalid.</value></data>
+  <data name="InvalidPanelPosition" xml:space="preserve"><value>The panel position is invalid.</value></data>
 </root>

@@ -65,7 +65,7 @@ Describe the workflow you want — for example, “Create a group for my project
 3. Right-click the tray icon and choose **Edit configuration**. Add a few actions, then click **Apply**.
 4. Press **Ctrl+Alt+Space** and make it your own.
 
-The self-contained portable build does not require a separate .NET installation. Keep the whole folder when moving it: configuration and settings live alongside the application. Paths to external apps and folders must still be valid on the destination computer.
+The self-contained portable build does not require a separate .NET installation. Keep the whole folder when moving it: the menu tree and application settings are stored together in the configuration file. Paths to external apps and folders must still be valid on the destination computer.
 
 > **Preview software:** check the release notes for the build you download. The screenshots show the current development interface; an earlier release may look different.
 

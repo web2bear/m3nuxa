@@ -19,6 +19,20 @@ internal static class AgentPipeWorkflowChecks
         var store = new ConfigStore(path);
         using var pipe = new AgentPipe(store, () => { });
         {
+            var successEnvelope = JsonNode.Parse(AgentPipe.SerializeSuccessForChecks(new JsonObject { ["probe"] = true }))!.AsObject();
+            Check(successEnvelope["protocolVersion"]?.GetValue<int>() == AgentPipeProtocol.Version &&
+                successEnvelope["success"]?.GetValue<bool>() == true && successEnvelope["data"]?["probe"]?.GetValue<bool>() == true,
+                "successful pipe response uses the versioned envelope");
+            var oldVersion = await pipe.DispatchForChecks("""{"protocolVersion":99,"session":"test","operation":"read","arguments":{}}""");
+            var oldVersionEnvelope = JsonNode.Parse(oldVersion)!.AsObject();
+            Check(oldVersionEnvelope["success"]?.GetValue<bool>() == false &&
+                oldVersionEnvelope["error"]?["code"]?.GetValue<string>() == "unsupported_protocol_version",
+                "unsupported protocol version returns a stable error code");
+            var malformed = await pipe.DispatchForChecks("{");
+            var malformedEnvelope = JsonNode.Parse(malformed)!.AsObject();
+            Check(malformedEnvelope["success"]?.GetValue<bool>() == false &&
+                malformedEnvelope["error"]?["code"]?.GetValue<string>() == "request_failed",
+                "malformed request returns the explicit error envelope");
             var initial = await pipe.ExecuteAsync("test", "begin");
             Check(initial["configPath"] is null, "unsaved configuration has no filename");
             await pipe.ExecuteAsync("test", "create", JsonNode.Parse("""
@@ -30,9 +44,9 @@ internal static class AgentPipeWorkflowChecks
             await pipe.ExecuteAsync("test", "update", JsonNode.Parse("""
             {"id":"action","node":{"Name":"Changed","Kind":"Action"}}
             """)!.AsObject());
-            await Reject(() => pipe.ExecuteAsync("test", "update", JsonNode.Parse("""
+            await RejectCode(() => pipe.ExecuteAsync("test", "update", JsonNode.Parse("""
             {"id":"action","node":{"Kind":"Action","Steps":[{"Kind":"Delay"},{"Kind":"Delay"}]}}
-            """)!.AsObject()), "update cannot replace equally many steps");
+            """)!.AsObject()), "steps_require_set_steps", "update cannot replace equally many steps");
             await Reject(() => pipe.ExecuteAsync("test", "setSteps", JsonNode.Parse("""{"id":"action","steps":[]}""")!.AsObject()), "empty sequence rejected");
             await Reject(() => pipe.ExecuteAsync("test", "setSteps", JsonNode.Parse("""{"id":"action","steps":[null]}""")!.AsObject()), "null step rejected");
             var unchanged = await pipe.ExecuteAsync("test", "validate");
@@ -51,7 +65,15 @@ internal static class AgentPipeWorkflowChecks
             Check(saveAs["Success"]!.GetValue<bool>(), "save as through agent pipe succeeds");
             var reopened = await pipe.ExecuteAsync("test", "begin");
             Check(reopened["configPath"]!.GetValue<string>() == otherPath && File.Exists(otherPath), "save as reports new active file");
+            await RejectCode(() => pipe.ExecuteAsync("session-without-begin", "validate"), "draft_not_started", "missing draft has stable error code");
         }
+    }
+
+    private static async Task RejectCode(Func<Task<JsonNode>> operation, string expectedCode, string name)
+    {
+        try { await operation(); }
+        catch (AgentPipe.ProtocolException ex) when (ex.Code == expectedCode) { return; }
+        throw new Exception(name + ": expected code " + expectedCode);
     }
 
     private static async Task Reject(Func<Task<JsonNode>> operation, string name)

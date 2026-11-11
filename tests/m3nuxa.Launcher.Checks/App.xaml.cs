@@ -35,6 +35,7 @@ public partial class App : Application
             for (var i = 0; i < displays.Count; i++) if (!displays[i].IsPrimary) { testArea = displays[i].WorkArea; break; }
             await CheckEarlyFileConflictAsync(testArea);
             SetCursorPos(testArea.X + 160, testArea.Y + 160);
+            await CheckPanelFrameAsync();
             var iconPath = Path.Combine(root, "icon.png");
             using (var bitmap = new System.Drawing.Bitmap(24, 24)) { using var graphics = System.Drawing.Graphics.FromImage(bitmap); graphics.Clear(System.Drawing.Color.Magenta); bitmap.Save(iconPath); }
             var group = new MenuNode { Name = "Тестовая группа", IconPath = iconPath, Kind = MenuNodeKind.Group, Children = [new MenuNode { Name = "Тестовое действие", IconPath = iconPath, Kind = MenuNodeKind.Action }] };
@@ -117,7 +118,7 @@ public partial class App : Application
             }
             service.Hide();
             overflow.Close();
-            await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, "result.txt"), "PASS: settings immediate registration, occupied-key rollback, independent menu drafts, singleton settings window, recording pause/cancel, nested font size; visible icons in root group, root action and nested action; WinUI menu popup, nested hierarchy, hide/reopen, empty menu; compact aligned service items and toggles; Exit above topmost overflow at bottom edge; isolated configuration.");
+            await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, "result.txt"), "PASS: unified settings apply, conflicting shortcuts, stale draft, registration, language, nested font size; visible icons in root group, root action and nested action; WinUI menu popup, nested hierarchy, hide/reopen, empty menu; compact aligned service items and toggles; Exit above topmost overflow at bottom edge; isolated configuration.");
             tray.Dispose(); Directory.Delete(root, true); Environment.Exit(0);
         }
         catch (Exception ex) { await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, "result.txt"), "FAIL: " + ex); tray?.Dispose(); Directory.Delete(root, true); Environment.Exit(1); }

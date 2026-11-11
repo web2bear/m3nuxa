@@ -7,7 +7,7 @@ using m3nuxa.App;
 
 namespace m3nuxa.Editor;
 
-public sealed record EditorResponse(bool Success, string? Message, JsonNode? Data);
+public sealed record EditorResponse(bool Success, string? Message, JsonNode? Data, string? ErrorCode = null);
 
 public sealed class EditorPipeClient
 {
@@ -66,12 +66,7 @@ public sealed class EditorPipeClient
     public async Task<EditorResponse> SendAsync(string operation, JsonNode? payload = null)
     {
         DevLog.Write("editor-pipe", $"Sending {operation}");
-        var request = new JsonObject
-        {
-            ["session"] = _session,
-            ["operation"] = operation,
-            ["arguments"] = payload?.DeepClone() ?? new JsonObject()
-        };
+        var request = AgentPipeProtocol.CreateRequest(_session, operation, payload?.DeepClone() as JsonObject);
 
         var processes = Process.GetProcessesByName("m3nuxa.App");
         try
@@ -90,15 +85,21 @@ public sealed class EditorPipeClient
                     await writer.WriteLineAsync(request.ToJsonString());
                     var response = await reader.ReadLineAsync(timeout.Token);
                     if (response is null) return new(false, L.Get("Editor_TheTrayApplicationClosedThe_20a486"), null);
-                    var data = JsonNode.Parse(response);
+                    var envelope = JsonNode.Parse(response)?.AsObject();
+                    if (envelope is null || envelope["protocolVersion"]?.GetValue<int>() != AgentPipeProtocol.Version ||
+                        envelope["success"] is not JsonValue successValue ||
+                        !successValue.TryGetValue<bool>(out var success))
+                        return new(false, L.Get("Editor_TheTrayApplicationClosedThe_20a486"), null, "invalid_response");
                     try { TrayDirectory = Path.GetDirectoryName(process.MainModule?.FileName); }
                     catch (System.ComponentModel.Win32Exception) { TrayDirectory = null; }
                     DevLog.Write("editor-pipe", $"Received {operation} response");
-                    var error = data?["error"]?.GetValue<string>();
-                    if (error is not null) return new(false, error, data);
-                    var success = data?["Success"]?.GetValue<bool>() ?? true;
-                    var message = data?["Error"]?.GetValue<string>();
-                    return new(success, message, data);
+                    if (!success)
+                    {
+                        var error = envelope["error"]?.AsObject();
+                        return new(false, error?["message"]?.GetValue<string>() ?? L.Get("Editor_CouldNotApplyTheConfiguration_9f63ee"),
+                            envelope["data"]?.DeepClone(), error?["code"]?.GetValue<string>() ?? "request_failed");
+                    }
+                    return new(true, null, envelope["data"]?.DeepClone());
                 }
                 catch (Exception ex) when (ex is IOException or TimeoutException or OperationCanceledException)
                 {

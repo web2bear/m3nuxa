@@ -52,9 +52,19 @@ public sealed class MenuNode
     public List<MenuNode> Children { get; set; } = [];
 }
 
+public sealed record AppSettings
+{
+    public string MainHotkey { get; init; } = "Ctrl+Alt+Space";
+    public string PanelHotkey { get; init; } = "";
+    public string PanelPosition { get; init; } = "Center";
+    public double MenuFontSize { get; init; } = 12;
+    public string Language { get; init; } = "en-US";
+}
+
 public sealed class AppConfig
 {
-    public int SchemaVersion { get; set; } = 2;
+    public int SchemaVersion { get; set; } = 3;
+    public AppSettings Settings { get; set; } = new();
     [JsonIgnore]
     public string MainHotkey { get; set; } = "Ctrl+Alt+Space";
     // Read old configurations once; new menu files contain only the tree.
