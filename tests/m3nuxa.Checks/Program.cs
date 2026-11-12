@@ -1,4 +1,4 @@
-﻿using m3nuxa.App;
+using m3nuxa.App;
 using System.Reflection;
 
 if (args.Length == 2 && args[0] == "--open-folder")
@@ -16,8 +16,10 @@ try
 {
     WorkflowModelChecks.Run(root);
     UnifiedConfigurationChecks.Run(root);
+    ConfigCatalogChecks.Run(root);
     WorkflowExecutionChecks.Run(root);
     AgentPipeWorkflowChecks.Run(root);
+    CopyConflictChecks.Run(root);
     LocalizationChecks.Run();
     DropGeometryChecks.Run();
     EditorDraftChecks.Run();
@@ -29,12 +31,7 @@ try
     var settingsPath = Path.Combine(root, "settings.json");
     var settings = new SettingsStore(settingsPath, "Ctrl+Shift+F8");
     Check(settings.Current.MainHotkey == "Ctrl+Shift+F8", "legacy global shortcut migrated");
-    Check(settings.Current.Language == "en-US", "default language is English");
-    File.WriteAllText(settingsPath, "{\"MainHotkey\":\"Ctrl+Shift+F8\",\"MenuFontSize\":12}");
-    Check(new SettingsStore(settingsPath, "").Current.Language == "en-US", "legacy settings default to English");
-    File.WriteAllText(settingsPath, "{\"Language\":\"unknown\"}");
-    Check(new SettingsStore(settingsPath, "").Current.Language == "en-US", "unsupported language falls back to English");
-    settings.Save(settings.Current with { MainHotkey = "Ctrl+Alt+F9", MenuFontSize = 16, Language = "ru-RU" });
+    settings.Save(settings.Current with { MainHotkey = "Ctrl+Alt+F9", MenuFontSize = 16 });
     Check(new SettingsStore(settingsPath, "Ctrl+Shift+F8").Current == settings.Current, "settings survive restart and migration does not overwrite");
     var settingsDraft = store.CreateDraft();
     settingsDraft.Config.Settings = settings.Current;
@@ -190,7 +187,7 @@ try
     var badShortcut = store.CreateDraft();
     badShortcut.Config.Items.Add(new MenuNode { Name = "Invalid send", Kind = MenuNodeKind.Action,
         Action = new MenuAction { Kind = ActionKind.SendShortcut, Shortcut = "Ctrl+" } });
-    Check(!store.Validate(badShortcut.Config).IsValid, "invalid sent shortcut blocked before execution");
+    Check(store.Validate(badShortcut.Config).IsValid, "invalid sent shortcut can be saved for later editing");
     Console.WriteLine("All configuration and icon checks passed.");
 }
 finally { Directory.Delete(root, recursive: true); }

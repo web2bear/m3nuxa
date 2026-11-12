@@ -31,11 +31,13 @@ internal static class WorkflowModelChecks
         Check(restored.Steps.Count == 2 && restored.Steps[1].DelayMilliseconds == 25 && restored.Steps[1].Name == "Wait for editor", "steps survive restart");
         draft = store.CreateDraft();
         draft.Config.Items[0].Steps[1].DelayMilliseconds = -1;
-        Check(!store.Validate(draft.Config).IsValid, "invalid subsequent step rejected");
+        Check(store.Validate(draft.Config).IsValid, "invalid subsequent step can be saved");
         draft.Config.Items[0].Steps.Clear();
-        Check(!store.Validate(draft.Config).IsValid, "empty sequence rejected");
+        Check(store.Apply(draft).Success && new ConfigStore(path).Current.Items[0].Steps.Count == 0, "empty sequence saves and reloads");
         draft.Config.Items[0].Steps.Add(new MenuAction { Kind = ActionKind.RunProgram, Path = "test.exe", WaitForExit = true, TimeoutMilliseconds = 0 });
-        Check(!store.Validate(draft.Config).IsValid, "non-positive timeout rejected");
+        Check(store.Validate(draft.Config).IsValid && store.Validate(draft.Config).Warnings.Count == 0, "incomplete step can be saved without path warnings");
+        draft.Config.Items[0].Steps[0].Kind = (ActionKind)999;
+        Check(!store.Validate(draft.Config).IsValid, "unknown step kind remains a structural error");
     }
 
     private static void Check(bool condition, string message)

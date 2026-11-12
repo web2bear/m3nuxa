@@ -16,7 +16,7 @@ internal static class AgentPipeWorkflowChecks
         var directory = Path.Combine(root, "pipe-workflow");
         Directory.CreateDirectory(directory);
         var path = Path.Combine(directory, "config.json");
-        var store = new ConfigStore(path);
+        var store = new ConfigStore(path, Path.Combine(directory, "active-config.txt"), directory);
         using var pipe = new AgentPipe(store, () => { });
         {
             var successEnvelope = JsonNode.Parse(AgentPipe.SerializeSuccessForChecks(new JsonObject { ["probe"] = true }))!.AsObject();
@@ -49,6 +49,12 @@ internal static class AgentPipeWorkflowChecks
             """)!.AsObject()), "steps_require_set_steps", "update cannot replace equally many steps");
             await Reject(() => pipe.ExecuteAsync("test", "setSteps", JsonNode.Parse("""{"id":"action","steps":[]}""")!.AsObject()), "empty sequence rejected");
             await Reject(() => pipe.ExecuteAsync("test", "setSteps", JsonNode.Parse("""{"id":"action","steps":[null]}""")!.AsObject()), "null step rejected");
+            var invalidPath = Path.Combine(directory, "invalid.json");
+            File.WriteAllText(invalidPath, "{\"SchemaVersion\":3,\"Name\":\"Invalid\",\"Settings\":{},\"Items\":null}");
+            try { await pipe.ExecuteAsync("test", "loadConfig", new JsonObject { ["path"] = invalidPath }); throw new Exception("invalid config accepted"); }
+            catch (AgentPipe.ProtocolException) { }
+            await pipe.ExecuteAsync("test", "update", JsonNode.Parse("""{"id":"group","node":{"Name":"Still present","Kind":"Group"}}""")!.AsObject());
+            File.Delete(invalidPath);
             var unchanged = await pipe.ExecuteAsync("test", "validate");
             Check(unchanged["IsValid"]!.GetValue<bool>(), "property updates preserve children and steps");
             await pipe.ExecuteAsync("test", "setSteps", JsonNode.Parse("""
@@ -60,11 +66,23 @@ internal static class AgentPipeWorkflowChecks
             Check(saved["configPath"]?.GetValue<string>() == Path.GetFullPath(path), "saved configuration path returned to editor");
             var node = new ConfigStore(path).Current.Items.Single().Children.Single();
             Check(node.Name == "Changed" && node.Steps.Count == 2 && node.Steps[0].DelayMilliseconds == 25 && node.Steps[1].Text == "second", "updated ordered sequence survives restart");
-            var otherPath = Path.Combine(directory, "saved-as.json");
-            var saveAs = await pipe.ExecuteAsync("test", "saveAs", new JsonObject { ["path"] = otherPath });
-            Check(saveAs["Success"]!.GetValue<bool>(), "save as through agent pipe succeeds");
+            var saveAs = await pipe.ExecuteAsync("test", "saveAs", new JsonObject { ["name"] = "Copy" });
+            Check(saveAs["config"]?["Name"]?.GetValue<string>() == "Copy" && store.FilePath == path,
+                "save as creates a named draft without activating it");
+            Check((await pipe.ExecuteAsync("test", "apply"))["Success"]!.GetValue<bool>(), "copy applies through pipe");
             var reopened = await pipe.ExecuteAsync("test", "begin");
-            Check(reopened["configPath"]!.GetValue<string>() == otherPath && File.Exists(otherPath), "save as reports new active file");
+            Check(reopened["configPath"]!.GetValue<string>() == store.FilePath && store.FilePath != path && File.Exists(store.FilePath),
+                "applying copy reports new active file");
+            Check(new ConfigStore(store.FilePath).Current.Items.Single().Children.Single().Steps.Count == 2,
+                "copy preserves workflow");
+            await pipe.ExecuteAsync("mcp-independent", "begin");
+            await pipe.ExecuteAsync("mcp-independent", "update", JsonNode.Parse("""{"id":"group","node":{"Name":"Independent draft","Kind":"Group"}}""")!.AsObject());
+            var delete = await pipe.ExecuteAsync("test", "deleteActiveConfig", new JsonObject { ["version"] = reopened["version"]!.GetValue<long>() });
+            Check(delete["configPath"]!.GetValue<string>() == path, "delete opens next active configuration in editor session");
+            Check((await pipe.ExecuteAsync("mcp-independent", "validate"))["IsValid"]!.GetValue<bool>(), "independent draft survives active deletion");
+            await Reject(() => pipe.ExecuteAsync("mcp-independent", "apply"), "independent draft becomes stale after deletion");
+            await pipe.ExecuteAsync("mcp-independent", "update", JsonNode.Parse("""{"id":"group","node":{"Name":"Preserved after failed apply","Kind":"Group"}}""")!.AsObject());
+            await pipe.ExecuteAsync("mcp-independent", "discard");
             await RejectCode(() => pipe.ExecuteAsync("session-without-begin", "validate"), "draft_not_started", "missing draft has stable error code");
         }
         var limitedPipe = pipe;

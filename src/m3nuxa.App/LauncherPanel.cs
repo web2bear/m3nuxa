@@ -1,4 +1,5 @@
 using Microsoft.UI.Windowing;
+using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
@@ -20,36 +21,36 @@ internal sealed class LauncherPanel : Window
     private static LauncherPanel? active;
     private readonly IReadOnlyList<MenuNode> root;
     private readonly Action<MenuNode> execute;
+    private readonly AppSettings settings;
     private readonly Stack<MenuNode> path = new();
     private readonly GridView grid = new() { SelectionMode = ListViewSelectionMode.None, IsItemClickEnabled = true,
         HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch };
-    private readonly HyperlinkButton home = new();
     private readonly HyperlinkButton back = new();
-    private readonly TextBlock title = new() { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center,
-        FontSize = 13, Opacity = .6, TextTrimming = TextTrimming.CharacterEllipsis };
+    private readonly HyperlinkButton forward = new();
+    private readonly BreadcrumbBar breadcrumbs = new() { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Left };
+    private readonly List<MenuNode[]> history = new() { Array.Empty<MenuNode>() };
+    private int historyIndex;
     private readonly TextBlock empty = new() { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Opacity = .65 };
     private bool activated;
     private PanelSize? resizedSize;
     private PointInt32? movedPosition;
-    private readonly Grid dragRegion = new() { Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent) };
-    private readonly SubclassProc frameCallback;
+    private readonly Grid header = new() { ColumnSpacing = 6 };
+    private readonly TextBlock itemDetails = new() { FontSize = 12, Opacity = .68, MaxLines = 1,
+        TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
+    private HyperlinkButton close = null!;
+    private TextBlock? hoveredCrumb;
+    private (GridViewItem Item, string Hint)? hoveredItem;
+    private (GridViewItem Item, string Hint)? focusedItem;
 
-    private LauncherPanel(IEnumerable<MenuNode> nodes, Action<MenuNode> execute, Action openEditor, bool atCursor)
+    private LauncherPanel(IEnumerable<MenuNode> nodes, Action<MenuNode> execute, Action openEditor, AppSettings settings)
     {
-        root = nodes.ToList(); this.execute = execute;
+        root = nodes.ToList(); this.execute = execute; this.settings = settings;
+        var atCursor = settings.PanelPosition == "Cursor";
         Title = "m3nuxa";
-        SystemBackdrop = new DesktopAcrylicBackdrop();
         AppWindow.IsShownInSwitchers = false;
         var presenter = (OverlappedPresenter)AppWindow.Presenter;
-        presenter.SetBorderAndTitleBar(false, false); presenter.IsResizable = true; presenter.IsAlwaysOnTop = true;
-        // The presenter can leave WS_DLGFRAME behind, adding a visible 3-pixel
-        // non-client frame even when HasBorder is false. Keep the DWM outline.
+        presenter.SetBorderAndTitleBar(true, false); presenter.IsResizable = true; presenter.IsAlwaysOnTop = true;
         var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-        frameCallback = ProcessFrameMessage;
-        if (!SetWindowSubclass(hwnd, frameCallback, 1, 0)) throw new System.ComponentModel.Win32Exception();
-        var style = GetWindowLong(hwnd, -16);
-        SetWindowLong(hwnd, -16, (style & ~0x00400000) | 0x00040000); // WS_DLGFRAME / WS_THICKFRAME
-        SetWindowPos(hwnd, nint.Zero, 0, 0, 0, 0, 0x0037); // FRAMECHANGED, NOMOVE, NOSIZE, NOZORDER, NOACTIVATE
         var corner = 2; DwmSetWindowAttribute(WinRT.Interop.WindowNative.GetWindowHandle(this), 33, ref corner, sizeof(int));
         GetCursorPos(out var cursor);
         var savedPosition = atCursor ? null : LoadPosition();
@@ -105,6 +106,24 @@ internal sealed class LauncherPanel : Window
             resizedSize = new PanelSize(actual.Width / windowScale, actual.Height / windowScale);
         };
         var layout = new Grid { Padding = new Thickness(20, 16, 20, 16), RowSpacing = 8 };
+        if (!new Windows.UI.ViewManagement.AccessibilitySettings().HighContrast)
+        {
+            var backdrop = new WinUIEx.TransparentTintBackdrop();
+            SystemBackdrop = backdrop;
+            layout.Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+            if (settings.PanelBackground.Length > 0) layout.RequestedTheme = LauncherMenu.ContrastTheme(settings.PanelBackground);
+            void UpdateBackdrop()
+            {
+                var color = settings.PanelBackground.Length > 0 ? LauncherMenu.ParseColor(settings.PanelBackground) :
+                    layout.ActualTheme == ElementTheme.Light ? Windows.UI.Color.FromArgb(255, 245, 245, 245) : Windows.UI.Color.FromArgb(255, 32, 32, 32);
+                color.A = (byte)Math.Round(settings.PanelOpacity * 255 / 100.0);
+                backdrop.TintColor = color;
+            }
+            layout.Loaded += (_, _) => UpdateBackdrop();
+            layout.ActualThemeChanged += (_, _) => UpdateBackdrop();
+            UpdateBackdrop();
+        }
+        else SystemBackdrop = new DesktopAcrylicBackdrop();
         void UpdateBorder()
         {
             // Let Windows choose its accessible border in high contrast mode.
@@ -117,34 +136,32 @@ internal sealed class LauncherPanel : Window
         layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        var header = new Grid { ColumnSpacing = 6 };
+        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        AutomationProperties.SetName(home, L.Language == "ru-RU" ? "Домой" : "Home");
-        AutomationProperties.SetName(back, L.Language == "ru-RU" ? "На уровень вверх" : "Up one level");
-        ConfigureNavigation(home, "\uE80F", L.Language == "ru-RU" ? "Домой" : "Home");
-        ConfigureNavigation(back, "\uE72B", L.Language == "ru-RU" ? "Вверх" : "Up");
-        ToolTipService.SetToolTip(home, L.Language == "ru-RU" ? "Домой" : "Home");
-        ToolTipService.SetToolTip(back, L.Language == "ru-RU" ? "На уровень вверх" : "Up one level");
-        home.Click += (_, _) => { path.Clear(); Refresh(); };
-        back.Click += (_, _) => { if (path.Count > 0) path.Pop(); Refresh(); };
-        header.Children.Add(home); header.Children.Add(back); Grid.SetColumn(back, 1);
-        dragRegion.Children.Add(title);
-        header.Children.Add(dragRegion); Grid.SetColumn(dragRegion, 2);
+        AutomationProperties.SetName(back, L.Language == "ru-RU" ? "Назад" : "Back");
+        AutomationProperties.SetName(forward, L.Language == "ru-RU" ? "Вперёд" : "Forward");
+        ConfigureArrow(back, "\uE76B", L.Language == "ru-RU" ? "Назад" : "Back");
+        ConfigureArrow(forward, "\uE76C", L.Language == "ru-RU" ? "Вперёд" : "Forward");
+        back.Click += (_, _) => MoveHistory(-1);
+        forward.Click += (_, _) => MoveHistory(1);
+        breadcrumbs.ItemClicked += (_, e) => Navigate(path.Reverse().Take(e.Index).ToArray());
+        header.Children.Add(back); header.Children.Add(forward); Grid.SetColumn(forward, 1);
+        header.Children.Add(breadcrumbs); Grid.SetColumn(breadcrumbs, 2);
         var editor = new HyperlinkButton { HorizontalAlignment = HorizontalAlignment.Right };
         ConfigureNavigation(editor, "\uE70F", L.Language == "ru-RU" ? "Правка" : "Edit");
         AutomationProperties.SetName(editor, L.Get("TrayEditor"));
         editor.Click += (_, _) => { Close(); openEditor(); };
-        header.Children.Add(editor); Grid.SetColumn(editor, 3);
-        var close = new HyperlinkButton { Content = new FontIcon { Glyph = "\uE8BB", FontSize = 12 },
+        close = new HyperlinkButton { Content = new FontIcon { Glyph = "\uE8BB", FontSize = 12 },
             Padding = new Thickness(4, 3, 4, 3), MinWidth = 0, MinHeight = 28 };
         AutomationProperties.SetName(close, L.Language == "ru-RU" ? "Закрыть" : "Close");
         ToolTipService.SetToolTip(close, L.Language == "ru-RU" ? "Закрыть" : "Close");
         close.Click += (_, _) => Close();
-        header.Children.Add(close); Grid.SetColumn(close, 4); layout.Children.Add(header);
+        header.Children.Add(close); Grid.SetColumn(close, 3); layout.Children.Add(header);
+        breadcrumbs.AddHandler(UIElement.PointerMovedEvent, new PointerEventHandler(OnBreadcrumbPointerMoved), true);
+        breadcrumbs.PointerExited += (_, _) => ClearBreadcrumbHover();
         var divider = new Border { Height = 1, Background = (Brush)Application.Current.Resources["DividerStrokeColorDefaultBrush"],
             Margin = new Thickness(0, 0, 0, 2), IsHitTestVisible = false };
         layout.Children.Add(divider); Grid.SetRow(divider, 1);
@@ -152,40 +169,45 @@ internal sealed class LauncherPanel : Window
         grid.ItemClick += (_, e) =>
         {
             if (e.ClickedItem is not FrameworkElement { Tag: MenuNode node }) return;
-            if (node.Kind == MenuNodeKind.Group) { path.Push(node); Refresh(); }
+            if (node.Kind == MenuNodeKind.Group) Navigate(path.Reverse().Append(node).ToArray());
             else { Close(); execute(node); }
         };
         layout.Children.Add(grid); Grid.SetRow(grid, 2);
         layout.Children.Add(empty); Grid.SetRow(empty, 2);
+        var footer = new Grid { ColumnSpacing = 12, MinHeight = 28 };
+        footer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        footer.Children.Add(itemDetails);
+        footer.Children.Add(editor); Grid.SetColumn(editor, 1);
+        layout.Children.Add(footer); Grid.SetRow(footer, 3);
         grid.Loaded += (_, _) => grid.Focus(FocusState.Programmatic);
         layout.KeyDown += (_, e) => { if (e.Key == VirtualKey.Escape) { e.Handled = true; Close(); } };
         var surface = new Grid();
         surface.Children.Add(layout);
-        void AddResizeGrip(HorizontalAlignment horizontal, VerticalAlignment vertical, int direction)
+        void UpdateTitleBarRegions()
         {
-            var shape = direction switch
+            if (header.XamlRoot is null || header.ActualHeight <= 0) return;
+            var scale = header.XamlRoot.RasterizationScale;
+            RectInt32 Bounds(FrameworkElement element)
             {
-                10 or 11 => Microsoft.UI.Input.InputSystemCursorShape.SizeWestEast,
-                12 or 15 => Microsoft.UI.Input.InputSystemCursorShape.SizeNorthSouth,
-                13 or 17 => Microsoft.UI.Input.InputSystemCursorShape.SizeNorthwestSoutheast,
-                _ => Microsoft.UI.Input.InputSystemCursorShape.SizeNortheastSouthwest
-            };
-            var grip = new ResizeGrip(shape) { Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
-                HorizontalAlignment = horizontal, VerticalAlignment = vertical,
-                Width = horizontal == HorizontalAlignment.Stretch ? double.NaN : 8,
-                Height = vertical == VerticalAlignment.Stretch ? double.NaN : 8 };
-            grip.PointerPressed += (_, e) => BeginWindowDrag(hwnd, direction, e);
-            surface.Children.Add(grip);
+                var origin = element.TransformToVisual(surface).TransformPoint(new Windows.Foundation.Point());
+                return new RectInt32((int)Math.Round(origin.X * scale), (int)Math.Round(origin.Y * scale),
+                    (int)Math.Ceiling(element.ActualWidth * scale), (int)Math.Ceiling(element.ActualHeight * scale));
+            }
+            var headerBounds = Bounds(header);
+            var source = InputNonClientPointerSource.GetForWindowId(AppWindow.Id);
+            source.SetRegionRects(NonClientRegionKind.Caption, new[] { new RectInt32(0, 0, AppWindow.Size.Width, headerBounds.Y + headerBounds.Height) });
+            source.SetRegionRects(NonClientRegionKind.Passthrough, new[] { Bounds(back), Bounds(forward), Bounds(breadcrumbs), Bounds(close) });
         }
-        AddResizeGrip(HorizontalAlignment.Stretch, VerticalAlignment.Top, 12);
-        AddResizeGrip(HorizontalAlignment.Stretch, VerticalAlignment.Bottom, 15);
-        AddResizeGrip(HorizontalAlignment.Left, VerticalAlignment.Stretch, 10);
-        AddResizeGrip(HorizontalAlignment.Right, VerticalAlignment.Stretch, 11);
-        AddResizeGrip(HorizontalAlignment.Left, VerticalAlignment.Top, 13);
-        AddResizeGrip(HorizontalAlignment.Right, VerticalAlignment.Top, 14);
-        AddResizeGrip(HorizontalAlignment.Left, VerticalAlignment.Bottom, 16);
-        AddResizeGrip(HorizontalAlignment.Right, VerticalAlignment.Bottom, 17);
-        dragRegion.PointerPressed += (_, e) => BeginWindowDrag(hwnd, 2, e);
+        void OnRootChanged(XamlRoot sender, XamlRootChangedEventArgs args) => UpdateTitleBarRegions();
+        header.Loaded += (_, _) =>
+        {
+            header.XamlRoot.Changed += OnRootChanged;
+            UpdateTitleBarRegions();
+        };
+        Closed += (_, _) => { if (header.XamlRoot is not null) header.XamlRoot.Changed -= OnRootChanged; };
+        header.SizeChanged += (_, _) => UpdateTitleBarRegions();
+        breadcrumbs.SizeChanged += (_, _) => UpdateTitleBarRegions();
         Content = surface;
         Activated += (_, e) =>
         {
@@ -196,51 +218,35 @@ internal sealed class LauncherPanel : Window
         Refresh();
     }
 
-    private sealed class ResizeGrip : UserControl
+    private static IEnumerable<DependencyObject> Descendants(DependencyObject parent)
     {
-        public ResizeGrip(Microsoft.UI.Input.InputSystemCursorShape shape)
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
         {
-            ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(shape);
-            Content = new Border { Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent) };
+            var child = VisualTreeHelper.GetChild(parent, i);
+            yield return child;
+            foreach (var descendant in Descendants(child)) yield return descendant;
         }
     }
 
-    private static void BeginWindowDrag(nint hwnd, int direction, PointerRoutedEventArgs args)
+    private void OnBreadcrumbPointerMoved(object sender, PointerRoutedEventArgs args)
     {
-        if (!args.GetCurrentPoint(null).Properties.IsLeftButtonPressed) return;
-        args.Handled = true;
-        ReleaseCapture();
-        GetCursorPos(out var point);
-        var coordinates = (nint)((point.Y << 16) | (point.X & 0xffff));
-        SendMessage(hwnd, 0x00A1, (nint)direction, coordinates); // WM_NCLBUTTONDOWN
+        var source = args.OriginalSource as DependencyObject;
+        while (source is not null && source is not BreadcrumbBarItem && source != breadcrumbs)
+            source = VisualTreeHelper.GetParent(source);
+        var label = source is BreadcrumbBarItem item ? Descendants(item).OfType<TextBlock>().FirstOrDefault() : null;
+        if (label == hoveredCrumb) return;
+        ClearBreadcrumbHover();
+        if (label is not null)
+        {
+            hoveredCrumb = label;
+            label.TextDecorations = Windows.UI.Text.TextDecorations.Underline;
+        }
     }
 
-    private nint ProcessFrameMessage(nint hwnd, uint message, nuint wparam, nint lparam, nuint id, nuint reference)
+    private void ClearBreadcrumbHover()
     {
-        // Use the full window for content while retaining native resize behavior.
-        if (message == 0x0083) return 0; // WM_NCCALCSIZE
-        if (message == 0x0084 && GetWindowRect(hwnd, out var rect)) // WM_NCHITTEST
-        {
-            var packed = lparam.ToInt64();
-            var x = (short)(packed & 0xffff);
-            var y = (short)((packed >> 16) & 0xffff);
-            var grip = Math.Max(1, (int)Math.Round(8 * GetDpiForWindow(hwnd) / 96.0));
-            var left = x < rect.Left + grip; var right = x >= rect.Right - grip;
-            var top = y < rect.Top + grip; var bottom = y >= rect.Bottom - grip;
-            if (top && left) return 13; if (top && right) return 14;
-            if (bottom && left) return 16; if (bottom && right) return 17;
-            if (left) return 10; if (right) return 11;
-            if (top) return 12; if (bottom) return 15;
-            if (Content is UIElement content && dragRegion.XamlRoot is not null && dragRegion.ActualWidth > 0)
-            {
-                var origin = dragRegion.TransformToVisual(content).TransformPoint(new Windows.Foundation.Point());
-                var scale = GetDpiForWindow(hwnd) / 96.0;
-                var cx = (x - rect.Left) / scale; var cy = (y - rect.Top) / scale;
-                if (cx >= origin.X && cx < origin.X + dragRegion.ActualWidth &&
-                    cy >= origin.Y && cy < origin.Y + dragRegion.ActualHeight) return 2; // HTCAPTION
-            }
-        }
-        return DefSubclassProc(hwnd, message, wparam, lparam);
+        if (hoveredCrumb is not null) hoveredCrumb.TextDecorations = Windows.UI.Text.TextDecorations.None;
+        hoveredCrumb = null;
     }
 
     private static string PositionFile => Path.Combine(AppContext.BaseDirectory, "panel-position.json");
@@ -306,33 +312,108 @@ internal sealed class LauncherPanel : Window
         button.MinHeight = 28;
     }
 
+    private static void ConfigureArrow(HyperlinkButton button, string glyph, string tooltip)
+    {
+        button.Content = new FontIcon { Glyph = glyph, FontSize = 12 };
+        button.Padding = new Thickness(4, 3, 4, 3);
+        button.MinWidth = 0;
+        button.MinHeight = 28;
+        ToolTipService.SetToolTip(button, tooltip);
+    }
+
+    private void Navigate(MenuNode[] destination)
+    {
+        if (path.Reverse().SequenceEqual(destination)) return;
+        history.RemoveRange(historyIndex + 1, history.Count - historyIndex - 1);
+        history.Add(destination);
+        historyIndex++;
+        SetPath(destination);
+    }
+
+    private void MoveHistory(int offset)
+    {
+        var target = historyIndex + offset;
+        if (target < 0 || target >= history.Count) return;
+        historyIndex = target;
+        SetPath(history[historyIndex]);
+    }
+
+    private void SetPath(IEnumerable<MenuNode> destination)
+    {
+        path.Clear();
+        foreach (var node in destination) path.Push(node);
+        Refresh();
+    }
+
     private void Refresh()
     {
-        home.IsEnabled = back.IsEnabled = path.Count > 0;
-        title.Text = path.Count == 0 ? "" : path.Peek().Name;
+        back.IsEnabled = historyIndex > 0;
+        forward.IsEnabled = historyIndex + 1 < history.Count;
+        breadcrumbs.ItemsSource = new[] { L.Language == "ru-RU" ? "Главная" : "Home" }
+            .Concat(path.Reverse().Select(node => node.Name)).ToArray();
+        ClearBreadcrumbHover();
+        hoveredItem = focusedItem = null;
+        itemDetails.Text = "";
         grid.Items.Clear();
         empty.Text = L.Language == "ru-RU" ? "Здесь пока нет пунктов" : "No items here yet";
         foreach (var node in (path.Count == 0 ? root : path.Peek().Children).Where(n => n.Kind != MenuNodeKind.Separator))
         {
-            var icon = new Image { Width = 40, Height = 40, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center };
+            var iconSize = settings.PanelIconSize switch { "Small" => 32, "Large" => 52, _ => 40 };
+            FrameworkElement icon = node.Kind == MenuNodeKind.Group ? CreateGroupPreview(node, iconSize) : CreateActionIcon(node, iconSize);
             var label = new TextBlock { Text = node.Name, TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.WrapWholeWords,
-                MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis, HorizontalAlignment = HorizontalAlignment.Stretch };
+                MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis, HorizontalAlignment = HorizontalAlignment.Stretch, FontSize = settings.PanelFontSize };
             var body = new StackPanel { Width = 92, Spacing = 3, Padding = new Thickness(4, 4, 4, 4), Tag = node };
             body.Children.Add(icon); body.Children.Add(label);
-            var item = new GridViewItem { Content = body, Tag = node, Width = 104, MinHeight = 88, Padding = new Thickness(0) };
+            var item = new GridViewItem { Content = body, Tag = node, Width = 104, MinHeight = 88,
+                Padding = new Thickness(0), VerticalContentAlignment = VerticalAlignment.Top };
             AutomationProperties.SetName(item, node.Name + (node.Kind == MenuNodeKind.Group ? (L.Language == "ru-RU" ? ", группа" : ", group") : ""));
-            var detail = node.Kind == MenuNodeKind.Group
-                ? L.Format("PanelGroupDetails", node.Children.Count(child => child.Kind != MenuNodeKind.Separator))
-                : L.Format("PanelActionDetails", node.Steps.Count);
-            if (node.Kind == MenuNodeKind.Action && node.Steps.Count == 1 && !string.IsNullOrWhiteSpace(node.Steps[0].Path))
-                detail += "\n" + L.Format("PanelPath", node.Steps[0].Path);
-            var hint = node.Name + "\n" + detail;
-            ToolTipService.SetToolTip(item, new ToolTip { Content = new TextBlock { Text = hint, TextWrapping = TextWrapping.Wrap, MaxWidth = 360 } });
-            AutomationProperties.SetHelpText(item, detail);
-            grid.Items.Add(item); LoadIcon(icon, node);
+            var detail = L.Format("PanelGroupDetails", node.Children.Count(child => child.Kind != MenuNodeKind.Separator));
+            var firstStep = node.Steps.FirstOrDefault();
+            var stepName = firstStep is null ? "" : !string.IsNullOrWhiteSpace(firstStep.Name)
+                ? firstStep.Name : L.Get("WorkflowKind" + firstStep.Kind);
+            stepName = string.Join(" ", stepName.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+            var count = L.Format("PanelStepsCount", node.Steps.Count);
+            var hint = node.Kind == MenuNodeKind.Group ? detail : (stepName.Length > 0 ? stepName + " · " + count : count);
+            AutomationProperties.SetHelpText(item, node.Kind == MenuNodeKind.Group ? detail : hint);
+            item.PointerEntered += (_, _) => { hoveredItem = (item, hint); UpdateItemDetails(); };
+            item.PointerExited += (_, _) => { if (hoveredItem?.Item == item) hoveredItem = null; UpdateItemDetails(); };
+            item.GotFocus += (_, _) => { focusedItem = (item, hint); UpdateItemDetails(); };
+            item.LostFocus += (_, _) => { if (focusedItem?.Item == item) focusedItem = null; UpdateItemDetails(); };
+            grid.Items.Add(item);
         }
         empty.Visibility = grid.Items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
+
+    private static Image CreateActionIcon(MenuNode node, int size)
+    {
+        var image = new Image { Width = size, Height = size, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center };
+        LoadIcon(image, node);
+        return image;
+    }
+
+    private static Border CreateGroupPreview(MenuNode group, int size)
+    {
+        var icons = new Grid { RowSpacing = 2, ColumnSpacing = 2, Padding = new Thickness(3) };
+        icons.RowDefinitions.Add(new RowDefinition()); icons.RowDefinitions.Add(new RowDefinition());
+        icons.ColumnDefinitions.Add(new ColumnDefinition()); icons.ColumnDefinitions.Add(new ColumnDefinition());
+        var children = group.Children.Where(child => child.Kind != MenuNodeKind.Separator).Take(4).ToArray();
+        for (var i = 0; i < children.Length; i++)
+        {
+            var image = new Image { Stretch = Stretch.Uniform, IsHitTestVisible = false };
+            Grid.SetRow(image, i / 2); Grid.SetColumn(image, i % 2);
+            icons.Children.Add(image);
+            LoadIcon(image, children[i]);
+        }
+        return new Border
+        {
+            Width = size, Height = size, HorizontalAlignment = HorizontalAlignment.Center,
+            BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(6),
+            BorderBrush = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"],
+            Background = (Brush)Application.Current.Resources["SubtleFillColorSecondaryBrush"], Child = icons
+        };
+    }
+
+    private void UpdateItemDetails() => itemDetails.Text = hoveredItem?.Hint ?? focusedItem?.Hint ?? "";
 
     private static async void LoadIcon(Image image, MenuNode node)
     {
@@ -346,24 +427,13 @@ internal sealed class LauncherPanel : Window
         catch (Exception ex) { DevLog.Write("panel", "Icon failed", ex); }
     }
 
-    public static void Show(IEnumerable<MenuNode> nodes, Action<MenuNode> execute, Action openEditor, bool atCursor)
+    public static void Show(IEnumerable<MenuNode> nodes, Action<MenuNode> execute, Action openEditor, AppSettings settings)
     {
-        active?.Close(); active = new LauncherPanel(nodes, execute, openEditor, atCursor); active.Activate();
+        active?.Close(); active = new LauncherPanel(nodes, execute, openEditor, settings); active.Activate();
     }
 
-    private delegate nint SubclassProc(nint hwnd, uint message, nuint wparam, nint lparam, nuint id, nuint reference);
-    [StructLayout(LayoutKind.Sequential)] private struct Rect { public int Left, Top, Right, Bottom; }
-    [DllImport("comctl32.dll")] private static extern bool SetWindowSubclass(nint hwnd, SubclassProc callback, nuint id, nuint reference);
-    [DllImport("comctl32.dll")] private static extern nint DefSubclassProc(nint hwnd, uint message, nuint wparam, nint lparam);
-    [DllImport("user32.dll")] private static extern bool ReleaseCapture();
-    [DllImport("user32.dll")] private static extern nint SendMessage(nint hwnd, uint message, nint wparam, nint lparam);
-    [DllImport("user32.dll")] private static extern bool GetWindowRect(nint hwnd, out Rect rect);
     [StructLayout(LayoutKind.Sequential)] private struct Point { public int X; public int Y; }
     [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(nint hwnd, int attribute, ref int value, int size);
-    [DllImport("user32.dll", EntryPoint = "GetWindowLongW")] private static extern int GetWindowLong(nint hwnd, int index);
-    [DllImport("user32.dll", EntryPoint = "SetWindowLongW")] private static extern int SetWindowLong(nint hwnd, int index, int value);
-    [DllImport("user32.dll")] private static extern bool SetWindowPos(nint hwnd, nint after, int x, int y, int width, int height, uint flags);
-    [DllImport("user32.dll")] private static extern uint GetDpiForWindow(nint hwnd);
     [DllImport("user32.dll")] private static extern bool GetCursorPos(out Point point);
     [DllImport("user32.dll")] private static extern nint MonitorFromPoint(Point point, uint flags);
     [DllImport("user32.dll")] private static extern nint MonitorFromWindow(nint hwnd, uint flags);

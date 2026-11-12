@@ -22,6 +22,8 @@ public sealed partial class MainPage : Page
     private MenuNode? selected;
     private string? stepNodeId;
     private string? activeConfigurationPath;
+    private long activeConfigurationVersion;
+    private string? draftConfigurationPath;
     private int selectedStepIndex;
     private ListView? stepList;
     private Border? stepDropIndicator;
@@ -29,6 +31,8 @@ public sealed partial class MainPage : Page
     private MenuAction? draggedStep;
     private bool stepDropHandled;
     private bool rendering;
+    private int settingsTabIndex;
+    private Action? updateAppearancePreviews;
     private bool dirty => draftState.IsDirty;
     private bool allowClose;
     private string? dragSnapshot;
@@ -38,6 +42,10 @@ public sealed partial class MainPage : Page
     private readonly Brush dropAccent;
     private bool dragOverLogged;
     private bool draftReady;
+    private bool pendingActivation;
+    private bool unsavedNewConfiguration;
+    private bool HasUnsavedChanges => dirty || unsavedNewConfiguration;
+    private string T(string en, string ru) => L.Language == "ru-RU" ? ru : en;
     private string? pendingSelection;
     private string? baseSnapshot => draftState.Baseline;
     private string? copiedNode;
@@ -50,7 +58,7 @@ public sealed partial class MainPage : Page
     {
         DevLog.Write("editor", "MainPage constructor started");
         InitializeComponent();
-        AddItemFlyout.Placement = Microsoft.UI.Xaml.Controls.Primitives.FlyoutPlacementMode.Bottom;
+        DetailsTabs.SelectedItem = DetailsSettingsItem;
         dropAccent = DropIndicator.Background;
         dropIndicatorTimer = DispatcherQueue.CreateTimer();
         dropIndicatorTimer.Interval = TimeSpan.FromMilliseconds(40);
@@ -82,7 +90,7 @@ public sealed partial class MainPage : Page
             if (allowClose) return;
             args.Cancel = true;
             if (activeShortcut is not null) await activeShortcut.StopAsync();
-            if (!dirty) { allowClose = true; App.MainWindow.Close(); return; }
+            if (!HasUnsavedChanges) { allowClose = true; App.MainWindow.Close(); return; }
             var answer = await ConfirmAsync(L.Get("Editor_UnsavedChanges_70d744"), L.Get("Editor_ApplyChangesBeforeClosing_c969f8"), L.Get("Editor_Apply_768af6"), L.Get("Editor_Discard_941d9e"));
             if (answer == ContentDialogResult.Primary && !await ApplyAsync()) return;
             if (answer == ContentDialogResult.None) return;
@@ -121,23 +129,10 @@ public sealed partial class MainPage : Page
 
     public void ShowSettings()
     {
-        if (activeShortcut is not null) { _ = activeShortcut.StopAsync(); activeShortcut = null; }
-        WorkspaceGrid.Visibility = Visibility.Collapsed;
-        SettingsPage.Visibility = Visibility.Visible;
-        OpenSettingsButton.Visibility = Visibility.Collapsed;
-        OpenMenuButton.Visibility = Visibility.Visible;
-        if (draftReady) RenderSettings();
+        if (MenuTree.RootNodes.Count > 0) MenuTree.SelectedNode = MenuTree.RootNodes[0];
     }
 
-    private void ShowMenuSection()
-    {
-        if (activeShortcut is not null) { _ = activeShortcut.StopAsync(); activeShortcut = null; }
-        SettingsPage.Visibility = Visibility.Collapsed;
-        WorkspaceGrid.Visibility = Visibility.Visible;
-        OpenSettingsButton.Visibility = Visibility.Visible;
-        OpenMenuButton.Visibility = Visibility.Collapsed;
-        RenderProperties();
-    }
+    private void ShowMenuSection() { }
 
     private void RenderSettings()
     {
@@ -145,48 +140,196 @@ public sealed partial class MainPage : Page
         try
         {
             globalShortcuts.Clear();
-            SettingsContents.Children.Clear();
-            SettingsContents.Children.Add(new TextBlock { Text = L.Get("Editor_Settings_7f17c7"), FontSize = 22, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-            SettingsContents.Children.Add(new TextBlock { Text = L.Get("Editor_SettingsDraftHint"), TextWrapping = TextWrapping.Wrap, Opacity = .7 });
-            var language = new ComboBox { Header = L.Get("Editor_SettingsLanguage"), HorizontalAlignment = HorizontalAlignment.Stretch };
-            language.Items.Add("English"); language.Items.Add("Русский");
-            language.SelectedIndex = config.Settings.Language == "ru-RU" ? 1 : 0;
-            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(language, "SettingsLanguage");
-            language.SelectionChanged += (_, _) =>
+            updateAppearancePreviews = null;
+            PropertiesPanel.Children.Clear();
+            AddText(L.Get("Editor_Name_aee78f"), config.Name, value =>
             {
-                if (rendering || language.SelectedIndex < 0) return;
-                var value = language.SelectedIndex == 1 ? "ru-RU" : "en-US";
-                if (config.Settings.Language == value) return;
-                Remember(); config.Settings = config.Settings with { Language = value }; MarkDirty();
-            };
-            SettingsContents.Children.Add(language);
-            SettingsContents.Children.Add(CreateShortcutEditor("SettingsHotkey", L.Get("Editor_SettingsMenuShortcut"), "",
+                config.Name = value;
+                PropertiesHint.Text = value;
+                if (MenuTree.RootNodes.Count > 0) MenuTree.RootNodes[0].Content = CreateConfigurationDisplay(value);
+                UpdateConfigurationSelector();
+            }, required: true);
+            PropertiesPanel.Children.Add(new TextBlock { Text = L.Get("Editor_SettingsDraftHint"), TextWrapping = TextWrapping.Wrap, Opacity = .7 });
+            var navigation = new NavigationView { PaneDisplayMode = NavigationViewPaneDisplayMode.Top,
+                IsBackButtonVisible = NavigationViewBackButtonVisible.Collapsed, IsSettingsVisible = false,
+                IsPaneToggleButtonVisible = false, SelectionFollowsFocus = NavigationViewSelectionFollowsFocus.Enabled,
+                HorizontalAlignment = HorizontalAlignment.Stretch };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(navigation, "AppearanceNavigation");
+            var menuItem = new NavigationViewItem { Content = T("Popup menu", "Всплывающее меню") };
+            var panelItem = new NavigationViewItem { Content = T("Launcher", "Ланчер") };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(menuItem, "MenuAppearanceTab");
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(panelItem, "PanelAppearanceTab");
+            navigation.MenuItems.Add(menuItem); navigation.MenuItems.Add(panelItem);
+            var menu = new StackPanel { Spacing = 12 };
+            var panel = new StackPanel { Spacing = 12 };
+            PropertiesPanel.Children.Add(navigation);
+            menu.Children.Add(CreateShortcutEditor("SettingsHotkey", L.Get("Editor_SettingsMenuShortcut"), "",
                 () => config.Settings.MainHotkey, value => config.Settings = config.Settings with { MainHotkey = value }, null, main: true));
-            SettingsContents.Children.Add(CreateShortcutEditor("SettingsPanelHotkey", L.Get("Editor_SettingsPanelShortcut"), "",
+            panel.Children.Add(CreateShortcutEditor("SettingsPanelHotkey", L.Get("Editor_SettingsPanelShortcut"), "",
                 () => config.Settings.PanelHotkey, value => config.Settings = config.Settings with { PanelHotkey = value }, null, panel: true));
-            var position = new ComboBox { Header = L.Get("Editor_SettingsPanelPosition"), HorizontalAlignment = HorizontalAlignment.Stretch };
-            position.Items.Add(L.Get("Editor_SettingsPositionCenter")); position.Items.Add(L.Get("Editor_SettingsPositionCursor"));
-            position.SelectedIndex = config.Settings.PanelPosition == "Cursor" ? 1 : 0;
-            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(position, "SettingsPanelPosition");
-            position.SelectionChanged += (_, _) =>
+            AddChoice(panel, "SettingsPanelPosition", L.Get("Editor_SettingsPanelPosition"),
+                [L.Get("Editor_SettingsPositionCenter"), L.Get("Editor_SettingsPositionCursor")], ["Center", "Cursor"],
+                config.Settings.PanelPosition, v => config.Settings = config.Settings with { PanelPosition = v });
+            AddNumber(menu, "MenuFontSize", L.Get("Editor_SettingsFontSize"), config.Settings.MenuFontSize,
+                v => config.Settings = config.Settings with { MenuFontSize = v });
+            AddChoice(menu, "MenuDensity", T("Item spacing", "Плотность пунктов"),
+                [T("Compact", "Компактная"), T("Normal", "Обычная"), T("Comfortable", "Свободная")], ["Compact", "Normal", "Comfortable"],
+                config.Settings.MenuDensity, v => config.Settings = config.Settings with { MenuDensity = v });
+            AddChoice(menu, "MenuIconSize", T("Icon size", "Размер иконок"),
+                [T("Small", "Маленький"), T("Normal", "Обычный"), T("Large", "Крупный")], ["Small", "Normal", "Large"],
+                config.Settings.MenuIconSize, v => config.Settings = config.Settings with { MenuIconSize = v });
+            AddAppearanceColor(menu, "MenuBackground", () => config.Settings.MenuBackground,
+                v => config.Settings = config.Settings with { MenuBackground = v });
+            AddReset(menu, () => config.Settings = config.Settings with { MenuFontSize = 12, MenuDensity = "Normal", MenuIconSize = "Normal", MenuBackground = "" });
+            panel.Children.Add(new TextBlock { Text = T("Appearance", "Внешний вид"), FontSize = 16, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Margin = new Thickness(0, 8, 0, 0) });
+            AddAppearanceColor(panel, "PanelBackground", () => config.Settings.PanelBackground,
+                v => config.Settings = config.Settings with { PanelBackground = v });
+            var opacityValue = new TextBlock { Text = $"{config.Settings.PanelOpacity}%", VerticalAlignment = VerticalAlignment.Center };
+            var opacity = new Slider { Header = T("Background opacity", "Непрозрачность фона"), Minimum = 40, Maximum = 100, StepFrequency = 1, Value = config.Settings.PanelOpacity, IsThumbToolTipEnabled = true };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(opacity, "PanelOpacity");
+            opacity.ValueChanged += (_, _) => { if (rendering || (int)opacity.Value == config.Settings.PanelOpacity) return; Remember(); config.Settings = config.Settings with { PanelOpacity = (int)opacity.Value }; opacityValue.Text = $"{(int)opacity.Value}%"; MarkDirty(); updateAppearancePreviews?.Invoke(); };
+            var opacityRow = new Grid { ColumnSpacing = 12, ColumnDefinitions = { new ColumnDefinition(), new ColumnDefinition { Width = GridLength.Auto } } };
+            opacityRow.Children.Add(opacity); Grid.SetColumn(opacityValue, 1); opacityRow.Children.Add(opacityValue); panel.Children.Add(opacityRow);
+            AddChoice(panel, "PanelIconSize", T("Icon size", "Размер иконок"),
+                [T("Small", "Маленький"), T("Normal", "Средний"), T("Large", "Большой")], ["Small", "Normal", "Large"],
+                config.Settings.PanelIconSize, v => config.Settings = config.Settings with { PanelIconSize = v });
+            AddNumber(panel, "PanelFontSize", T("Label size", "Размер подписей"), config.Settings.PanelFontSize,
+                v => config.Settings = config.Settings with { PanelFontSize = v });
+            AddReset(panel, () => config.Settings = config.Settings with { PanelBackground = "", PanelOpacity = 85, PanelIconSize = "Normal", PanelFontSize = 12 });
+            var menuPreview = new StackPanel { Spacing = 6, Margin = new Thickness(0, 16, 0, 0) };
+            var panelPreview = new StackPanel { Spacing = 6, Margin = new Thickness(0, 16, 0, 0) };
+            Grid PreviewLayout(StackPanel fields, StackPanel preview)
             {
-                if (rendering || position.SelectedIndex < 0) return;
-                var value = position.SelectedIndex == 1 ? "Cursor" : "Center";
-                if (config.Settings.PanelPosition == value) return;
-                Remember(); config.Settings = config.Settings with { PanelPosition = value }; MarkDirty();
-            };
-            SettingsContents.Children.Add(position);
-            var font = new NumberBox { Header = L.Get("Editor_SettingsFontSize"), Minimum = 10, Maximum = 24, SmallChange = 1,
-                SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact, Value = config.Settings.MenuFontSize };
-            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(font, "MenuFontSize");
-            font.ValueChanged += (_, _) =>
+                var layout = new Grid { Padding = new Thickness(16), ColumnSpacing = 20, RowSpacing = 8 };
+                layout.ColumnDefinitions.Add(new ColumnDefinition());
+                layout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                layout.Children.Add(fields); layout.Children.Add(preview);
+                void Arrange(double width)
+                {
+                    var sideBySide = width >= 740;
+                    Grid.SetColumn(preview, sideBySide ? 1 : 0); Grid.SetRow(preview, sideBySide ? 0 : 1);
+                    layout.ColumnDefinitions[1].Width = sideBySide ? GridLength.Auto : new GridLength(0);
+                }
+                layout.SizeChanged += (_, args) => Arrange(args.NewSize.Width);
+                Arrange(0);
+                return layout;
+            }
+            var menuContent = PreviewLayout(menu, menuPreview);
+            var panelContent = PreviewLayout(panel, panelPreview);
+            navigation.SelectionChanged += (_, args) =>
             {
-                if (rendering || !double.IsFinite(font.Value) || font.Value == config.Settings.MenuFontSize) return;
-                Remember(); config.Settings = config.Settings with { MenuFontSize = font.Value }; MarkDirty();
+                if (ReferenceEquals(args.SelectedItem, menuItem)) { settingsTabIndex = 0; navigation.Content = menuContent; }
+                else if (ReferenceEquals(args.SelectedItem, panelItem)) { settingsTabIndex = 1; navigation.Content = panelContent; }
             };
-            SettingsContents.Children.Add(font);
+            navigation.SelectedItem = settingsTabIndex == 1 ? panelItem : menuItem;
+            navigation.Content = settingsTabIndex == 1 ? panelContent : menuContent;
+            updateAppearancePreviews = () => { RenderAppearancePreview(menuPreview, false); RenderAppearancePreview(panelPreview, true); };
+            updateAppearancePreviews();
+            var deleteConfiguration = new Button { Content = T("Delete configuration", "Удалить конфигурацию"),
+                Style = (Style)Resources["DeleteConfigurationButtonStyle"],
+                IsEnabled = draftReady && !unsavedNewConfiguration && string.Equals(draftConfigurationPath, activeConfigurationPath, StringComparison.OrdinalIgnoreCase) };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(deleteConfiguration, "DeleteConfiguration");
+            deleteConfiguration.Click += DeleteConfigurationClicked;
+            PropertiesPanel.Children.Add(deleteConfiguration);
         }
         finally { rendering = false; }
+    }
+
+    private void AddChoice(Panel parent, string id, string title, string[] labels, string[] values, string current, Action<string> set)
+    {
+        var choice = new ComboBox { Header = title, HorizontalAlignment = HorizontalAlignment.Stretch };
+        foreach (var label in labels) choice.Items.Add(label);
+        choice.SelectedIndex = Array.IndexOf(values, current);
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(choice, id);
+        choice.SelectionChanged += (_, _) => { if (rendering || choice.SelectedIndex < 0) return; Remember(); set(values[choice.SelectedIndex]); MarkDirty(); updateAppearancePreviews?.Invoke(); };
+        parent.Children.Add(choice);
+    }
+
+    private void AddNumber(Panel parent, string id, string title, double current, Action<double> set)
+    {
+        var number = new NumberBox { Header = title, Minimum = 10, Maximum = 24, SmallChange = 1,
+            SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact, Value = current };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(number, id);
+        number.ValueChanged += (_, _) => { if (rendering || !double.IsFinite(number.Value)) return; Remember(); set(number.Value); MarkDirty(); updateAppearancePreviews?.Invoke(); };
+        parent.Children.Add(number);
+    }
+
+    private void AddAppearanceColor(Panel parent, string id, Func<string> get, Action<string> set)
+    {
+        var label = new TextBlock { Text = T("Background color", "Цвет фона") };
+        var button = new Button();
+        void UpdateButton()
+        {
+            var color = get();
+            var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            if (color.Length == 7)
+                content.Children.Add(new Border { Width = 18, Height = 18, CornerRadius = new CornerRadius(3), Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255,
+                    Convert.ToByte(color.Substring(1, 2), 16), Convert.ToByte(color.Substring(3, 2), 16), Convert.ToByte(color.Substring(5, 2), 16))) });
+            content.Children.Add(new TextBlock { Text = color.Length == 0 ? T("System", "Системный") : color });
+            button.Content = content;
+        }
+        UpdateButton();
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, T("Background color", "Цвет фона"));
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(button, id);
+        button.Click += async (_, _) =>
+        {
+            var current = get();
+            var initial = current.Length == 7 ? current : "#303840";
+            var picker = new ColorPicker { IsAlphaEnabled = false, IsAlphaSliderVisible = false, IsAlphaTextInputVisible = false,
+                Color = Windows.UI.Color.FromArgb(255, Convert.ToByte(initial.Substring(1, 2), 16), Convert.ToByte(initial.Substring(3, 2), 16), Convert.ToByte(initial.Substring(5, 2), 16)) };
+            var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = T("Background color", "Цвет фона"), Content = picker,
+                PrimaryButtonText = T("Choose", "Выбрать"), SecondaryButtonText = T("System", "Системный"), CloseButtonText = T("Cancel", "Отмена") };
+            var result = await dialog.ShowAsync();
+            if (result == ContentDialogResult.None) return;
+            var c = picker.Color; var value = result == ContentDialogResult.Secondary ? "" : $"#{c.R:X2}{c.G:X2}{c.B:X2}";
+            if (value == get()) return;
+            Remember(); set(value); MarkDirty(); updateAppearancePreviews?.Invoke(); UpdateButton();
+        };
+        var group = new StackPanel { Spacing = 6 }; group.Children.Add(label); group.Children.Add(button); parent.Children.Add(group);
+    }
+
+    private void AddReset(Panel parent, Action reset)
+    {
+        var button = new Button { Content = T("Reset appearance", "Сбросить внешний вид"), Margin = new Thickness(0, 8, 0, 0) };
+        button.Click += (_, _) => { Remember(); reset(); MarkDirty(); RenderSettings(); };
+        parent.Children.Add(button);
+    }
+
+    private void RenderAppearancePreview(StackPanel host, bool panel)
+    {
+        host.Children.Clear();
+        host.Children.Add(new TextBlock { Text = T("Preview", "Предпросмотр"), FontSize = 14, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+        var color = panel ? config.Settings.PanelBackground : config.Settings.MenuBackground;
+        var background = color.Length == 7 ? new SolidColorBrush(Windows.UI.Color.FromArgb(255,
+            Convert.ToByte(color.Substring(1, 2), 16), Convert.ToByte(color.Substring(3, 2), 16), Convert.ToByte(color.Substring(5, 2), 16))) :
+            panel ? new SolidColorBrush(host.ActualTheme == ElementTheme.Light ? Windows.UI.Color.FromArgb(255, 245, 245, 245) : Windows.UI.Color.FromArgb(255, 32, 32, 32)) :
+            (Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"];
+        if (panel && background is SolidColorBrush solid) solid.Opacity = config.Settings.PanelOpacity / 100.0;
+        var surface = new StackPanel { Spacing = panel ? 8 : 2 };
+        if (color.Length > 0)
+        {
+            var c = ((SolidColorBrush)background).Color;
+            static double Linear(byte value) { var v = value / 255.0; return v <= 0.04045 ? v / 12.92 : Math.Pow((v + 0.055) / 1.055, 2.4); }
+            surface.RequestedTheme = 0.2126 * Linear(c.R) + 0.7152 * Linear(c.G) + 0.0722 * Linear(c.B) > 0.179 ? ElementTheme.Light : ElementTheme.Dark;
+        }
+        var size = panel ? config.Settings.PanelFontSize : config.Settings.MenuFontSize;
+        var iconSize = panel ? config.Settings.PanelIconSize switch { "Small" => 32, "Large" => 52, _ => 40 } : config.Settings.MenuIconSize switch { "Small" => 12, "Large" => 22, _ => 16 };
+        var tiles = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 3 };
+        if (panel) surface.Children.Add(new TextBlock { Text = T("Home", "Главная"), Margin = new Thickness(4, 0, 0, 6) });
+        foreach (var (glyph, label) in new[] { ("\uE8B7", T("Folders", "Папки")), ("\uE71D", T("Applications", "Приложения")), ("\uE70F", T("Editor", "Редактор")) })
+        {
+            var row = new StackPanel { Orientation = panel ? Orientation.Vertical : Orientation.Horizontal, Spacing = panel ? 3 : 10,
+                Width = panel ? 92 : double.NaN, HorizontalAlignment = panel ? HorizontalAlignment.Center : HorizontalAlignment.Stretch,
+                Padding = new Thickness(8, panel ? 4 : config.Settings.MenuDensity switch { "Compact" => 2, "Comfortable" => 8, _ => 4 }, 8, 4) };
+            row.Children.Add(new FontIcon { Glyph = glyph, FontSize = iconSize });
+            row.Children.Add(new TextBlock { Text = label, FontSize = size, VerticalAlignment = VerticalAlignment.Center });
+            if (panel) tiles.Children.Add(row); else surface.Children.Add(row);
+        }
+        if (panel) surface.Children.Add(tiles);
+        host.Children.Add(new Border { Background = background, CornerRadius = new CornerRadius(8), Padding = new Thickness(12),
+            HorizontalAlignment = HorizontalAlignment.Left, MinWidth = 220, Child = surface });
     }
 
     private async void MainPageLoaded(object sender, RoutedEventArgs args) => await LoadCurrentAsync();
@@ -201,6 +344,8 @@ public sealed partial class MainPage : Page
         if (draft is null) { ShowNotice(response.Message ?? L.Get("Editor_CouldNotReadTheConfiguration_d3f938"), InfoBarSeverity.Error); return; }
         UpdateConfigurationTitle(response);
         draftState.Reset(draft.Config);
+        pendingActivation = false;
+        unsavedNewConfiguration = false;
         try { EnsureBundledIconsAvailable(draft.Config.Items); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { ShowNotice(ex.Message, InfoBarSeverity.Warning); }
         draftReady = true;
@@ -208,6 +353,7 @@ public sealed partial class MainPage : Page
         if (SettingsPage.Visibility == Visibility.Visible) RenderSettings();
         if (pendingSelection is not null) { SelectMenuItem(pendingSelection); pendingSelection = null; }
         UpdateApplyState();
+        UpdateConfigurationSelector();
         ShowHotkeyAvailability(await client.ReadAsync());
         DevLog.Write("editor", "Current configuration loaded");
     }
@@ -215,6 +361,8 @@ public sealed partial class MainPage : Page
     private void UpdateConfigurationTitle(EditorResponse response)
     {
         activeConfigurationPath = response.Data?["configPath"]?.GetValue<string>();
+        activeConfigurationVersion = response.Data?["version"]?.GetValue<long>() ?? activeConfigurationVersion;
+        draftConfigurationPath = activeConfigurationPath;
         ShowConfigurationTitle(activeConfigurationPath);
     }
 
@@ -222,9 +370,6 @@ public sealed partial class MainPage : Page
     {
         var title = L.Get("Editor_M3nuxaMenuEditor_652d6b");
         if (!string.IsNullOrWhiteSpace(sourcePath)) title += $" — {sourcePath}";
-        if (!string.IsNullOrWhiteSpace(sourcePath) && !string.IsNullOrWhiteSpace(activeConfigurationPath) &&
-            !string.Equals(sourcePath, activeConfigurationPath, StringComparison.OrdinalIgnoreCase))
-            title += "  " + L.Format("Editor_ApplyDestination", activeConfigurationPath);
         App.MainWindow.Title = title;
     }
 
@@ -248,8 +393,10 @@ public sealed partial class MainPage : Page
     }
     private void UpdateApplyState()
     {
-        ApplyButton.IsEnabled = dirty;
-        ToolTipService.SetToolTip(ApplyButton, dirty ? L.Get("Editor_ThereAreUnsavedChangesApply_226d2b") : L.Get("Editor_NoChangesToApply_fefed9"));
+        ApplyButton.IsEnabled = dirty || pendingActivation;
+        ToolTipService.SetToolTip(ApplyButton, dirty ? L.Get("Editor_ThereAreUnsavedChangesApply_226d2b") : pendingActivation
+            ? T("Apply and activate this configuration", "Применить и активировать эту конфигурацию")
+            : L.Get("Editor_NoChangesToApply_fefed9"));
     }
     private void ShowNotice(string message, InfoBarSeverity severity = InfoBarSeverity.Informational)
     {
@@ -264,8 +411,10 @@ public sealed partial class MainPage : Page
         try
         {
             MenuTree.RootNodes.Clear();
-            foreach (var node in config.Items) MenuTree.RootNodes.Add(BuildNode(node));
-            MenuTree.SelectedNode = FindTreeNode(MenuTree.RootNodes, selectId);
+            var root = new TreeViewNode { Content = CreateConfigurationDisplay(config.Name), IsExpanded = true };
+            foreach (var node in config.Items) root.Children.Add(BuildNode(node));
+            MenuTree.RootNodes.Add(root);
+            MenuTree.SelectedNode = FindTreeNode(root.Children, selectId) ?? root;
         }
         finally { rendering = false; }
         RenderProperties();
@@ -286,7 +435,7 @@ public sealed partial class MainPage : Page
         if (id is null) return null;
         foreach (var node in nodes)
         {
-            if (Model(node).Id == id) return node;
+            if (node.Content is NodeDisplay display && display.Model.Id == id) return node;
             var found = FindTreeNode(node.Children, id);
             if (found is not null) return found;
         }
@@ -303,15 +452,23 @@ public sealed partial class MainPage : Page
         {
             selected = MenuTree.SelectedNode?.Content is NodeDisplay display ? display.Model : null;
             UpdateSelectionCommands();
-            if (selected?.Kind == MenuNodeKind.Action && stepNodeId != selected.Id) DetailsTabs.SelectedIndex = 0;
+            if (selected?.Kind == MenuNodeKind.Action && stepNodeId != selected.Id) DetailsTabIndex = 0;
             PropertiesIcon.Content = selected is not null && selected.Kind != MenuNodeKind.Separator ? CreateItemIcon(selected, 24) : null;
             PropertiesIcon.Visibility = selected is not null && selected.Kind != MenuNodeKind.Separator ? Visibility.Visible : Visibility.Collapsed;
+            ConfigurationPropertiesIcon.Visibility = MenuTree.SelectedNode is not null && MenuTree.SelectedNode == MenuTree.RootNodes.FirstOrDefault() ? Visibility.Visible : Visibility.Collapsed;
             foreach (var field in globalShortcuts.Keys.ToArray()) globalShortcuts.Remove(field);
             PropertiesPanel.Children.Clear();
             DetailsTabs.Visibility = selected?.Kind == MenuNodeKind.Action ? Visibility.Visible : Visibility.Collapsed;
             PropertiesHint.Text = selected is null ? L.Get("Editor_SelectAnItemOnThe_2c92bb") : selected.Kind == MenuNodeKind.Separator ? L.Get("Editor_Separator_afb9a7") : selected.Name;
             PropertiesType.Text = selected is null || selected.Kind == MenuNodeKind.Separator ? "" : selected.Kind == MenuNodeKind.Group ? L.Get("Editor_MenuGroup_30ae35") : L.Get("Editor_Action_4fe9c0");
             ToolTipService.SetToolTip(PropertiesHint, PropertiesHint.Text);
+            if (selected is null && MenuTree.SelectedNode == MenuTree.RootNodes.FirstOrDefault())
+            {
+                PropertiesHint.Text = config.Name;
+                PropertiesType.Text = T("Configuration", "Конфигурация");
+                RenderSettings();
+                return;
+            }
             if (selected is null)
             {
                 PropertiesPanel.Children.Add(new TextBlock { Text = L.Get("Editor_AddAFolderFileOr_029745"), TextWrapping = TextWrapping.Wrap, Opacity = .65, Margin = new Thickness(0, 20, 0, 0) });
@@ -334,11 +491,11 @@ public sealed partial class MainPage : Page
             WrapPropertiesSection(0, L.Get("Workflow_ItemSettings"));
             if (item.Kind != MenuNodeKind.Action) return;
             if (stepNodeId != item.Id) { stepNodeId = item.Id; selectedStepIndex = 0; }
-            if (item.Steps.Count == 0) return;
-            selectedStepIndex = Math.Clamp(selectedStepIndex, 0, item.Steps.Count - 1);
+            selectedStepIndex = item.Steps.Count == 0 ? 0 : Math.Clamp(selectedStepIndex, 0, item.Steps.Count - 1);
             var stepsStart = PropertiesPanel.Children.Count;
             AddStepControls(item);
             WrapPropertiesSection(stepsStart, null);
+            if (item.Steps.Count == 0) return;
             var action = item.Steps[selectedStepIndex];
             var settingsStart = PropertiesPanel.Children.Count;
             AddText(L.Get("Workflow_StepName"), action.Name, value =>
@@ -355,7 +512,7 @@ public sealed partial class MainPage : Page
                 }
             }, placeholder: StepDisplayName(item, selectedStepIndex));
             if (action.Kind is ActionKind.OpenItem or ActionKind.OpenFolder or ActionKind.RunProgram or ActionKind.RunScript or ActionKind.CopySelection or ActionKind.MoveSelection)
-                AddText(action.Kind is ActionKind.CopySelection or ActionKind.MoveSelection ? L.Get("Editor_DestinationFolder_40a307") : L.Get("Editor_Path_1b46c6"), action.Path, value => action.Path = value, variables: true, browse: action.Kind is ActionKind.OpenFolder or ActionKind.CopySelection or ActionKind.MoveSelection ? "folder" : "file", required: true);
+                AddText(action.Kind is ActionKind.CopySelection or ActionKind.MoveSelection ? L.Get("Editor_DestinationFolder_40a307") : L.Get("Editor_Path_1b46c6"), action.Path, value => action.Path = value, variables: true, browse: action.Kind is ActionKind.OpenFolder or ActionKind.CopySelection or ActionKind.MoveSelection ? "folder" : "file");
             if (action.Kind is ActionKind.RunProgram or ActionKind.RunScript)
             {
                 AddText(L.Get("Editor_Arguments_3c3a07"), action.Arguments, value => action.Arguments = value, variables: true);
@@ -372,7 +529,7 @@ public sealed partial class MainPage : Page
                 PropertiesPanel.Children.Add(CreateShortcutEditor("SentShortcut", L.Get("Editor_ShortcutToSend_bc4001"),
                     L.Get("Editor_PressedInTheWindowFrom_9e476c"), () => action.Shortcut, value => action.Shortcut = value, item.Id, sent: true));
             if (action.Kind is ActionKind.InsertText or ActionKind.PasteText or ActionKind.SetClipboardText)
-                AddText(L.Get("Editor_SnippetText_d7c024"), action.Text, value => action.Text = value, variables: true, multiline: true, required: action.Kind != ActionKind.SetClipboardText);
+                AddText(L.Get("Editor_SnippetText_d7c024"), action.Text, value => action.Text = value, variables: true, multiline: true);
             if (action.Kind == ActionKind.PasteText)
             {
                 var restore = new ToggleSwitch { Header = L.Get("Workflow_RestoreClipboard"), OnContent = L.Get("Editor_On"), OffContent = L.Get("Editor_Off"), IsOn = action.RestoreClipboard };
@@ -387,13 +544,19 @@ public sealed partial class MainPage : Page
         finally { rendering = false; UpdateDetailsTab(); }
     }
 
-    private void DetailsTabsSelectionChanged(object sender, SelectionChangedEventArgs args) => UpdateDetailsTab();
+    private int DetailsTabIndex
+    {
+        get => ReferenceEquals(DetailsTabs.SelectedItem, DetailsStepsItem) ? 1 : 0;
+        set => DetailsTabs.SelectedItem = value == 1 ? DetailsStepsItem : DetailsSettingsItem;
+    }
+
+    private void DetailsTabsSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args) => UpdateDetailsTab();
 
     private void UpdateDetailsTab()
     {
         if (PropertiesPanel is null || DetailsTabs is null || selected?.Kind != MenuNodeKind.Action) return;
         for (var i = 0; i < PropertiesPanel.Children.Count; i++)
-            PropertiesPanel.Children[i].Visibility = (i == 0) == (DetailsTabs.SelectedIndex == 0) ? Visibility.Visible : Visibility.Collapsed;
+            PropertiesPanel.Children[i].Visibility = (i == 0) == (DetailsTabIndex == 0) ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private IEnumerable<UIElement> CurrentPropertyElements() => PropertiesPanel.Children.SelectMany(child =>
@@ -488,7 +651,7 @@ public sealed partial class MainPage : Page
             button.Click += (_, _) => { Remember(); action(); MarkDirty(); RenderProperties(); };
             commands.PrimaryCommands.Add(button);
         }
-        Command("Workflow_Duplicate", new SymbolIcon(Symbol.Copy), true, () =>
+        Command("Workflow_Duplicate", new SymbolIcon(Symbol.Copy), item.Steps.Count > 0, () =>
         {
             var copy = JsonSerializer.Deserialize<MenuAction>(JsonSerializer.Serialize(item.Steps[selectedStepIndex], JsonOptions), JsonOptions)!;
             copy.Name = UniqueStepName(item, StepDisplayName(item, selectedStepIndex));
@@ -502,7 +665,7 @@ public sealed partial class MainPage : Page
             (item.Steps[selectedStepIndex], item.Steps[destination]) = (item.Steps[destination], item.Steps[selectedStepIndex]);
             selectedStepIndex = destination;
         }
-        Command("Workflow_MoveUp", new FontIcon { Glyph = "\uE70E" }, selectedStepIndex > 0, () => Move(-1));
+        Command("Workflow_MoveUp", new FontIcon { Glyph = "\uE70E" }, item.Steps.Count > 0 && selectedStepIndex > 0, () => Move(-1));
         Command("Workflow_MoveDown", new FontIcon { Glyph = "\uE70D" }, selectedStepIndex < item.Steps.Count - 1, () => Move(1));
         var heading = new Grid { ColumnSpacing = 8 };
         heading.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -814,7 +977,7 @@ public sealed partial class MainPage : Page
     private void RenameClicked(object sender, RoutedEventArgs args)
     {
         if (selected is null || selected.Kind == MenuNodeKind.Separator) return;
-        if (selected.Kind == MenuNodeKind.Action) DetailsTabs.SelectedIndex = 0;
+        if (selected.Kind == MenuNodeKind.Action) DetailsTabIndex = 0;
         if (CurrentPropertyElements().OfType<TextBox>().FirstOrDefault() is TextBox name)
         {
             name.Focus(FocusState.Programmatic);
@@ -873,7 +1036,8 @@ public sealed partial class MainPage : Page
         var clone = JsonSerializer.Deserialize<MenuNode>(copiedNode, JsonOptions)!;
         AssignNewIds(clone);
         clone.Name += L.Get("Editor_Copy_7d4e5c");
-        Add(clone);
+        var copyDestination = AddDestination();
+        draftState.Insert(copyDestination, copyDestination.Count, [clone]); MarkDirty(); RefreshTree(clone.Id);
     }
 
     private static MenuNode? FindModel(IEnumerable<MenuNode> nodes, string id) =>
@@ -903,40 +1067,33 @@ public sealed partial class MainPage : Page
     }
 
     private List<MenuNode> AddDestination() => selected?.Kind == MenuNodeKind.Group ? selected.Children : SelectedSiblings();
+    private int AddIndex(List<MenuNode> destination) =>
+        selected?.Kind == MenuNodeKind.Group || (MenuTree.SelectedNode is not null && MenuTree.SelectedNode == MenuTree.RootNodes.FirstOrDefault())
+            ? 0 : destination.Count;
     private void Add(MenuNode node)
-    { var destination = AddDestination(); draftState.Insert(destination, destination.Count, [node]); MarkDirty(); RefreshTree(node.Id); }
+    { var destination = AddDestination(); draftState.Insert(destination, AddIndex(destination), [node]); MarkDirty(); RefreshTree(node.Id); }
     private void AddGroupClicked(object sender, RoutedEventArgs args) => Add(new MenuNode { Name = L.Get("Editor_NewGroup_55c687"), Kind = MenuNodeKind.Group });
     private void AddSeparatorClicked(object sender, RoutedEventArgs args) => Add(new MenuNode { Kind = MenuNodeKind.Separator });
     private void AddSnippetClicked(object sender, RoutedEventArgs args) => Add(new MenuNode { Name = L.Get("Editor_NewSnippet_7f18a1"), Kind = MenuNodeKind.Action, Action = new MenuAction { Kind = ActionKind.InsertText } });
     private void AddActionClicked(object sender, RoutedEventArgs args)
     {
-        if (sender is not FrameworkElement anchor) return;
-        var menu = new MenuFlyout();
-        foreach (var choice in ActionChoices())
-        {
-            var option = new MenuFlyoutItem { Text = choice.Label };
-            option.Click += (_, _) => Add(new MenuNode
-            {
-                Name = choice.Label,
-                Kind = MenuNodeKind.Action,
-                Action = new MenuAction { Kind = choice.Kind }
-            });
-            menu.Items.Add(option);
-        }
-        menu.ShowAt(anchor);
+        Add(new MenuNode { Name = L.Get("Editor_NewAction_991100"), Kind = MenuNodeKind.Action });
+        DetailsTabIndex = 1;
     }
 
     private async void AddFolderClicked(object sender, RoutedEventArgs args)
     {
         var picker = new FolderPicker(); picker.FileTypeFilter.Add("*"); InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindow));
-        try { var folder = await picker.PickSingleFolderAsync(); if (folder is not null) ImportPaths([folder.Path], AddDestination()); }
+        var destination = AddDestination(); var index = AddIndex(destination);
+        try { var folder = await picker.PickSingleFolderAsync(); if (folder is not null) ImportPaths([folder.Path], destination, index); }
         catch (Exception ex) { ShowNotice(ex.Message, InfoBarSeverity.Error); }
     }
     private async void AddFileClicked(object sender, RoutedEventArgs args)
     {
         var picker = new FileOpenPicker(); InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindow));
         foreach (var ext in new[] { ".exe", ".bat", ".cmd", ".ps1", ".lnk" }) picker.FileTypeFilter.Add(ext);
-        try { var files = await picker.PickMultipleFilesAsync(); ImportPaths(files.Select(file => file.Path), AddDestination()); }
+        var destination = AddDestination(); var index = AddIndex(destination);
+        try { var files = await picker.PickMultipleFilesAsync(); ImportPaths(files.Select(file => file.Path), destination, index); }
         catch (Exception ex) { ShowNotice(ex.Message, InfoBarSeverity.Error); }
     }
 
@@ -948,7 +1105,7 @@ public sealed partial class MainPage : Page
         choice.SelectedIndex = 0;
         var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = L.Get("Editor_ImportDesktop"), Content = choice, PrimaryButtonText = L.Get("Editor_PreviewDesktop"), CloseButtonText = L.Get("Editor_Cancel_0ec753") };
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
-        var destination = AddDestination();
+        var destination = AddDestination(); var index = AddIndex(destination);
         try
         {
             var errors = new List<string>();
@@ -975,7 +1132,7 @@ public sealed partial class MainPage : Page
             var confirm = new ContentDialog { XamlRoot = XamlRoot, Title = L.Get("Editor_PreviewDesktop"), Content = preview, PrimaryButtonText = L.Get("Editor_DesktopAdd"), CloseButtonText = L.Get("Editor_Cancel_0ec753"), IsPrimaryButtonEnabled = root.Children.Count > 0 };
             if (await confirm.ShowAsync() == ContentDialogResult.Primary)
             {
-                draftState.Insert(destination, destination.Count, [root]); MarkDirty(); RefreshTree(root.Id);
+                draftState.Insert(destination, index, [root]); MarkDirty(); RefreshTree(root.Id);
             }
         }
         catch (Exception ex) { ShowNotice(ex.Message, InfoBarSeverity.Error); }
@@ -1058,7 +1215,8 @@ public sealed partial class MainPage : Page
         foreach (var node in VisibleNodes(MenuTree.RootNodes))
         {
             if (MenuTree.ContainerFromNode(node) is not TreeViewItem container) continue;
-            var model = Model(node);
+            if (node.Content is not NodeDisplay display) continue;
+            var model = display.Model;
             yield return new(model.Id, model.Kind == MenuNodeKind.Group, BoundsInWindow(container));
         }
     }
@@ -1123,6 +1281,16 @@ public sealed partial class MainPage : Page
     {
         if (activeShortcut is not null) await activeShortcut.StopAsync();
         if (!draftReady && !await RestoreDraftAsync()) return false;
+        var original = baseSnapshot is null ? null : JsonSerializer.Deserialize<AppConfig>(baseSnapshot, JsonOptions);
+        var saveCopy = false;
+        if (!unsavedNewConfiguration && original is not null && !string.Equals(original.Name, config.Name, StringComparison.Ordinal))
+        {
+            var choice = await ConfirmAsync(T("Save renamed configuration", "Сохранить переименованную конфигурацию"),
+                T("Overwrite the existing configuration or save a copy?", "Перезаписать существующую конфигурацию или сохранить копию?"),
+                T("Overwrite", "Перезаписать"), T("Save copy", "Сохранить копию"));
+            if (choice == ContentDialogResult.None) return false;
+            saveCopy = choice == ContentDialogResult.Secondary;
+        }
         var staged = await client.ReplaceDraftAsync(config);
         if (!staged.Success && staged.ErrorCode == "draft_not_started")
         {
@@ -1131,6 +1299,13 @@ public sealed partial class MainPage : Page
             staged = await client.ReplaceDraftAsync(config);
         }
         if (!staged.Success) { ShowNotice(staged.Message ?? L.Get("Editor_CouldNotPrepareTheConfiguration_896ac2"), InfoBarSeverity.Error); return false; }
+        if (saveCopy)
+        {
+            var copied = await client.SendAsync("saveAs", new JsonObject { ["name"] = config.Name });
+            if (!copied.Success) { ShowNotice(copied.Message ?? T("Could not create a copy", "Не удалось создать копию"), InfoBarSeverity.Error); return false; }
+            unsavedNewConfiguration = true;
+            draftConfigurationPath = null;
+        }
         var response = destinationPath is null ? await client.ApplyAsync() : await client.SaveAsAsync(destinationPath);
         ShowHotkeyAvailability(response);
         if (!response.Success) { ShowNotice(response.Message ?? L.Get("Editor_CouldNotApplyTheConfiguration_9f63ee"), InfoBarSeverity.Error); return false; }
@@ -1139,7 +1314,9 @@ public sealed partial class MainPage : Page
         var draft = EditorPipeClient.ReadDraft(begin);
         if (draft is not null) { UpdateConfigurationTitle(begin); draftState.Reset(draft.Config); draftReady = true; RefreshTree(selected?.Id); if (SettingsPage.Visibility == Visibility.Visible) RenderSettings(); }
         else draftState.SetBaseline();
-        UpdateApplyState(); Notice.IsOpen = false;
+        pendingActivation = false;
+        unsavedNewConfiguration = false;
+        UpdateApplyState(); UpdateConfigurationSelector(); Notice.IsOpen = false;
         var warnings = response.Data?["Validation"]?["Warnings"]?.Deserialize<string[]>() ?? [];
         if (warnings.Length > 0) ShowNotice(string.Join("\n", warnings), InfoBarSeverity.Warning);
         return true;
@@ -1162,51 +1339,109 @@ public sealed partial class MainPage : Page
         draftReady = true;
         return true;
     }
-    private async void LoadClicked(object sender, RoutedEventArgs args)
+    private async Task<bool> ConfirmSwitchAsync()
     {
-        if (dirty && await ConfirmAsync(L.Get("Editor_LoadAnotherFile_f18ee0"), L.Get("Editor_UnsavedChangesWillBeDiscarded_0fca95"), L.Get("Editor_Load_f909c7")) != ContentDialogResult.Primary) return;
-        var picker = new FileOpenPicker(); picker.FileTypeFilter.Add(".json"); InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindow));
-        try
+        if (!HasUnsavedChanges) return true;
+        var answer = await ConfirmAsync(T("Unsaved changes", "Несохранённые изменения"),
+            T("Apply changes before switching?", "Применить изменения перед переключением?"),
+            L.Get("Editor_Apply_768af6"), L.Get("Editor_Discard_941d9e"));
+        return answer == ContentDialogResult.Secondary || (answer == ContentDialogResult.Primary && await ApplyAsync());
+    }
+
+    private void OpenDraft(EditorResponse response, string? path = null, bool isNew = false)
+    {
+        var draft = EditorPipeClient.ReadDraft(response);
+        if (draft is null) { ShowNotice(response.Message ?? T("Could not open configuration", "Не удалось открыть конфигурацию"), InfoBarSeverity.Error); return; }
+        draftState.Reset(draft.Config);
+        draftConfigurationPath = path;
+        ShowConfigurationTitle(path);
+        pendingActivation = true;
+        unsavedNewConfiguration = isNew;
+        draftReady = true;
+        RefreshTree();
+        UpdateApplyState();
+        UpdateConfigurationSelector();
+    }
+
+    private void UpdateConfigurationSelector() => ConfigurationSelector.Content = config.Name;
+
+    private async void ConfigurationsFlyoutOpening(object sender, object args)
+    {
+        ConfigurationsFlyout.Items.Clear();
+        var loading = new MenuFlyoutItem { Text = T("Loading…", "Загрузка…"), IsEnabled = false };
+        ConfigurationsFlyout.Items.Add(loading);
+        var response = await client.SendAsync("listConfigs");
+        ConfigurationsFlyout.Items.Clear();
+        if (!response.Success)
         {
-            var file = await picker.PickSingleFileAsync(); if (file is null) return;
-            if (activeConfigurationPath is not null && string.Equals(Path.GetFullPath(file.Path), Path.GetFullPath(activeConfigurationPath), StringComparison.OrdinalIgnoreCase))
+            ConfigurationsFlyout.Items.Add(new MenuFlyoutItem { Text = response.Message ?? "Error", IsEnabled = false });
+            return;
+        }
+        if (response.Data?["configs"] is JsonArray entries) foreach (var entry in entries)
+        {
+            if (entry is null) continue;
+            var name = entry["name"]?.GetValue<string>() ?? entry["Name"]?.GetValue<string>() ?? "?";
+            var path = entry["path"]?.GetValue<string>() ?? entry["Path"]?.GetValue<string>() ?? "";
+            var error = entry["error"]?.GetValue<string>() ?? entry["Error"]?.GetValue<string>();
+            var active = entry["isActive"]?.GetValue<bool>() ?? entry["IsActive"]?.GetValue<bool>() ?? false;
+            var label = name + (active ? T(" (active)", " (активна)") : "");
+            var option = new ToggleMenuFlyoutItem { Text = error is null ? label : label + " — " + error,
+                IsChecked = string.Equals(path, draftConfigurationPath, StringComparison.OrdinalIgnoreCase), IsEnabled = error is null };
+            option.Click += async (_, _) =>
             {
-                var response = await client.ReloadAsync();
-                if (!response.Success) { ShowNotice(response.Message ?? L.Get("Editor_CouldNotReload_075f1d"), InfoBarSeverity.Error); return; }
-                await LoadCurrentAsync();
-                return;
-            }
-            var loadResponse = await client.SendAsync("loadConfig", new JsonObject { ["path"] = file.Path });
-            if (!loadResponse.Success) { ShowNotice(loadResponse.Message ?? L.Get("Editor_TheFileDoesNotContain_2469d6"), InfoBarSeverity.Error); return; }
-            var loaded = loadResponse.Data?["config"]?.Deserialize<AppConfig>(JsonOptions) ?? throw new InvalidDataException(L.Get("Editor_TheFileDoesNotContain_2469d6"));
-            Remember(); config = loaded; MarkDirty(); RefreshTree();
-            if (SettingsPage.Visibility == Visibility.Visible) RenderSettings();
-            ShowConfigurationTitle(file.Path);
+                if (string.Equals(path, draftConfigurationPath, StringComparison.OrdinalIgnoreCase)) return;
+                if (!await ConfirmSwitchAsync()) return;
+                OpenDraft(await client.SendAsync("loadConfig", new JsonObject { ["path"] = path }), path);
+            };
+            ConfigurationsFlyout.Items.Add(option);
         }
-        catch (Exception ex) { ShowNotice(ex.Message, InfoBarSeverity.Error); }
-    }
-    private async void SaveClicked(object sender, RoutedEventArgs args)
-    {
-        var picker = new Microsoft.Windows.Storage.Pickers.FileSavePicker(App.MainWindow.AppWindow.Id)
+        ConfigurationsFlyout.Items.Add(new MenuFlyoutSeparator());
+        var create = new MenuFlyoutItem { Text = T("New configuration…", "Новая конфигурация…") };
+        create.Click += async (_, _) =>
         {
-            SuggestedFileName = Path.GetFileNameWithoutExtension(activeConfigurationPath) ?? "config",
-            DefaultFileExtension = ".json"
+            if (!await ConfirmSwitchAsync()) return;
+            var name = await AskConfigurationNameAsync(T("New configuration", "Новая конфигурация"));
+            if (name is not null) OpenDraft(await client.SendAsync("newConfig", new JsonObject { ["name"] = name }), isNew: true);
         };
-        picker.FileTypeChoices.Add(L.Get("Editor_JsonConfiguration_453120"), [".json"]);
-        try
-        {
-            var file = await picker.PickSaveFileAsync();
-            if (file is not null) await ApplyAsync(file.Path);
-        }
-        catch (Exception ex) { ShowNotice(ex.Message, InfoBarSeverity.Error); }
+        ConfigurationsFlyout.Items.Add(create);
     }
+
+    private async Task<string?> AskConfigurationNameAsync(string title)
+    {
+        var input = new TextBox { Header = L.Get("Editor_Name_aee78f") };
+        var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = title, Content = input,
+            PrimaryButtonText = T("Create", "Создать"), CloseButtonText = L.Get("Editor_Cancel_0ec753") };
+        return await dialog.ShowAsync() == ContentDialogResult.Primary ? input.Text : null;
+    }
+
+    private async void DeleteConfigurationClicked(object sender, RoutedEventArgs args)
+    {
+        if (!string.Equals(draftConfigurationPath, activeConfigurationPath, StringComparison.OrdinalIgnoreCase) || unsavedNewConfiguration) return;
+        var requestedPath = activeConfigurationPath;
+        if (await ConfirmAsync(T("Delete configuration", "Удалить конфигурацию"),
+            T("Delete the active configuration?", "Удалить активную конфигурацию?"), L.Get("Editor_Delete_86ea33")) != ContentDialogResult.Primary) return;
+        if (!await ConfirmSwitchAsync()) return;
+        if (!string.Equals(requestedPath, activeConfigurationPath, StringComparison.OrdinalIgnoreCase))
+        {
+            ShowNotice(T("The active configuration changed; deletion was cancelled.", "Активная конфигурация изменилась; удаление отменено."), InfoBarSeverity.Warning);
+            return;
+        }
+        var response = await client.SendAsync("deleteActiveConfig", new JsonObject { ["version"] = activeConfigurationVersion });
+        var draft = EditorPipeClient.ReadDraft(response);
+        if (draft is null) { ShowNotice(response.Message ?? T("Could not delete configuration", "Не удалось удалить конфигурацию"), InfoBarSeverity.Error); return; }
+        UpdateConfigurationTitle(response);
+        draftState.Reset(draft.Config);
+        pendingActivation = false; unsavedNewConfiguration = false; draftReady = true;
+        RefreshTree(); UpdateApplyState(); UpdateConfigurationSelector();
+    }
+
     private async Task<ContentDialogResult> ConfirmAsync(string title, string message, string primary, string secondary = "")
     {
         var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = title, Content = message, PrimaryButtonText = primary, CloseButtonText = L.Get("Editor_Cancel_0ec753"), SecondaryButtonText = secondary, DefaultButton = ContentDialogButton.Primary };
         return await dialog.ShowAsync();
     }
 
-    private void MenuTreeDragItemsStarting(TreeView sender, TreeViewDragItemsStartingEventArgs args) { dragEscapeMonitor?.Dispose(); dragEscapeMonitor = new DragEscapeMonitor(); draftState.CommitPending(); dragSnapshot = Snapshot(); dragNodeId = args.Items.FirstOrDefault() is TreeViewNode node ? Model(node).Id : null; sender.CanReorderItems = false; dropIndicatorTimer.Start(); }
+    private void MenuTreeDragItemsStarting(TreeView sender, TreeViewDragItemsStartingEventArgs args) { if (args.Items.FirstOrDefault() is not TreeViewNode { Content: NodeDisplay }) { args.Cancel = true; return; } dragEscapeMonitor?.Dispose(); dragEscapeMonitor = new DragEscapeMonitor(); draftState.CommitPending(); dragSnapshot = Snapshot(); dragNodeId = args.Items.FirstOrDefault() is TreeViewNode node ? Model(node).Id : null; sender.CanReorderItems = false; dropIndicatorTimer.Start(); }
     internal bool InternalDragActive() => (dragSnapshot is not null && dragNodeId is not null) || (stepDragItem is not null && draggedStep is not null);
     private void UpdateDropIndicator()
     {
@@ -1334,9 +1569,9 @@ public sealed partial class MainPage : Page
                 if (model.Kind != MenuNodeKind.Group && node.Children.Count > 0) throw new InvalidOperationException(L.Get("Editor_OnlyAGroupCanContain_04ef69"));
                 model.Children = Read(node.Children); return model;
             }).ToList();
-            config.Items = Read(MenuTree.RootNodes);
+            config.Items = Read(MenuTree.RootNodes[0].Children);
             if (Snapshot() != dragSnapshot) { draftState.RecordChange(dragSnapshot); MarkDirty(); }
-            var selectedId = sender.SelectedNode is { } node ? Model(node).Id : null;
+            var selectedId = sender.SelectedNode?.Content is NodeDisplay selectedDisplay ? selectedDisplay.Model.Id : null;
             DispatcherQueue.TryEnqueue(() => RefreshTree(selectedId));
         }
         catch (Exception ex) { draftState.Restore(dragSnapshot); RefreshTree(); ShowNotice(ex.Message, InfoBarSeverity.Warning); }
@@ -1438,6 +1673,15 @@ public sealed partial class MainPage : Page
         return panel;
     }
     private static Symbol SymbolFor(MenuNode item) => item.Kind == MenuNodeKind.Group ? Symbol.Folder : item.Action?.Kind == ActionKind.InsertText ? Symbol.Paste : Symbol.Document;
+    private static StackPanel CreateConfigurationDisplay(string name)
+    {
+        var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(panel, name);
+        panel.Children.Add(new SymbolIcon(Symbol.Setting) { Width = 20, Height = 20 });
+        panel.Children.Add(new TextBlock { Text = name, VerticalAlignment = VerticalAlignment.Center, MaxWidth = 190, TextTrimming = TextTrimming.CharacterEllipsis });
+        return panel;
+    }
+
     private sealed class NodeDisplay : StackPanel
     {
         public MenuNode Model { get; }

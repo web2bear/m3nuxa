@@ -84,6 +84,28 @@ internal sealed class McpHttpTools
     public static async Task<string> Read(AgentPipe pipe) =>
         (await pipe.ExecuteAsync("", "read")).ToJsonString();
 
+    [McpServerTool(Name = "list_configurations"), Description("List configurations in the configured folder, including the active one and any read errors.")]
+    public static async Task<string> ListConfigurations(AgentPipe pipe) =>
+        (await pipe.ExecuteAsync("", "listConfigs")).ToJsonString();
+
+    [McpServerTool(Name = "open_configuration"), Description("Open a listed configuration as an independent draft; it becomes active only after apply.")]
+    public static async Task<string> OpenConfiguration(AgentPipe pipe, string path)
+    {
+        var draftId = "mcp-" + Guid.NewGuid().ToString("N");
+        var response = (await pipe.ExecuteAsync(draftId, "loadConfig", new JsonObject { ["path"] = path })).AsObject();
+        response["draftId"] = draftId;
+        return response.ToJsonString();
+    }
+
+    [McpServerTool(Name = "new_configuration"), Description("Create an empty configuration draft. It is saved and activated only after apply.")]
+    public static async Task<string> NewConfiguration(AgentPipe pipe, string name)
+    {
+        var draftId = "mcp-" + Guid.NewGuid().ToString("N");
+        var response = (await pipe.ExecuteAsync(draftId, "newConfig", new JsonObject { ["name"] = name })).AsObject();
+        response["draftId"] = draftId;
+        return response.ToJsonString();
+    }
+
     [McpServerTool(Name = "begin"), Description("Start an independent draft and return its draftId. Pass draftId to later editing tools.")]
     public static async Task<string> Begin(AgentPipe pipe)
     {

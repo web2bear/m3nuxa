@@ -224,7 +224,7 @@ or select an existing item.</value>
     <value>Load another file?</value>
   </data>
   <data name="Editor_LoadConfiguration_0439e7" xml:space="preserve">
-    <value>Load from file…</value>
+    <value>Configurations…</value>
   </data>
   <data name="Editor_Load_f909c7" xml:space="preserve">
     <value>Load</value>
@@ -491,7 +491,7 @@ or select an existing item.</value>
   <data name="Workflow_Sequence" xml:space="preserve"><value>Action sequence</value></data>
   <data name="Workflow_StepName" xml:space="preserve"><value>Step name</value></data>
   <data name="Editor_MenuSection" xml:space="preserve"><value>Menu</value></data>
-  <data name="Editor_SettingsDraftHint" xml:space="preserve"><value>Settings and the menu are saved together with Apply. Restart the editor to change its language.</value></data>
+  <data name="Editor_SettingsDraftHint" xml:space="preserve"><value>Settings and the menu are saved together with Apply.</value></data>
   <data name="Editor_SettingsLanguage" xml:space="preserve"><value>Interface language</value></data>
   <data name="Editor_SettingsMenuShortcut" xml:space="preserve"><value>Menu shortcut</value></data>
   <data name="Editor_SettingsPanelShortcut" xml:space="preserve"><value>Launcher panel shortcut</value></data>

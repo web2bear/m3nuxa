@@ -81,4 +81,5 @@
   <data name="PanelPositionCursor" xml:space="preserve"><value>Рядом с курсором</value></data>
   <data name="InvalidPanelShortcut" xml:space="preserve"><value>Некорректное сочетание клавиш панели.</value></data>
   <data name="InvalidPanelPosition" xml:space="preserve"><value>Некорректное положение панели.</value></data>
+  <data name="InvalidAppearance" xml:space="preserve"><value>Некорректные параметры внешнего вида.</value></data>
 </root>

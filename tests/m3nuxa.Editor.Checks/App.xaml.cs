@@ -38,8 +38,11 @@ public partial class App : Application
                 if (position.X < work.X || position.Y < work.Y || position.X + size.Width > work.X + work.Width || position.Y + size.Height > work.Y + work.Height)
                     throw new Exception($"Check window is outside the additional screen work area: {position.X},{position.Y}, {size.Width}x{size.Height}.");
             }
+            page.CheckContextAdd();
             page.CheckLocalization();
             page.CheckConfigurationTitle();
+            page.CheckAppearanceSettings();
+            page.CheckNewDraftRequiresConfirmation();
             if (Environment.GetEnvironmentVariable("m3nuxa_DROP_CHECK") is { } snapshotPath)
             {
                 page.SetupDropChecks();

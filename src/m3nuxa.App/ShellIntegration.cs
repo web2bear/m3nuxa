@@ -108,5 +108,5 @@ internal static class MessageBox
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int MessageBoxW(nint owner, string text, string title, uint flags);
 }
 internal enum DialogResult { Yes = 6, No = 7, Cancel = 2 }
-internal enum MessageBoxButtons : uint { OK = 0, YesNoCancel = 3 }
+internal enum MessageBoxButtons : uint { OK = 0, YesNoCancel = 3, YesNo = 4 }
 internal enum MessageBoxIcon : uint { Error = 16, Question = 32, Warning = 48, Information = 64 }

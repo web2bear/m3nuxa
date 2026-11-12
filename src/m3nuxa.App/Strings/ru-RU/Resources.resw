@@ -1,4 +1,4 @@
-﻿<?xml version='1.0' encoding='utf-8'?>
+<?xml version='1.0' encoding='utf-8'?>
 <root>
   <resheader name="resmimetype">
     <value>text/microsoft-resx</value>
@@ -286,6 +286,7 @@
   <data name="WorkflowProcessTimeout" xml:space="preserve"><value>Процесс не завершился за установленное время.</value></data>
   <data name="WorkflowProcessExitCode" xml:space="preserve"><value>Процесс завершился с кодом {0}.</value></data>
   <data name="WorkflowClipboardNoText" xml:space="preserve"><value>Буфер обмена не содержит текста.</value></data>
+  <data name="WorkflowNoSteps" xml:space="preserve"><value>В действии нет шагов.</value></data>
   <data name="WorkflowFolderUnavailable" xml:space="preserve"><value>Системная папка недоступна.</value></data>
   <data name="WorkflowFolderUnknown" xml:space="preserve"><value>Неизвестная системная папка: {0}.</value></data>
   <data name="WorkflowFolderUnavailableNamed" xml:space="preserve"><value>Системная папка недоступна: {0}.</value></data>
@@ -301,8 +302,11 @@
   <data name="WorkflowKindSetClipboardText" xml:space="preserve"><value>Записать текст в буфер</value></data>
   <data name="WorkflowKindPasteText" xml:space="preserve"><value>Вставить текст</value></data>
   <data name="PanelGroupDetails" xml:space="preserve"><value>Группа · пунктов: {0}</value></data>
+  <data name="PanelStepsCount" xml:space="preserve"><value>Шагов: {0}</value></data>
   <data name="PanelActionDetails" xml:space="preserve"><value>Действие · шагов: {0}</value></data>
   <data name="PanelPath" xml:space="preserve"><value>Путь: {0}</value></data>
   <data name="LegacySettingsReadFailed" xml:space="preserve"><value>Не удалось перенести прежние настройки из файла {0}: {1}. Исправьте или восстановите этот файл и перезапустите приложение. Конфигурация не изменена.</value></data>
   <data name="ConfigPathUnchecked" xml:space="preserve"><value>{0}: доступность пути будет проверена при выполнении действия: {1}</value></data>
+  <data name="AppMigrateConfig" xml:space="preserve"><value>Скопировать существующую конфигурацию из {0} в новую папку конфигураций {1}? Исходный файл будет сохранён.</value></data>
+  <data name="TrayLanguage" xml:space="preserve"><value>Язык</value></data>
 </root>

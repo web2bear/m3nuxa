@@ -48,6 +48,10 @@
                     <SolidColorBrush x:Key="ToolbarRedBrush" Color="{ThemeResource SystemColorButtonTextColor}" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
+            <Style x:Key="DeleteConfigurationButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+                <Setter Property="BorderBrush" Value="{ThemeResource ToolbarRedBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+            </Style>
             <Style x:Key="WorkflowSectionStyle" TargetType="Border">
                 <Setter Property="Background" Value="{ThemeResource SectionBackgroundBrush}" />
                 <Setter Property="BorderBrush" Value="{ThemeResource SectionStrokeBrush}" />
@@ -72,12 +76,6 @@
             <AppBarButton x:Name="ApplyButton" MinWidth="40" Label="{x:Bind Localize('Editor_Apply_768af6')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_Apply_768af6')}" Click="ApplyClicked" IsEnabled="False">
                 <AppBarButton.Icon><SymbolIcon Symbol="Save" Foreground="{ThemeResource ToolbarGreenBrush}" /></AppBarButton.Icon>
             </AppBarButton>
-            <AppBarButton AutomationProperties.AutomationId="SaveDraft" MinWidth="40" Label="{x:Bind Localize('Editor_SaveDraftSeparately_23cefc')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_SaveAsHint')}" Click="SaveClicked">
-                <AppBarButton.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE792;" Foreground="{ThemeResource ToolbarBlueBrush}" /></AppBarButton.Icon>
-            </AppBarButton>
-            <AppBarButton AutomationProperties.AutomationId="LoadConfiguration" MinWidth="40" Label="{x:Bind Localize('Editor_LoadConfiguration_0439e7')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_LoadConfiguration_0439e7')}" Click="LoadClicked">
-                <AppBarButton.Icon><SymbolIcon Symbol="OpenFile" Foreground="{ThemeResource ToolbarBlueBrush}" /></AppBarButton.Icon>
-            </AppBarButton>
             <AppBarSeparator />
             <AppBarButton AutomationProperties.AutomationId="ImportDesktop" MinWidth="40" Label="{x:Bind Localize('Editor_ImportDesktop')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_ImportDesktop')}" Click="ImportDesktopClicked">
                 <AppBarButton.Icon><SymbolIcon Symbol="Import" Foreground="{ThemeResource ToolbarGreenBrush}" /></AppBarButton.Icon>
@@ -86,7 +84,7 @@
             <AppBarToggleButton x:Name="PinButton" MinWidth="40" Label="{x:Bind Localize('Editor_AlwaysOnTop_1bee89')}" AutomationProperties.Name="{x:Bind Localize('Editor_KeepTheEditorOnTop_3e7cbb')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_KeepTheEditorAboveOther_eb06b1')}" Click="PinClicked">
                 <AppBarToggleButton.Icon><SymbolIcon Symbol="Pin" /></AppBarToggleButton.Icon>
             </AppBarToggleButton>
-            <AppBarButton x:Name="OpenSettingsButton" AutomationProperties.AutomationId="OpenSettings" MinWidth="40" Label="{x:Bind Localize('Editor_Settings_7f17c7')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_Settings_7f17c7')}" Click="SettingsClicked">
+            <AppBarButton x:Name="OpenSettingsButton" Visibility="Collapsed" AutomationProperties.AutomationId="OpenSettings" MinWidth="40" Label="{x:Bind Localize('Editor_Settings_7f17c7')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_Settings_7f17c7')}" Click="SettingsClicked">
                 <AppBarButton.Icon><SymbolIcon Symbol="Setting" Foreground="{ThemeResource ToolbarGrayBrush}" /></AppBarButton.Icon>
             </AppBarButton>
             <AppBarButton x:Name="OpenMenuButton" AutomationProperties.AutomationId="OpenMenu" MinWidth="40" Label="{x:Bind Localize('Editor_MenuSection')}" Click="MenuSectionClicked" Visibility="Collapsed">
@@ -103,15 +101,8 @@
             </Grid.ColumnDefinitions>
             <Grid x:Name="MenuPanel" Grid.Column="1" RowDefinitions="Auto,*,Auto" AllowDrop="True" Background="{ThemeResource WorkspacePanelBrush}" BorderBrush="{ThemeResource WorkspaceStrokeBrush}" BorderThickness="1" CornerRadius="12">
                 <Grid Padding="12,10,12,6">
-                    <DropDownButton AutomationProperties.AutomationId="CreateFolder" Content="{x:Bind Localize('Workflow_Add')}" HorizontalAlignment="Left" AutomationProperties.Name="{x:Bind Localize('Workflow_Add')}">
-                        <DropDownButton.Flyout><MenuFlyout x:Name="AddItemFlyout">
-                            <MenuFlyoutItem Text="{x:Bind Localize('Editor_Folder_72cf46')}" Click="AddFolderClicked" />
-                            <MenuFlyoutItem Text="{x:Bind Localize('Editor_File_c1973e')}" Click="AddFileClicked" />
-                            <MenuFlyoutItem Text="{x:Bind Localize('Editor_Action_4fe9c0')}" Click="AddActionClicked" />
-                            <MenuFlyoutItem Text="{x:Bind Localize('Editor_Snippet_720dc5')}" Click="AddSnippetClicked" />
-                            <MenuFlyoutItem Text="{x:Bind Localize('Editor_Group_ae8ad7')}" Click="AddGroupClicked" />
-                            <MenuFlyoutItem Text="{x:Bind Localize('Editor_Separator_afb9a7')}" Click="AddSeparatorClicked" />
-                        </MenuFlyout></DropDownButton.Flyout>
+                    <DropDownButton x:Name="ConfigurationSelector" AutomationProperties.AutomationId="ConfigurationSelector" HorizontalAlignment="Stretch" AutomationProperties.Name="Configurations">
+                        <DropDownButton.Flyout><MenuFlyout x:Name="ConfigurationsFlyout" Opening="ConfigurationsFlyoutOpening" /></DropDownButton.Flyout>
                     </DropDownButton>
                 </Grid>
                 <TreeView x:Name="MenuTree" Grid.Row="1" Margin="8,2,8,4" SelectionMode="Single"
@@ -124,6 +115,15 @@
                     </TreeView.ItemTemplate>
                     <TreeView.ContextFlyout>
                         <MenuFlyout>
+                            <MenuFlyoutSubItem Text="{x:Bind Localize('Workflow_Add')}">
+                                <MenuFlyoutItem Text="{x:Bind Localize('Editor_Folder_72cf46')}" Click="AddFolderClicked" />
+                                <MenuFlyoutItem Text="{x:Bind Localize('Editor_File_c1973e')}" Click="AddFileClicked" />
+                                <MenuFlyoutItem Text="{x:Bind Localize('Editor_Action_4fe9c0')}" Click="AddActionClicked" />
+                                <MenuFlyoutItem Text="{x:Bind Localize('Editor_Snippet_720dc5')}" Click="AddSnippetClicked" />
+                                <MenuFlyoutItem Text="{x:Bind Localize('Editor_Group_ae8ad7')}" Click="AddGroupClicked" />
+                                <MenuFlyoutItem Text="{x:Bind Localize('Editor_Separator_afb9a7')}" Click="AddSeparatorClicked" />
+                            </MenuFlyoutSubItem>
+                            <MenuFlyoutSeparator />
                             <MenuFlyoutItem x:Name="CutButton" KeyboardAcceleratorTextOverride="Ctrl+X" Text="{x:Bind Localize('Editor_Cut_1b696e')}" Click="CutClicked"><MenuFlyoutItem.Icon><SymbolIcon Symbol="Cut" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
                             <MenuFlyoutItem x:Name="CopyButton" KeyboardAcceleratorTextOverride="Ctrl+C" Text="{x:Bind Localize('Editor_Copy_4a05d8')}" Click="CopyClicked"><MenuFlyoutItem.Icon><SymbolIcon Symbol="Copy" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
                             <MenuFlyoutItem x:Name="PasteButton" KeyboardAcceleratorTextOverride="Ctrl+Shift+V" Text="{x:Bind Localize('Editor_Insert_eeb8ca')}" Click="PasteClicked"><MenuFlyoutItem.Icon><SymbolIcon Symbol="Paste" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
@@ -143,17 +143,22 @@
             <Grid x:Name="DetailsPanel" Grid.Column="2" RowDefinitions="Auto,*" Background="{ThemeResource WorkspacePanelBrush}" BorderBrush="{ThemeResource WorkspaceStrokeBrush}" BorderThickness="1" CornerRadius="12">
                 <Grid Padding="14,10,14,8" ColumnDefinitions="Auto,*" ColumnSpacing="10">
                     <Button x:Name="PropertiesIcon" VerticalAlignment="Center" Click="PropertiesIconClicked" AutomationProperties.Name="{x:Bind Localize('Icon_ChooseBundled')}" />
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
-                        <TextBlock x:Name="PropertiesHint" Text="{x:Bind Localize('Editor_SelectAnItemOnThe_2c92bb')}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    <SymbolIcon x:Name="ConfigurationPropertiesIcon" Symbol="Setting" Width="24" Height="24" Margin="12,8" VerticalAlignment="Center" Visibility="Collapsed" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Stretch" Spacing="0">
+                        <TextBlock x:Name="PropertiesHint" Text="{x:Bind Localize('Editor_SelectAnItemOnThe_2c92bb')}" FontSize="18" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                         <TextBlock x:Name="PropertiesType" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
                 </Grid>
                 <ScrollViewer Grid.Row="1" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
                     <StackPanel>
-                        <TabView x:Name="DetailsTabs" Margin="14,0,14,4" IsAddTabButtonVisible="False" TabWidthMode="Equal" Width="370" HorizontalAlignment="Left" SelectedIndex="0" SelectionChanged="DetailsTabsSelectionChanged" Visibility="Collapsed">
-                            <TabViewItem Header="{x:Bind Localize('Workflow_ItemSettings')}" IsClosable="False"><TabViewItem.IconSource><SymbolIconSource Symbol="Setting" /></TabViewItem.IconSource></TabViewItem>
-                            <TabViewItem Header="{x:Bind Localize('Workflow_Steps')}" IsClosable="False"><TabViewItem.IconSource><SymbolIconSource Symbol="List" /></TabViewItem.IconSource></TabViewItem>
-                        </TabView>
+                        <NavigationView x:Name="DetailsTabs" Margin="14,0,14,4" PaneDisplayMode="Top"
+                                        IsBackButtonVisible="Collapsed" IsSettingsVisible="False" IsPaneToggleButtonVisible="False"
+                                        SelectionFollowsFocus="Enabled" SelectionChanged="DetailsTabsSelectionChanged" Visibility="Collapsed">
+                            <NavigationView.MenuItems>
+                                <NavigationViewItem x:Name="DetailsSettingsItem" Content="{x:Bind Localize('Workflow_ItemSettings')}" Icon="Setting" />
+                                <NavigationViewItem x:Name="DetailsStepsItem" Content="{x:Bind Localize('Workflow_Steps')}" Icon="List" />
+                            </NavigationView.MenuItems>
+                        </NavigationView>
                         <StackPanel x:Name="PropertiesPanel" Padding="14,2,14,14" Spacing="12" HorizontalAlignment="Stretch" />
                     </StackPanel>
                 </ScrollViewer>

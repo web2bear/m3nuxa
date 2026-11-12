@@ -37,7 +37,6 @@ internal sealed class TrayApplication : IDisposable
     {
         DevLog.Write("app", "TrayApplication starting");
         _store = store;
-        L.SetLanguage(store.Current.Settings.Language);
         _foreground = new ForegroundTracker();
         _window.Content = _root;
         _window.AppWindow.IsShownInSwitchers = false;
@@ -49,7 +48,7 @@ internal sealed class TrayApplication : IDisposable
         _window.AppWindow.Resize(new SizeInt32(2, 2));
         _tray = new ShellIntegration(_window, service => _window.DispatcherQueue.TryEnqueue(() =>
         {
-            if (service) ShowFlyout(BuildServiceMenu()); else ShowMenu(_store.Current.Items);
+            if (service) ShowFlyout(BuildServiceMenu()); else OpenEditor();
         }), (node, panel) => _window.DispatcherQueue.TryEnqueue(() => OnHotkey(node, panel)));
         RegisterHotkeys();
         _agentPipe = new AgentPipe(_store, RegisterHotkeys, suspended =>
@@ -68,7 +67,6 @@ internal sealed class TrayApplication : IDisposable
         var menu = LauncherMenu.Create();
         void Add(string text, Action action) { var item = new MenuFlyoutItem { Text = text }; item.Click += (_, _) => action(); menu.Items.Add(item); }
         Add(L.Get("TrayEditor"), OpenEditor);
-        Add(L.Get("TraySettings"), OpenSettings);
         Add(L.Get("WorkflowRuns"), ShowWorkflowRuns);
         Add(L.Get("TrayReload"), Reload);
         _mcpMenuItem = new ToggleMenuFlyoutItem { Text = L.Get("TrayMcp"), IsChecked = _mcpHttp.IsRunning };
@@ -79,9 +77,31 @@ internal sealed class TrayApplication : IDisposable
         menu.Items.Add(_copyMcpAddressItem);
         _startupMenuItem = new ToggleMenuFlyoutItem { Text = L.Get("TrayStartup"), IsChecked = IsStartupEnabled() };
         _startupMenuItem.Click += (_, _) => ToggleStartup(); menu.Items.Add(_startupMenuItem);
+        var languageMenu = new MenuFlyoutSubItem { Text = L.Get("TrayLanguage") };
+        foreach (var (label, language) in new[] { ("English", "en-US"), ("Русский", "ru-RU") })
+        {
+            var item = new ToggleMenuFlyoutItem { Text = label, IsChecked = L.Language == language };
+            item.Click += (_, _) => ChangeLanguage(language);
+            languageMenu.Items.Add(item);
+        }
+        menu.Items.Add(languageMenu);
         menu.Items.Add(new MenuFlyoutSeparator());
         Add(L.Get("TrayExit"), async () => await ExitAsync());
         return menu;
+    }
+
+    private void ChangeLanguage(string language)
+    {
+        if (L.Language == language) return;
+        try
+        {
+            L.SaveLanguage(language);
+            _tray.ShowBalloonTip(5000, L.Get("TrayLanguage"), L.Get("Settings/EditorRestartRequired"), ToolTipIcon.Warning);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(ex.Message, "m3nuxa", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
     }
 
     private bool ReadMcpEnabled()
@@ -152,7 +172,11 @@ internal sealed class TrayApplication : IDisposable
                 catch (Exception ex) { DevLog.Write("app", "Could not select editor item", ex); }
             }
             _editor.Refresh();
-            if (_editor.MainWindowHandle != IntPtr.Zero) NativeMethods.SetForegroundWindow(_editor.MainWindowHandle);
+            if (_editor.MainWindowHandle != IntPtr.Zero)
+            {
+                if (IsIconic(_editor.MainWindowHandle)) ShowWindow(_editor.MainWindowHandle, 9);
+                NativeMethods.SetForegroundWindow(_editor.MainWindowHandle);
+            }
             return;
         }
         if (!File.Exists(path))
@@ -194,14 +218,14 @@ internal sealed class TrayApplication : IDisposable
         var invocation = InvocationContext.Capture(_foreground.LastWindow);
         _menu?.Hide();
         LauncherPanel.Show(_store.Current.Items, node => _ = Execute(node, invocation), OpenEditor,
-            _store.Current.Settings.PanelPosition == "Cursor");
+            _store.Current.Settings);
     }
 
     private void ShowMenu(IReadOnlyList<MenuNode> nodes)
     {
         var invocation = InvocationContext.Capture(_foreground.LastWindow);
-        var menu = LauncherMenu.Create();
-        LauncherMenu.Fill(menu.Items, nodes, node => _ = Execute(node, invocation), node => { _menu?.Hide(); OpenEditor(node.Id); }, _store.Current.Settings.MenuFontSize);
+        var menu = LauncherMenu.Create(_store.Current.Settings);
+        LauncherMenu.Fill(menu.Items, nodes, node => _ = Execute(node, invocation), node => { _menu?.Hide(); OpenEditor(node.Id); }, _store.Current.Settings);
         if (menu.Items.Count == 0) menu.Items.Add(new MenuFlyoutItem { Text = L.Get("TrayEmptyMenu"), IsEnabled = false });
         ShowFlyout(menu);
     }
@@ -225,6 +249,8 @@ internal sealed class TrayApplication : IDisposable
         if (_root.XamlRoot is null) { RoutedEventHandler? loaded = null; loaded = (_, _) => { _root.Loaded -= loaded; Show(); }; _root.Loaded += loaded; }
         else Show();
     }
+    [DllImport("user32.dll")] private static extern bool IsIconic(nint window);
+    [DllImport("user32.dll")] private static extern bool ShowWindow(nint window, int command);
     [DllImport("user32.dll")] private static extern bool SetWindowPos(nint window, nint after, int x, int y, int width, int height, uint flags);
     [StructLayout(LayoutKind.Sequential)] private struct CursorPoint { public int X, Y; }
     [DllImport("user32.dll")] private static extern bool GetCursorPos(out CursorPoint point);
@@ -254,7 +280,7 @@ internal sealed class TrayApplication : IDisposable
 
     private async Task Execute(MenuNode node, InvocationContext? context)
     {
-        if (_exiting || node.Steps.Count == 0) return;
+        if (_exiting) return;
         if (_workflowRuns.Any(run => run.NodeId == node.Id && !run.Finished))
         {
             _tray.ShowBalloonTip(5000, L.Get("WorkflowRuns"), L.Get("WorkflowAlreadyRunning"), ToolTipIcon.Warning, ShowWorkflowRuns);
@@ -272,7 +298,7 @@ internal sealed class TrayApplication : IDisposable
                 (index, step) =>
                 {
                     run.StepIndex = index;
-                    run.StepKind = L.Get("WorkflowKind" + step.Kind);
+                    run.StepKind = Enum.IsDefined(step.Kind) ? L.Get("WorkflowKind" + step.Kind) : L.Get("ActionUnknown");
                     _workflowWindow?.Refresh();
                 });
             run.FileSteps = result.FileSteps;
@@ -306,7 +332,6 @@ internal sealed class TrayApplication : IDisposable
 
     private void RegisterHotkeys()
     {
-        L.SetLanguage(_store.Current.Settings.Language);
         RegisterHotkeyBindings();
     }
 
@@ -363,11 +388,17 @@ internal sealed class TrayApplication : IDisposable
         return key?.GetValue("m3nuxa") is string;
     }
 
-    private static void ToggleStartup()
+    private void ToggleStartup()
     {
         using var key = Registry.CurrentUser.CreateSubKey(RunKey);
         if (key.GetValue("m3nuxa") is not null) key.DeleteValue("m3nuxa", false);
-        else key.SetValue("m3nuxa", $"\"{Environment.ProcessPath}\"");
+        else
+        {
+            var command = $"\"{Environment.ProcessPath}\"";
+            if (Environment.GetCommandLineArgs().Skip(1).Any(arg => arg == "--config-dir" || arg.StartsWith("--config-dir=", StringComparison.Ordinal)))
+                command += $" --config-dir \"{_store.ConfigDirectory}\"";
+            key.SetValue("m3nuxa", command);
+        }
     }
 
     private bool _disposed;

@@ -69,6 +69,8 @@ internal static class ActionExecutor
     {
         try
         {
+            var validationError = ValidateStep(action);
+            if (validationError is not null) return new ActionResult(0, 0, new[] { validationError }, false);
             if (UsesClipboardValue(action) && context.ClipboardText is null)
                 context = context with { ClipboardText = await ClipboardOperations.ReadTextAsync(cancellationToken) };
             if (!Handlers.TryGetValue(action.Kind, out var handler))
@@ -79,6 +81,25 @@ internal static class ActionExecutor
         {
             return new ActionResult(0, 0, [UsesSensitiveValue(action) && ex is not WorkflowSafeException ? L.Get("WorkflowSensitiveError") : ex.Message], false);
         }
+    }
+
+    private static string? ValidateStep(MenuAction action)
+    {
+        const string label = "";
+        if (!Enum.IsDefined(action.Kind)) return L.Get("ActionUnknown");
+        if (action.Kind == ActionKind.Delay)
+            return action.DelayMilliseconds < 0 ? L.Format("ConfigDelayInvalid", label).TrimStart(':', ' ') : null;
+        if (action.Kind == ActionKind.SetClipboardText) return null;
+        if (action.Kind is ActionKind.RunProgram or ActionKind.RunScript && action.TimeoutMilliseconds is <= 0)
+            return L.Format("ConfigTimeoutInvalid", label).TrimStart(':', ' ');
+        if (action.Kind == ActionKind.SendShortcut)
+        {
+            if (string.IsNullOrWhiteSpace(action.Shortcut)) return L.Format("ConfigShortcutRequired", label).TrimStart(':', ' ');
+            return HotkeyParser.TryParse(action.Shortcut, out _, out _) ? null : L.Format("ConfigShortcutInvalid", label).TrimStart(':', ' ');
+        }
+        if (action.Kind is ActionKind.InsertText or ActionKind.PasteText)
+            return string.IsNullOrEmpty(action.Text) ? L.Format("ConfigSnippetRequired", label).TrimStart(':', ' ') : null;
+        return string.IsNullOrWhiteSpace(action.Path) ? L.Format("ConfigPathRequired", label).TrimStart(':', ' ') : null;
     }
 
     internal static ActionResult Ok() => new(1, 0, [], false);
