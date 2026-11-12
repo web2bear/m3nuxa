@@ -51,6 +51,12 @@ public partial class App : Application
             if (popups.Count == 0) throw new Exception("Menu popup did not open");
             CheckIcon(sub.Icon, "Root group");
             CheckIcon(((MenuFlyoutItem)flyout.Items[1]).Icon, "Root action");
+            var iconContent = Descendants((DependencyObject)((MenuFlyoutItem)flyout.Items[1]).Icon).OfType<Image>().FirstOrDefault();
+            if (iconContent is null || iconContent.ActualWidth < 20 || iconContent.ActualHeight < 20)
+                throw new Exception($"Large menu icon rendered too small: {iconContent?.ActualWidth}x{iconContent?.ActualHeight}");
+            var iconBox = Descendants((DependencyObject)flyout.Items[1]).OfType<Viewbox>().FirstOrDefault(v => v.Name == "IconRoot");
+            if (iconBox is null || iconBox.ActualWidth < 21)
+                throw new Exception($"Large menu icon is scaled by the template to {iconBox?.ActualWidth} pixels");
             var peer = Microsoft.UI.Xaml.Automation.Peers.FrameworkElementAutomationPeer.CreatePeerForElement(sub);
             var expand = (Microsoft.UI.Xaml.Automation.Provider.IExpandCollapseProvider)peer.GetPattern(Microsoft.UI.Xaml.Automation.Peers.PatternInterface.ExpandCollapse);
             expand.Expand();

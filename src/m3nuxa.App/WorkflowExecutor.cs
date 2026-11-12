@@ -25,6 +25,7 @@ internal static class WorkflowExecutor
             new(cancelled, stepIndex, error) { FileSteps = fileSteps.ToArray() };
         try
         {
+            if (steps.Count == 0) return Finish(false, -1, L.Get("WorkflowNoSteps"));
             for (index = 0; index < steps.Count; index++)
             {
                 cancellationToken.ThrowIfCancellationRequested();

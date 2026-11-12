@@ -163,7 +163,7 @@ internal sealed class AgentPipe : IDisposable
                 if (request["session"]?.GetValue<string>() is null || request["operation"]?.GetValue<string>() is null)
                     throw new ProtocolException("invalid_request", "Request must include session and operation.");
                 var data = Handle(request);
-                if (request["operation"]?.GetValue<string>() is "apply" or "saveAs" or "reload")
+                if (request["operation"]?.GetValue<string>() is "apply" or "reload")
                 {
                     var succeeded = data["Success"]?.GetValue<bool>() == true;
                     if (!succeeded)
@@ -224,7 +224,10 @@ internal sealed class AgentPipe : IDisposable
         {
             "openSettings" => OpenSettingsRequest(),
             "read" => ReadConfiguration(),
-            "loadConfig" => LoadConfiguration(args),
+            "listConfigs" => JsonSerializer.SerializeToNode(new { configs = _store.ListConfigurations() }, JsonOptions)!,
+            "loadConfig" => LoadConfiguration(session, args),
+            "newConfig" => NewConfiguration(session, args),
+            "deleteActiveConfig" => DeleteActiveConfiguration(session, args),
             "begin" => BeginDraft(session),
             "reload" => ReloadConfiguration(),
             _ => HandleDraftOperation(session, operation, args)
@@ -247,11 +250,32 @@ internal sealed class AgentPipe : IDisposable
             unavailableHotkeys = _hotkeyStatus?.Invoke()
         }, JsonOptions)!;
 
-    private JsonNode LoadConfiguration(JsonObject args)
+    private JsonNode LoadConfiguration(string session, JsonObject args)
     {
         var path = args["path"]?.GetValue<string>() ?? throw new ArgumentException("The path field is required.");
         var loaded = _store.LoadDraft(path);
-        return JsonSerializer.SerializeToNode(new { config = loaded.Config }, JsonOptions)!;
+        return SetDraft(session, loaded);
+    }
+
+    private JsonNode NewConfiguration(string session, JsonObject args) =>
+        SetDraft(session, _store.CreateConfigurationDraft(args["name"]?.GetValue<string>() ?? throw new ArgumentException("The name field is required.")));
+
+    private JsonNode DeleteActiveConfiguration(string session, JsonObject args)
+    {
+        var expectedVersion = args["version"]?.GetValue<long>() ?? throw new ArgumentException("The version field is required.");
+        _store.DeleteActiveConfiguration(expectedVersion, _preflight);
+        _applied();
+        return BeginDraft(session);
+    }
+
+    private JsonNode SetDraft(string session, ConfigDraft draft)
+    {
+        if (session.StartsWith("mcp-", StringComparison.Ordinal) && !_drafts.ContainsKey(session) &&
+            _drafts.Keys.Count(key => key.StartsWith("mcp-", StringComparison.Ordinal)) >= 32)
+            throw new ProtocolException("draft_limit", "Too many active drafts. Discard an unused draft first.");
+        _drafts[session] = draft;
+        _draftActivity[session] = DateTime.UtcNow;
+        return JsonSerializer.SerializeToNode(new { version = draft.BaseVersion, config = draft.Config }, JsonOptions)!;
     }
 
     private JsonNode BeginDraft(string session)
@@ -321,8 +345,14 @@ internal sealed class AgentPipe : IDisposable
 
     private JsonNode SaveDraftAs(string session, ConfigDraft draft, JsonObject args)
     {
-        var path = args["path"]?.GetValue<string>() ?? throw new ArgumentException("The path field is required.");
-        return SaveDraft(session, draft, path);
+        var name = args["name"]?.GetValue<string>() ?? throw new ArgumentException("The name field is required.");
+        var copy = _store.CreateConfigurationDraft(name);
+        copy.Config = JsonSerializer.Deserialize<AppConfig>(JsonSerializer.Serialize(draft.Config, JsonOptions), JsonOptions)!;
+        copy.Config.Name = name;
+        copy.BaseVersion = draft.BaseVersion;
+        copy.OriginPath = draft.OriginPath ?? draft.SourcePath;
+        copy.OriginFingerprint = draft.OriginPath is null ? draft.SourceFingerprint : draft.OriginFingerprint;
+        return SetDraft(session, copy);
     }
 
     private JsonNode SaveDraft(string session, ConfigDraft draft, string? destinationPath)

@@ -10,6 +10,13 @@ internal static class WorkflowExecutionChecks
         var directory = Path.Combine(root, "workflow-execution");
         Directory.CreateDirectory(directory);
         var context = new InvocationContext(IntPtr.Zero, [], null);
+        var empty = await WorkflowExecutor.RunAsync([], context, CancellationToken.None);
+        Check(!empty.Success && empty.StepIndex == -1 && empty.Error == L.Get("WorkflowNoSteps"), "empty sequence reports an error on invocation");
+        foreach (var invalid in new[] { new MenuAction { Kind = ActionKind.OpenFolder }, new MenuAction { Kind = ActionKind.Delay, DelayMilliseconds = -1 }, new MenuAction { Kind = ActionKind.SendShortcut }, new MenuAction { Kind = ActionKind.InsertText }, new MenuAction { Kind = ActionKind.RunProgram, Path = "x", TimeoutMilliseconds = 0 } })
+        {
+            var invalidResult = await WorkflowExecutor.RunAsync([invalid], context, CancellationToken.None);
+            Check(!invalidResult.Success && !string.IsNullOrWhiteSpace(invalidResult.Error), "invalid step reports an error on invocation");
+        }
         var unknown = await ActionExecutor.ExecuteAsync(new MenuAction { Kind = (ActionKind)999 }, context);
         Check(!unknown.Success && unknown.Error == L.Get("ActionUnknown"), "unknown action reports a safe error");
         var sensitivePath = Path.Combine(directory, "sensitive missing folder");

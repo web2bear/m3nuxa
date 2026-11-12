@@ -33,7 +33,8 @@ internal sealed class IconSelectionDialog
         previewNode = new MenuNode { Kind = item.Kind, Action = item.Action, IconPath = item.IconPath, IconColor = item.IconColor };
         color = item.IconColor is { Length: 7 } saved && saved[0] == '#' && uint.TryParse(saved.AsSpan(1), System.Globalization.NumberStyles.HexNumber, null, out _) ? saved : "#60A5FA";
         Dialog = new ContentDialog { XamlRoot = root, Title = L.Get("Icon_ChooseBundled"),
-            PrimaryButtonText = L.Get("Icon_Confirm"), CloseButtonText = L.Get("Editor_Cancel_0ec753"), DefaultButton = ContentDialogButton.Primary };
+            PrimaryButtonText = L.Get("Icon_Confirm"), CloseButtonText = L.Get("Editor_Cancel_0ec753"), DefaultButton = ContentDialogButton.Primary,
+            FlowDirection = FlowDirection.RightToLeft };
 
         var previewRow = new Grid { ColumnSpacing = 16, ColumnDefinitions = {
             new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }, new ColumnDefinition { Width = GridLength.Auto } } };
@@ -108,7 +109,7 @@ internal sealed class IconSelectionDialog
         };
         RestoreCatalogSelection();
 
-        var content = new Grid { Height = Math.Clamp(height, 280, 580), RowSpacing = 10 };
+        var content = new Grid { Height = Math.Clamp(height, 280, 580), RowSpacing = 10, FlowDirection = FlowDirection.LeftToRight };
         void Row(FrameworkElement element, bool stretch = false)
         {
             content.RowDefinitions.Add(new RowDefinition { Height = stretch ? new GridLength(1, GridUnitType.Star) : GridLength.Auto });

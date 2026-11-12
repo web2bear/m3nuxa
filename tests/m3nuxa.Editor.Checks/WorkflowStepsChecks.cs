@@ -17,7 +17,7 @@ public sealed partial class MainPage
         node.Steps[1].Name = "";
         draftState.SetBaseline();
         RefreshTree(node.Id);
-        DetailsTabs.SelectedIndex = 1;
+        DetailsTabIndex = 1;
         await Task.Delay(100);
         var list = stepList ?? throw new Exception("Step list missing");
         list.UpdateLayout();

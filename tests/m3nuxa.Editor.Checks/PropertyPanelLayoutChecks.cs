@@ -25,7 +25,7 @@ public sealed partial class MainPage
                     await Task.Delay(200);
                     foreach (var tab in node.Kind == MenuNodeKind.Action ? new[] { 0, 1 } : new[] { 0 })
                     {
-                    if (node.Kind == MenuNodeKind.Action) DetailsTabs.SelectedIndex = tab;
+                    if (node.Kind == MenuNodeKind.Action) DetailsTabIndex = tab;
                     DetailsPanel.UpdateLayout();
                     foreach (var section in PropertiesPanel.Children.OfType<Border>().Where(section => section.Visibility == Microsoft.UI.Xaml.Visibility.Visible))
                     {

@@ -1,4 +1,4 @@
-﻿<?xml version='1.0' encoding='utf-8'?>
+<?xml version='1.0' encoding='utf-8'?>
 <root>
   <resheader name="resmimetype">
     <value>text/microsoft-resx</value>
@@ -286,6 +286,7 @@ Cancel — exit.</value>
   <data name="WorkflowProcessTimeout" xml:space="preserve"><value>The process did not finish within the configured timeout.</value></data>
   <data name="WorkflowProcessExitCode" xml:space="preserve"><value>The process exited with code {0}.</value></data>
   <data name="WorkflowClipboardNoText" xml:space="preserve"><value>Clipboard does not contain text.</value></data>
+  <data name="WorkflowNoSteps" xml:space="preserve"><value>This action has no steps.</value></data>
   <data name="WorkflowFolderUnavailable" xml:space="preserve"><value>The system folder is unavailable.</value></data>
   <data name="WorkflowFolderUnknown" xml:space="preserve"><value>Unknown system folder: {0}.</value></data>
   <data name="WorkflowFolderUnavailableNamed" xml:space="preserve"><value>System folder is unavailable: {0}.</value></data>
@@ -301,8 +302,11 @@ Cancel — exit.</value>
   <data name="WorkflowKindSetClipboardText" xml:space="preserve"><value>Set clipboard text</value></data>
   <data name="WorkflowKindPasteText" xml:space="preserve"><value>Paste text</value></data>
   <data name="PanelGroupDetails" xml:space="preserve"><value>Group · items: {0}</value></data>
+  <data name="PanelStepsCount" xml:space="preserve"><value>Steps: {0}</value></data>
   <data name="PanelActionDetails" xml:space="preserve"><value>Action · steps: {0}</value></data>
   <data name="PanelPath" xml:space="preserve"><value>Path: {0}</value></data>
   <data name="LegacySettingsReadFailed" xml:space="preserve"><value>Could not migrate the previous settings file {0}: {1}. Repair or restore this file and restart the application. The configuration was not changed.</value></data>
   <data name="ConfigPathUnchecked" xml:space="preserve"><value>{0}: path availability will be checked when the action runs: {1}</value></data>
+  <data name="AppMigrateConfig" xml:space="preserve"><value>Copy the existing configuration from {0} to the new configuration folder {1}? The original file will be kept.</value></data>
+  <data name="TrayLanguage" xml:space="preserve"><value>Language</value></data>
 </root>

@@ -5,7 +5,7 @@ $state = Join-Path $env:TEMP ('m3nuxa-internal-' + [guid]::NewGuid().ToString('N
 $editor = $null
 $previousState = $env:m3nuxa_DROP_CHECK
 $previousLanguage = $env:m3nuxa_CHECK_LANGUAGE
-$settings = Join-Path $out 'settings.json'
+$settings = Join-Path $out 'app-language.json'
 $originalSettings = if (Test-Path -LiteralPath $settings) { [IO.File]::ReadAllBytes($settings) } else { $null }
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type 'using System; using System.Runtime.InteropServices; public static class InternalDropFocus { [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd); }'
@@ -30,12 +30,14 @@ try {
     if (!(Test-Path $state) -or $editor.MainWindowHandle -eq 0) { throw 'Test editor did not start.' }
     [System.Windows.Forms.SendKeys]::SendWait('%')
     [void][InternalDropFocus]::SetForegroundWindow($editor.MainWindowHandle)
-    $null = Invoke-Winapp @('ui','click','CreateFolder','-a',"$($editor.Id)",'--json')
+    $null = Invoke-Winapp @('ui','click','Default','--right','-a',"$($editor.Id)",'--json')
+    $null = Invoke-Winapp @('ui','invoke','Добавить','-a',"$($editor.Id)",'--json')
     $null = Invoke-Winapp @('ui','invoke','Сниппет','-a',"$($editor.Id)",'--json')
     Start-Sleep -Milliseconds 500
     $tree = Invoke-Winapp @('ui','inspect','-a',"$($editor.Id)",'--depth','15','--json')
     $rows = @(Flatten $tree.windows.elements | Where-Object { $_.type -eq 'TreeItem' })
-    if ($rows.Count -ne 2) { throw "Expected two root rows; found $($rows.Count)." }
+    if ($rows.Count -ne 3) { throw "Expected configuration root, group and action; found $($rows.Count)." }
+    $rows = @($rows | Select-Object -Skip 1)
     # Drag an unselected action; selecting the group first must not change the source.
     $null = Invoke-Winapp @('ui','click','Drop group','-a',"$($editor.Id)",'--json')
     Start-Sleep -Milliseconds 300
@@ -54,7 +56,8 @@ try {
     Write-Host 'PASS: internal TreeView drag moved action into group'
     $tree = Invoke-Winapp @('ui','inspect','-a',"$($editor.Id)",'--depth','15','--json')
     $rows = @(Flatten $tree.windows.elements | Where-Object { $_.type -eq 'TreeItem' })
-    if ($rows.Count -ne 2) { throw "Expected group and child; found $($rows.Count)." }
+    if ($rows.Count -ne 3) { throw "Expected configuration root, group and child; found $($rows.Count)." }
+    $rows = @($rows | Select-Object -Skip 1)
     $from = '{0},{1}' -f [int]($rows[1].x + 100),[int]($rows[1].y + $rows[1].height / 2)
     $to = '{0},{1}' -f [int]($rows[0].x + 30),[int]($rows[1].y + $rows[1].height + 50)
     $null = Invoke-Winapp @('ui','drag',$from,$to,'-a',"$($editor.Id)",'--dwell-ms','800','--json')

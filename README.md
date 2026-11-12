@@ -18,7 +18,7 @@ Windows 11 · Portable · English & Russian · Native Windows interface
 
 Open your project folder. Launch your editor. Paste a meeting template. Send selected files to their destination. Put the actions you repeat into a menu that follows your workflow.
 
-Press **Ctrl+Alt+Space** to open your menu at the cursor, or click the tray icon. Use nested groups to keep a growing collection easy to navigate. Give an action its own hotkey for direct access, or assign one to a group to open just that part of your menu.
+Press **Ctrl+Alt+Space** to open your menu at the cursor. Left-click the tray icon to open the editor. Use nested groups to keep a growing collection easy to navigate. Give an action its own hotkey for direct access, or assign one to a group to open just that part of your menu.
 
 ## A home for your everyday actions
 
@@ -30,7 +30,7 @@ Press **Ctrl+Alt+Space** to open your menu at the cursor, or click the tray icon
 
 ## Build a menu that feels like yours
 
-The visual editor puts your menu tree and the selected item's settings side by side. Add groups, actions, snippets, and separators; drag items into place; choose icons that make each command easy to recognize.
+The visual editor puts your menu tree and the selected item's settings side by side. Use a tree node’s context menu to add groups, actions, snippets, and separators; drag items into place; choose icons that make each command easy to recognize.
 
 ![The m3nuxa visual editor showing a nested workflow and a Copy selected items action with its destination folder](docs/screenshots/showcase/editor.png)
 
@@ -44,10 +44,10 @@ Drag supported files, folders, or shortcuts into the tree to create actions. Imp
 
 ## Quietly available from the tray
 
-Open the editor, reload your configuration, change settings, or enable startup with Windows from the tray menu. Customize the menu hotkey, font size, and interface language in settings.
+Open the editor, reload your configuration, or enable startup with Windows from the tray menu. Customize the menu hotkey and font size in settings. Choose the language for both applications from the tray menu; reopen the editor to update its language.
 
 <p align="center">
-  <img src="docs/screenshots/showcase/tray-menu.png" alt="The m3nuxa tray menu with editor, settings, reload, MCP server, and startup options" width="420">
+  <img src="docs/screenshots/showcase/tray-menu.png" alt="The m3nuxa tray menu with editor, reload, MCP server, and startup options" width="420">
 </p>
 
 ## Let your AI assistant help organize it
@@ -64,6 +64,8 @@ Describe the workflow you want — for example, “Create a group for my project
 2. Run **m3nuxa.App.exe**. Keep the editor and the other supplied files alongside it.
 3. Right-click the tray icon and choose **Edit configuration**. Add a few actions, then click **Apply**.
 4. Press **Ctrl+Alt+Space** and make it your own.
+
+Configurations are stored in `configs` next to `m3nuxa.App.exe` by default. To use another directory, start the application with `--config-dir "C:\path\to\configs"` or set the `M3NUXA_CONFIG_DIR` environment variable. The command-line option takes precedence. Select a configuration in the editor and click **Apply** to activate it; its root contains its name and application settings.
 
 The self-contained portable build does not require a separate .NET installation. Keep the whole folder when moving it: the menu tree and application settings are stored together in the configuration file. Paths to external apps and folders must still be valid on the destination computer.
 

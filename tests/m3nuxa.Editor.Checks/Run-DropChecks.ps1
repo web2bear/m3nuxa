@@ -7,7 +7,7 @@
  Set-Content -LiteralPath (Join-Path $fixture 'Document.txt') -Value 'test'
  $previousState = $env:m3nuxa_DROP_CHECK
  $previousLanguage = $env:m3nuxa_CHECK_LANGUAGE
- $settings = Join-Path $out 'settings.json'
+ $settings = Join-Path $out 'app-language.json'
  $originalSettings = if (Test-Path -LiteralPath $settings) { [IO.File]::ReadAllBytes($settings) } else { $null }
  $env:m3nuxa_DROP_CHECK = $state
  $editor = $null; $explorerWindow = $null

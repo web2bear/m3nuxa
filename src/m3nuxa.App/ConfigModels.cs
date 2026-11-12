@@ -58,12 +58,19 @@ public sealed record AppSettings
     public string PanelHotkey { get; init; } = "";
     public string PanelPosition { get; init; } = "Center";
     public double MenuFontSize { get; init; } = 12;
-    public string Language { get; init; } = "en-US";
+    public string MenuDensity { get; init; } = "Normal";
+    public string MenuIconSize { get; init; } = "Normal";
+    public string MenuBackground { get; init; } = "";
+    public string PanelBackground { get; init; } = "";
+    public int PanelOpacity { get; init; } = 85;
+    public string PanelIconSize { get; init; } = "Normal";
+    public double PanelFontSize { get; init; } = 12;
 }
 
 public sealed class AppConfig
 {
     public int SchemaVersion { get; set; } = 3;
+    public string Name { get; set; } = "Default";
     public AppSettings Settings { get; set; } = new();
     [JsonIgnore]
     public string MainHotkey { get; set; } = "Ctrl+Alt+Space";
@@ -77,7 +84,13 @@ public sealed class ConfigDraft
 {
     public required AppConfig Config { get; set; }
     public required long BaseVersion { get; set; }
+    public string? SourcePath { get; set; }
+    public string? SourceFingerprint { get; set; }
+    public string? OriginPath { get; set; }
+    public string? OriginFingerprint { get; set; }
 }
+
+public sealed record ConfigEntry(string Path, string Name, bool IsActive, string? Error);
 
 public sealed record ValidationResult(IReadOnlyList<string> Errors, IReadOnlyList<string> Warnings)
 {

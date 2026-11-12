@@ -18,6 +18,10 @@ public sealed partial class MainPage
         var selection = CreateIconSelectionDialog(node);
         var pending = selection.Dialog.ShowAsync();
         await Task.Delay(150);
+        var cancelButton = Descendants(selection.Dialog).OfType<Button>().Single(button => button.Name == "CloseButton" && Equals(button.Content, selection.Dialog.CloseButtonText));
+        var confirmButton = Descendants(selection.Dialog).OfType<Button>().Single(button => button.Name == "PrimaryButton" && Equals(button.Content, selection.Dialog.PrimaryButtonText));
+        Require(cancelButton.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point()).X <
+            confirmButton.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point()).X, "cancel must be left of confirm");
         Require(selection.Icons.SelectedItem is string, "current icon is not selected");
         var preview = Descendants(selection.Dialog).OfType<ContentControl>().Single(control => AutomationProperties.GetAutomationId(control) == "IconPreview");
         Require(preview.Content is FrameworkElement { ActualWidth: > 0 }, "current icon preview is missing");
@@ -41,6 +45,15 @@ public sealed partial class MainPage
         Require(!dirty && node.IconPath == path, "catalog selection committed immediately");
         InvokeDialogButton(selection.Dialog, "CloseButton"); await pending;
         Require(!dirty && node.IconPath == path && node.IconColor == "#60A5FA", "cancel changed the draft");
+
+        selection = CreateIconSelectionDialog(node);
+        pending = selection.Dialog.ShowAsync(); await Task.Delay(100);
+        selection.SetColor("#22C55E");
+        FocusCheckWindow(); selection.Search.Focus(FocusState.Programmatic); await Task.Delay(100);
+        Send((0x1b, false), (0x1b, true));
+        for (var attempt = 0; attempt < 20 && pending.Status == Windows.Foundation.AsyncStatus.Started; attempt++) await Task.Delay(100);
+        Require(pending.Status == Windows.Foundation.AsyncStatus.Completed && !dirty && node.IconColor == "#60A5FA", $"Escape must cancel without changes (status={pending.Status}, dirty={dirty}, color={node.IconColor})");
+        await pending; await Task.Delay(200);
 
         selection = CreateIconSelectionDialog(node);
         pending = selection.Dialog.ShowAsync(); await Task.Delay(100);

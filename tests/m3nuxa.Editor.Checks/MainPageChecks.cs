@@ -5,6 +5,30 @@ namespace m3nuxa.Editor.Views;
 
 public sealed partial class MainPage
 {
+    internal void CheckAppearanceSettings()
+    {
+        config = new AppConfig();
+        RenderSettings();
+        var navigation = PropertiesPanel.Children.OfType<Microsoft.UI.Xaml.Controls.NavigationView>().Single();
+        if (navigation.MenuItems.Count != 2 || navigation.PaneDisplayMode != Microsoft.UI.Xaml.Controls.NavigationViewPaneDisplayMode.Top ||
+            navigation.SelectionFollowsFocus != Microsoft.UI.Xaml.Controls.NavigationViewSelectionFollowsFocus.Enabled)
+            throw new Exception("Appearance navigation must have two top items and follow focus.");
+        navigation.SelectedItem = navigation.MenuItems[1];
+        var layout = (Microsoft.UI.Xaml.Controls.Grid)navigation.Content;
+        var fields = (Microsoft.UI.Xaml.Controls.StackPanel)layout.Children[0];
+        var slider = fields.Children.OfType<Microsoft.UI.Xaml.Controls.Grid>().SelectMany(x => x.Children.OfType<Microsoft.UI.Xaml.Controls.Slider>()).Single();
+        slider.Value = 60;
+        if (config.Settings.PanelOpacity != 60) throw new Exception("Panel opacity was not updated in the draft.");
+        RenderSettings();
+        navigation = PropertiesPanel.Children.OfType<Microsoft.UI.Xaml.Controls.NavigationView>().Single();
+        if (navigation.SelectedItem != navigation.MenuItems[1])
+            throw new Exception("Settings section was not preserved after redraw.");
+        navigation.SelectedItem = navigation.MenuItems[0];
+        if (navigation.Content is not Microsoft.UI.Xaml.Controls.Grid menuLayout ||
+            menuLayout.Children[0] is not Microsoft.UI.Xaml.Controls.StackPanel menuFields ||
+            !menuFields.Children.OfType<Microsoft.UI.Xaml.Controls.NumberBox>().Any())
+            throw new Exception("Selecting the menu section did not show its settings.");
+    }
     private IEnumerable<UIElement> PropertyElements() => PropertiesPanel.Children.SelectMany(child =>
         child is Border { Child: StackPanel section } ? section.Children.Cast<UIElement>() : Enumerable.Repeat(child, 1));
 
@@ -15,10 +39,29 @@ public sealed partial class MainPage
         UpdateConfigurationTitle(new EditorResponse(true, null, new System.Text.Json.Nodes.JsonObject { ["configPath"] = path }));
         if (!App.MainWindow.Title.Contains(path, StringComparison.Ordinal)) throw new Exception("Active configuration path missing from title.");
         ShowConfigurationTitle(imported);
-        if (!App.MainWindow.Title.Contains(path, StringComparison.Ordinal) || !App.MainWindow.Title.Contains(imported, StringComparison.Ordinal))
-            throw new Exception("Imported source and apply destination should both be shown.");
+        if (App.MainWindow.Title.Contains(path, StringComparison.Ordinal) || !App.MainWindow.Title.Contains(imported, StringComparison.Ordinal))
+            throw new Exception("The title must identify the selected draft, not the active configuration.");
         UpdateConfigurationTitle(new EditorResponse(true, null, new System.Text.Json.Nodes.JsonObject()));
         if (App.MainWindow.Title.Contains(path, StringComparison.Ordinal)) throw new Exception("Unsaved configuration should not show an old path.");
+    }
+
+    internal void CheckNewDraftRequiresConfirmation()
+    {
+        var response = new EditorResponse(true, null, System.Text.Json.JsonSerializer.SerializeToNode(new
+        {
+            version = 1L,
+            config = new AppConfig { Name = "Copy" }
+        }));
+        OpenDraft(response, isNew: true);
+        if (dirty || !HasUnsavedChanges || !ApplyButton.IsEnabled)
+            throw new Exception("A new or copied configuration must require confirmation before it is saved.");
+        OpenDraft(response, path: "existing.json");
+        if (HasUnsavedChanges || !ApplyButton.IsEnabled)
+            throw new Exception("Opening an existing configuration should permit activation without inventing changes.");
+        Remember(); config.Name = "Edited"; MarkDirty();
+        if (!HasUnsavedChanges) throw new Exception("Changes to an existing configuration must require confirmation.");
+        unsavedNewConfiguration = false;
+        pendingActivation = false;
     }
 
     internal void CheckLocalization()
@@ -32,11 +75,13 @@ public sealed partial class MainPage
         if (L.Get("Editor_Path_1b46c6") != expectedPath)
             throw new Exception("The localized Path resource was not loaded from the editor PRI.");
         var commands = MainCommandBar.PrimaryCommands.OfType<Microsoft.UI.Xaml.Controls.AppBarButton>().ToArray();
-        var expected = expectedLanguage == "ru-RU" ? new[] { "Сохранить", "Сохранить как…", "Загрузить из файла…" } : new[] { "Save", "Save as…", "Load from file…" };
-        if (!commands.Take(3).Select(command => command.Label).SequenceEqual(expected)) throw new Exception("File command labels or order are wrong.");
-        if (commands[0].Icon is not Microsoft.UI.Xaml.Controls.SymbolIcon { Symbol: Microsoft.UI.Xaml.Controls.Symbol.Save } ||
-            commands[1].Icon is not Microsoft.UI.Xaml.Controls.FontIcon { Glyph: "\uE792" } ||
-            commands[2].Icon is not Microsoft.UI.Xaml.Controls.SymbolIcon { Symbol: Microsoft.UI.Xaml.Controls.Symbol.OpenFile }) throw new Exception("File command icons are wrong.");
+        if (commands.Length < 1 || commands[0].Label != expectedApply ||
+            commands[0].Icon is not Microsoft.UI.Xaml.Controls.SymbolIcon { Symbol: Microsoft.UI.Xaml.Controls.Symbol.Save })
+            throw new Exception("Save command is missing.");
+        if (commands.Any(command => Microsoft.UI.Xaml.Automation.AutomationProperties.GetAutomationId(command) is "SaveDraft" or "LoadConfiguration"))
+            throw new Exception("Obsolete configuration commands are still present.");
+        if (Microsoft.UI.Xaml.Automation.AutomationProperties.GetAutomationId(ConfigurationSelector) != "ConfigurationSelector")
+            throw new Exception("Configuration selector is missing.");
         if (commands.Any(command => Microsoft.UI.Xaml.Automation.AutomationProperties.GetAutomationId(command) == "ReloadConfiguration")) throw new Exception("Reload command still exists.");
     }
 
@@ -68,9 +113,9 @@ public sealed partial class MainPage
         {
             await Task.Delay(100);
             MenuTree.UpdateLayout();
-            if (MenuTree.RootNodes.All(node => MenuTree.ContainerFromNode(node) is TreeViewItem row && Descendants(row).OfType<Image>().Any(image => image.Source is not null))) break;
+            if (MenuTree.RootNodes[0].Children.All(node => MenuTree.ContainerFromNode(node) is TreeViewItem row && Descendants(row).OfType<Image>().Any(image => image.Source is not null))) break;
         }
-        foreach (var node in MenuTree.RootNodes)
+        foreach (var node in MenuTree.RootNodes[0].Children)
         {
             var row = (TreeViewItem)MenuTree.ContainerFromNode(node);
             if (!Descendants(row).OfType<Image>().Any(image => image.Source is not null))
@@ -193,9 +238,10 @@ public sealed partial class MainPage
 
         // Exercise the same node move and completion handler as native TreeView drag/drop.
         dragSnapshot = Snapshot();
-        var actionNode = MenuTree.RootNodes[0];
-        var groupNode = MenuTree.RootNodes.Last();
-        MenuTree.RootNodes.Remove(actionNode);
+        var rootChildren = MenuTree.RootNodes[0].Children;
+        var actionNode = rootChildren[0];
+        var groupNode = rootChildren.Last();
+        rootChildren.Remove(actionNode);
         groupNode.Children.Add(actionNode);
         groupNode.IsExpanded = true;
         MenuTreeDragItemsCompleted(MenuTree, null!);
@@ -249,7 +295,7 @@ public sealed partial class MainPage
         }
         void CheckRows(string stage)
         {
-            foreach (var node in VisibleNodes(MenuTree.RootNodes))
+            foreach (var node in VisibleNodes(MenuTree.RootNodes[0].Children))
             {
                 if (MenuTree.ContainerFromNode(node) is not TreeViewItem container)
                     throw new Exception($"{stage}: row missing for {Model(node).Name}.");

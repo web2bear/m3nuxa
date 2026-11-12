@@ -19,7 +19,7 @@ public partial class App
         var originalLanguage = L.Language;
         var draft = config.CreateDraft();
         var stale = config.CreateDraft();
-        draft.Config.Settings = draft.Config.Settings with { MainHotkey = "Ctrl+Alt+F10", PanelHotkey = "Ctrl+Alt+F9", PanelPosition = "Cursor", MenuFontSize = 18 };
+        draft.Config.Settings = draft.Config.Settings with { MainHotkey = "Ctrl+Alt+F10", PanelHotkey = "Ctrl+Alt+F9", PanelPosition = "Cursor", MenuFontSize = 18, MenuIconSize = "Large" };
         if (config.Current.Settings.PanelPosition == "Cursor") throw new Exception("Unapplied settings changed running config");
         var invalid = config.CreateDraft();
         invalid.Config.Settings = invalid.Config.Settings with { PanelHotkey = invalid.Config.Settings.MainHotkey };
@@ -70,20 +70,14 @@ public partial class App
         }
         finally { suspended.SetValue(tray, false); Activate(); }
         if (RegisterHotKey(0, 28500, 3, 0x79)) { UnregisterHotKey(0, 28500); throw new Exception("Hotkeys were not restored after capture"); }
-        var languageDraft = config.CreateDraft();
         var changedLanguage = originalLanguage == "ru-RU" ? "en-US" : "ru-RU";
-        languageDraft.Config.Settings = languageDraft.Config.Settings with { Language = changedLanguage };
-        if (!config.Apply(languageDraft).Success) throw new Exception("Language change was not applied");
-        Activate();
+        L.SetLanguage(changedLanguage);
         var menu = (MenuFlyout)typeof(TrayApplication).GetMethod("BuildServiceMenu", flags)!.Invoke(tray, null)!;
         if (((MenuFlyoutItem)menu.Items.Last()).Text != (changedLanguage == "ru-RU" ? "Выход" : "Exit"))
-            throw new Exception("Tray did not update its language after applying config");
-        var restore = config.CreateDraft();
-        restore.Config.Settings = restore.Config.Settings with { Language = originalLanguage };
-        if (!config.Apply(restore).Success) throw new Exception("Could not restore test language");
-        Activate();
+            throw new Exception("Tray did not update its language");
+        L.SetLanguage(originalLanguage);
         var items = new List<MenuFlyoutItemBase>();
-        LauncherMenu.Fill(items, [new MenuNode { Name = "Group", Kind = MenuNodeKind.Group, Children = [new MenuNode { Name = "Child", Kind = MenuNodeKind.Action }] }], _ => {}, _ => {}, config.Current.Settings.MenuFontSize);
+        LauncherMenu.Fill(items, [new MenuNode { Name = "Group", Kind = MenuNodeKind.Group, Children = [new MenuNode { Name = "Child", Kind = MenuNodeKind.Action }] }], _ => {}, _ => {}, config.Current.Settings);
         var group = (MenuFlyoutSubItem)items[0];
         if (group.FontSize != 18 || ((MenuFlyoutItem)group.Items[0]).FontSize != 18) throw new Exception("Font size not propagated to nested menus");
     }

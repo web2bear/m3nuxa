@@ -15,13 +15,10 @@ public sealed class SettingsStore
         {
             Current = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path))
                 ?? throw new InvalidDataException(this.localize("Settings/EmptyFile"));
-            Current = Current with { Language = NormalizeLanguage(Current.Language) };
             Validate(Current, this.localize);
         }
         else { Current = new AppSettings { MainHotkey = legacyHotkey }; Save(Current); }
     }
-    public static string NormalizeLanguage(string? language) =>
-        string.Equals(language, "ru-RU", StringComparison.OrdinalIgnoreCase) ? "ru-RU" : "en-US";
     private static string DefaultMessage(string key) => key switch
     {
         "Settings/EmptyFile" => "The settings file is empty.",
@@ -29,6 +26,7 @@ public sealed class SettingsStore
         "Settings/InvalidPanelShortcut" => "The panel shortcut is invalid.",
         "Settings/InvalidPanelPosition" => "The panel position is invalid.",
         "Settings/InvalidFontSize" => "The font size must be between 10 and 24.",
+        "Settings/InvalidAppearance" => "The appearance settings are invalid.",
         _ => throw new ArgumentOutOfRangeException(nameof(key))
     };
     public static void Validate(AppSettings value, Func<string, string>? localize = null)
@@ -42,10 +40,17 @@ public sealed class SettingsStore
             throw new InvalidDataException(localize("Settings/InvalidPanelPosition"));
         if (!double.IsFinite(value.MenuFontSize) || value.MenuFontSize < 10 || value.MenuFontSize > 24)
             throw new InvalidDataException(localize("Settings/InvalidFontSize"));
+        static bool ColorValid(string? color) => color is not null && (color.Length == 0 ||
+            color.Length == 7 && color[0] == '#' && uint.TryParse(color.AsSpan(1), System.Globalization.NumberStyles.HexNumber, null, out _));
+        if (value.MenuDensity is not ("Compact" or "Normal" or "Comfortable") ||
+            value.MenuIconSize is not ("Small" or "Normal" or "Large") ||
+            value.PanelIconSize is not ("Small" or "Normal" or "Large") ||
+            !ColorValid(value.MenuBackground) || !ColorValid(value.PanelBackground) ||
+            value.PanelOpacity is < 40 or > 100 || !double.IsFinite(value.PanelFontSize) || value.PanelFontSize is < 10 or > 24)
+            throw new InvalidDataException(localize("Settings/InvalidAppearance"));
     }
     public void Save(AppSettings value)
     {
-        value = value with { Language = NormalizeLanguage(value.Language) };
         Validate(value, localize);
         var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
