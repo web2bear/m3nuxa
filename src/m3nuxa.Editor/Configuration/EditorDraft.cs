@@ -1,8 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using m3nuxa.App;
+using m3nuxa.App.Configuration;
 
-namespace m3nuxa.Editor;
+namespace m3nuxa.Editor.Configuration;
 
 // Owns the local draft and its history; the editor supplies user gestures.
 internal sealed class EditorDraft

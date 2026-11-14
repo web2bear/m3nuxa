@@ -21,39 +21,30 @@ public partial class App : Microsoft.UI.Xaml.Application
         DevLog.Write("app", "Main started");
 
         string configDirectory;
-        string? migratedLanguageSource = null;
         try
         {
             configDirectory = ResolveConfigDirectory(Environment.GetCommandLineArgs().Skip(1).ToArray());
             Directory.CreateDirectory(configDirectory);
-            ConfigStore.OfferLegacyMigration(configDirectory, Path.Combine(AppContext.BaseDirectory, "active-config.txt"),
-                (legacyPath, directory) =>
-                {
-                    var accepted = MessageBox.Show(L.Format("AppMigrateConfig", legacyPath, directory), "m3nuxa",
-                        MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes;
-                    if (accepted && !Directory.EnumerateFiles(directory, "*.json").Any()) migratedLanguageSource = legacyPath;
-                    return accepted;
-                });
         }
         catch (Exception ex)
         {
             MessageBox.Show(ex.Message, "m3nuxa", MessageBoxButtons.OK, MessageBoxIcon.Error);
             Exit(); return;
         }
-        var selectionFile = Path.Combine(configDirectory, "active-config.txt");
+        GlobalSettingsStore globalSettings;
+        try { globalSettings = new GlobalSettingsStore(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            MessageBox.Show(ex.Message, "m3nuxa", MessageBoxButtons.OK, MessageBoxIcon.Error); Exit(); return;
+        }
         string path;
-        try { path = ConfigStore.StartupPath(selectionFile, selectFromCatalog: true); }
+        try { path = ConfigStore.StartupCatalogPath(configDirectory, globalSettings.GetActiveProfile(configDirectory)); }
         catch (Exception ex) { MessageBox.Show(ex.Message, "m3nuxa", MessageBoxButtons.OK, MessageBoxIcon.Error); Exit(); return; }
         ConfigStore store;
-        try { store = new ConfigStore(selectionFile: selectionFile, configDirectory: configDirectory); }
-        catch (LegacySettingsException ex)
-        {
-            MessageBox.Show(ex.Message, "m3nuxa", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            Exit(); return;
-        }
+        try { store = new ConfigStore(path, configDirectory: configDirectory, globalSettings: globalSettings); }
         catch (InvalidOperationException ex)
         {
-            MessageBox.Show($"{selectionFile}: {ex.Message}", "m3nuxa", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show($"{path}: {ex.Message}", "m3nuxa", MessageBoxButtons.OK, MessageBoxIcon.Error);
             Exit(); return;
         }
         catch (Exception ex) when (ex is InvalidDataException or System.Text.Json.JsonException)
@@ -66,7 +57,7 @@ public partial class App : Microsoft.UI.Xaml.Application
                 Exit(); return;
             }
             if (choice != DialogResult.No) { Exit(); return; }
-            store = ConfigStore.CreateDefaultAfterInvalid(path, selectionFile, configDirectory);
+            store = ConfigStore.CreateDefaultAfterInvalid(path, configDirectory: configDirectory, globalSettings: globalSettings);
             var result = store.Apply(store.CreateDraft());
             if (!result.Success) { MessageBox.Show(result.Error, "m3nuxa"); Exit(); return; }
         }
@@ -75,7 +66,9 @@ public partial class App : Microsoft.UI.Xaml.Application
             MessageBox.Show($"{path}: {ex.Message}", "m3nuxa", MessageBoxButtons.OK, MessageBoxIcon.Error);
             Exit(); return;
         }
-        L.MigrateLanguage(migratedLanguageSource ?? store.FilePath, Path.Combine(AppContext.BaseDirectory, "settings.json"));
+        if (File.Exists(store.FilePath) && string.IsNullOrWhiteSpace(globalSettings.GetActiveProfile(configDirectory)))
+            globalSettings.SetActiveProfile(configDirectory, Path.GetFileName(store.FilePath));
+        L.SetLanguage(globalSettings.Current.Language);
         if (!File.Exists(store.FilePath))
         {
             var initial = store.Apply(store.CreateDraft());
@@ -85,7 +78,7 @@ public partial class App : Microsoft.UI.Xaml.Application
                 Exit(); return;
             }
         }
-        try { tray = new TrayApplication(store); }
+        try { tray = new TrayApplication(store, globalSettings); }
         catch (Exception ex) { DevLog.Write("app", "Fatal UI error", ex); throw; }
 
     }    

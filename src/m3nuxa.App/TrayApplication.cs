@@ -15,13 +15,13 @@ internal sealed class TrayApplication : IDisposable
 {
     private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private readonly ConfigStore _store;
+    private readonly GlobalSettingsStore _globalSettings;
     private readonly ShellIntegration _tray;
     private readonly Window _window = new() { Title = "m3nuxa" };
     private readonly Grid _root = new();
     private readonly ForegroundTracker _foreground;
     private AgentPipe? _agentPipe;
     private readonly McpHttpServer _mcpHttp = new();
-    private readonly string _mcpSettingsPath = Path.Combine(AppContext.BaseDirectory, "mcp-http.json");
     private ToggleMenuFlyoutItem _mcpMenuItem = new();
     private ToggleMenuFlyoutItem _copyMcpAddressItem = new();
     private ToggleMenuFlyoutItem _startupMenuItem = null!;
@@ -31,12 +31,12 @@ internal sealed class TrayApplication : IDisposable
     private bool _exiting;
     private IReadOnlyList<string> _unavailableHotkeys = [];
     private readonly List<WorkflowRun> _workflowRuns = [];
-    private WorkflowRunsWindow? _workflowWindow;
 
-    public TrayApplication(ConfigStore store)
+    public TrayApplication(ConfigStore store, GlobalSettingsStore globalSettings)
     {
         DevLog.Write("app", "TrayApplication starting");
         _store = store;
+        _globalSettings = globalSettings;
         _foreground = new ForegroundTracker();
         _window.Content = _root;
         _window.AppWindow.IsShownInSwitchers = false;
@@ -67,7 +67,7 @@ internal sealed class TrayApplication : IDisposable
         var menu = LauncherMenu.Create();
         void Add(string text, Action action) { var item = new MenuFlyoutItem { Text = text }; item.Click += (_, _) => action(); menu.Items.Add(item); }
         Add(L.Get("TrayEditor"), OpenEditor);
-        Add(L.Get("WorkflowRuns"), ShowWorkflowRuns);
+        Add(L.Get("ApplicationLog"), OpenApplicationLog);
         Add(L.Get("TrayReload"), Reload);
         _mcpMenuItem = new ToggleMenuFlyoutItem { Text = L.Get("TrayMcp"), IsChecked = _mcpHttp.IsRunning };
         _mcpMenuItem.Click += (_, _) => _ = SetMcpEnabledAsync(!_mcpHttp.IsRunning, true);
@@ -95,10 +95,11 @@ internal sealed class TrayApplication : IDisposable
         if (L.Language == language) return;
         try
         {
-            L.SaveLanguage(language);
+            _globalSettings.Update(settings => settings with { Language = language });
+            L.SetLanguage(language);
             _tray.ShowBalloonTip(5000, L.Get("TrayLanguage"), L.Get("Settings/EditorRestartRequired"), ToolTipIcon.Warning);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex)
         {
             MessageBox.Show(ex.Message, "m3nuxa", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
@@ -106,17 +107,7 @@ internal sealed class TrayApplication : IDisposable
 
     private bool ReadMcpEnabled()
     {
-        try
-        {
-            if (!File.Exists(_mcpSettingsPath)) return false;
-            using var document = JsonDocument.Parse(File.ReadAllText(_mcpSettingsPath));
-            return document.RootElement.TryGetProperty("enabled", out var enabled) && enabled.GetBoolean();
-        }
-        catch (Exception ex)
-        {
-            DevLog.Write("mcp-http", "Could not read saved state", ex);
-            return false;
-        }
+        return _globalSettings.Current.McpHttpEnabled;
     }
 
     private async Task SetMcpEnabledAsync(bool enabled, bool save)
@@ -126,7 +117,7 @@ internal sealed class TrayApplication : IDisposable
         {
             if (enabled) await _mcpHttp.StartAsync(_agentPipe ?? throw new InvalidOperationException(L.Get("TrayPipeNotReady")));
             else await _mcpHttp.StopAsync();
-            if (save) File.WriteAllText(_mcpSettingsPath, JsonSerializer.Serialize(new { enabled }));
+            if (save) _globalSettings.Update(settings => settings with { McpHttpEnabled = enabled });
         }
         catch (Exception ex)
         {
@@ -188,6 +179,8 @@ internal sealed class TrayApplication : IDisposable
         try
         {
             var start = new ProcessStartInfo(path) { UseShellExecute = true };
+            start.ArgumentList.Add("--language");
+            start.ArgumentList.Add(L.Language);
             if (showSettings) start.ArgumentList.Add("--settings");
             else if (nodeId is not null) { start.ArgumentList.Add("--select"); start.ArgumentList.Add(nodeId); }
             _editor = Process.Start(start);
@@ -218,7 +211,7 @@ internal sealed class TrayApplication : IDisposable
         var invocation = InvocationContext.Capture(_foreground.LastWindow);
         _menu?.Hide();
         LauncherPanel.Show(_store.Current.Items, node => _ = Execute(node, invocation), OpenEditor,
-            _store.Current.Settings);
+            _store.Current.Settings, _globalSettings.Current, _globalSettings.Update);
     }
 
     private void ShowMenu(IReadOnlyList<MenuNode> nodes)
@@ -267,15 +260,14 @@ internal sealed class TrayApplication : IDisposable
         Application.Current.Exit();
     }
 
-    private void ShowWorkflowRuns()
+    private void OpenApplicationLog()
     {
-        if (_workflowWindow is null)
+        try { ApplicationLog.Open(); }
+        catch (Exception ex)
         {
-            _workflowWindow = new WorkflowRunsWindow(_workflowRuns);
-            _workflowWindow.Closed += (_, _) => _workflowWindow = null;
+            DevLog.Write("app", "Could not open application log", ex);
+            MessageBox.Show(ex.Message, "m3nuxa", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
-        _workflowWindow.Refresh();
-        _workflowWindow.Activate();
     }
 
     private async Task Execute(MenuNode node, InvocationContext? context)
@@ -283,15 +275,13 @@ internal sealed class TrayApplication : IDisposable
         if (_exiting) return;
         if (_workflowRuns.Any(run => run.NodeId == node.Id && !run.Finished))
         {
-            _tray.ShowBalloonTip(5000, L.Get("WorkflowRuns"), L.Get("WorkflowAlreadyRunning"), ToolTipIcon.Warning, ShowWorkflowRuns);
-            ShowWorkflowRuns();
+            _tray.ShowBalloonTip(5000, node.Name, L.Get("WorkflowAlreadyRunning"), ToolTipIcon.Warning);
             return;
         }
-        // A running action must be isolated from later configuration edits.
         var steps = JsonSerializer.Deserialize<List<MenuAction>>(JsonSerializer.Serialize(node.Steps))!;
         var run = new WorkflowRun { NodeId = node.Id, Name = node.Name };
         _workflowRuns.Add(run);
-        _workflowWindow?.Refresh();
+        ApplicationLog.Write($"{run.Name}: {L.Get("WorkflowRunning")}");
         try
         {
             var result = await WorkflowExecutor.RunAsync(steps, context ?? InvocationContext.Capture(), run.Cancellation.Token,
@@ -299,25 +289,32 @@ internal sealed class TrayApplication : IDisposable
                 {
                     run.StepIndex = index;
                     run.StepKind = Enum.IsDefined(step.Kind) ? L.Get("WorkflowKind" + step.Kind) : L.Get("ActionUnknown");
-                    _workflowWindow?.Refresh();
+                    ApplicationLog.Write($"{run.Name}: {L.Format("WorkflowStep", index + 1, run.StepKind)}");
                 });
             run.FileSteps = result.FileSteps;
             run.Cancelled = result.Cancelled;
             run.Error = result.Error;
             run.StepIndex = result.StepIndex;
+            foreach (var summary in result.FileSteps)
+                ApplicationLog.Write($"{run.Name}: {L.Format("WorkflowStep", summary.StepIndex + 1, "")} {L.Format("ActionSummary", summary.Succeeded, summary.Skipped, summary.Failed)}");
+            var state = run.Cancelled ? L.Get("WorkflowCancelled") : run.Error is null ? L.Get("WorkflowSuccess") : L.Get("WorkflowFailed");
+            ApplicationLog.Write($"{run.Name}: {state}" + (run.Error is null ? "" : $" — {run.Error}"));
             if (run.Error is not null && !_disposed)
-                _tray.ShowBalloonTip(5000, run.Name, run.Error, ToolTipIcon.Error, ShowWorkflowRuns);
+                _tray.ShowBalloonTip(5000, run.Name, run.Error, ToolTipIcon.Error, OpenApplicationLog);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            run.Error = ex.Message;
-            if (!_disposed) _tray.ShowBalloonTip(5000, run.Name, run.Error, ToolTipIcon.Error, ShowWorkflowRuns);
+            DevLog.Write("workflow", "Unexpected workflow error");
+            run.Error = L.Get("ActionFailed");
+            ApplicationLog.Write($"{run.Name}: {L.Get("WorkflowFailed")} — {run.Error}");
+            if (!_disposed) _tray.ShowBalloonTip(5000, run.Name, run.Error, ToolTipIcon.Error, OpenApplicationLog);
         }
         finally
         {
             run.Finished = true;
             run.Completion.TrySetResult();
-            _workflowWindow?.Refresh();
+            _workflowRuns.Remove(run);
+            run.Cancellation.Dispose();
         }
     }
 
@@ -407,7 +404,6 @@ internal sealed class TrayApplication : IDisposable
         if (_disposed) return;
         _disposed = true;
         foreach (var run in _workflowRuns.Where(run => !run.Finished)) run.Cancellation.Cancel();
-        _workflowWindow?.Close();
         _tray.Dispose();
         _menu?.Hide();
         _foreground.Dispose();

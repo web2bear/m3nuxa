@@ -79,7 +79,7 @@ internal static class ActionExecutor
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return new ActionResult(0, 0, [UsesSensitiveValue(action) && ex is not WorkflowSafeException ? L.Get("WorkflowSensitiveError") : ex.Message], false);
+            return new ActionResult(0, 0, (string[])[UsesSensitiveValue(action) && ex is not WorkflowSafeException ? L.Get("WorkflowSensitiveError") : ex.Message], false);
         }
     }
 

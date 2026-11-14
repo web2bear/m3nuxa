@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace m3nuxa.App;
+namespace m3nuxa.App.Configuration;
 
 public sealed class SettingsStore
 {
