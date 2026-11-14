@@ -31,8 +31,8 @@
     <ItemGroup>
         <Compile Include="..\m3nuxa.App\AgentPipeProtocol.cs" Link="AgentPipeProtocol.cs" />
         <Compile Include="..\m3nuxa.App\L.cs" Link="L.cs" />
-        <Compile Include="..\m3nuxa.App\ConfigModels.cs" Link="ConfigModels.cs" />
-        <Compile Include="..\m3nuxa.App\HotkeyParser.cs" Link="HotkeyParser.cs" />
+        <Compile Include="..\m3nuxa.App\Configuration\ConfigModels.cs" Link="Configuration\ConfigModels.cs" />
+        <Compile Include="..\m3nuxa.App\Configuration\HotkeyParser.cs" Link="Configuration\HotkeyParser.cs" />
         <Compile Include="..\m3nuxa.App\DevLog.cs" Link="DevLog.cs" />
         <Compile Include="..\m3nuxa.App\ItemIcon.cs" Link="ItemIcon.cs" />
         <Content Include="..\..\assets\icon-packs\**\*" Link="icon-packs\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

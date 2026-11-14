@@ -4,8 +4,9 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using m3nuxa.App;
+using m3nuxa.App.Configuration;
 
-namespace m3nuxa.Editor;
+namespace m3nuxa.Editor.Configuration;
 
 public sealed record EditorResponse(bool Success, string? Message, JsonNode? Data, string? ErrorCode = null);
 

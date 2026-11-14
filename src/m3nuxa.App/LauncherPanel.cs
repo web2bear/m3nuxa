@@ -7,7 +7,6 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using System.Runtime.InteropServices;
-using System.Text.Json;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Graphics;
 using Windows.Storage.Streams;
@@ -22,6 +21,7 @@ internal sealed class LauncherPanel : Window
     private readonly IReadOnlyList<MenuNode> root;
     private readonly Action<MenuNode> execute;
     private readonly AppSettings settings;
+    private readonly Action<Func<GlobalSettings, GlobalSettings>> updateSettings;
     private readonly Stack<MenuNode> path = new();
     private readonly GridView grid = new() { SelectionMode = ListViewSelectionMode.None, IsItemClickEnabled = true,
         HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch };
@@ -42,9 +42,10 @@ internal sealed class LauncherPanel : Window
     private (GridViewItem Item, string Hint)? hoveredItem;
     private (GridViewItem Item, string Hint)? focusedItem;
 
-    private LauncherPanel(IEnumerable<MenuNode> nodes, Action<MenuNode> execute, Action openEditor, AppSettings settings)
+    private LauncherPanel(IEnumerable<MenuNode> nodes, Action<MenuNode> execute, Action openEditor, AppSettings settings,
+        GlobalSettings globalSettings, Action<Func<GlobalSettings, GlobalSettings>> updateSettings)
     {
-        root = nodes.ToList(); this.execute = execute; this.settings = settings;
+        root = nodes.ToList(); this.execute = execute; this.settings = settings; this.updateSettings = updateSettings;
         var atCursor = settings.PanelPosition == "Cursor";
         Title = "m3nuxa";
         AppWindow.IsShownInSwitchers = false;
@@ -53,8 +54,10 @@ internal sealed class LauncherPanel : Window
         var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
         var corner = 2; DwmSetWindowAttribute(WinRT.Interop.WindowNative.GetWindowHandle(this), 33, ref corner, sizeof(int));
         GetCursorPos(out var cursor);
-        var savedPosition = atCursor ? null : LoadPosition();
-        var (savedWidth, savedHeight) = LoadSize();
+        PointInt32? savedPosition = atCursor || globalSettings.PanelX is null || globalSettings.PanelY is null
+            ? null : new PointInt32(globalSettings.PanelX.Value, globalSettings.PanelY.Value);
+        var savedWidth = globalSettings.PanelWidth is { } panelWidth && double.IsFinite(panelWidth) ? Math.Clamp(panelWidth, 320, 3000) : 660;
+        var savedHeight = globalSettings.PanelHeight is { } panelHeight && double.IsFinite(panelHeight) ? Math.Clamp(panelHeight, 240, 3000) : 620;
         long Overlap(DisplayArea area, PointInt32 saved)
         {
             var bounds = area.WorkArea;
@@ -249,51 +252,24 @@ internal sealed class LauncherPanel : Window
         hoveredCrumb = null;
     }
 
-    private static string PositionFile => Path.Combine(AppContext.BaseDirectory, "panel-position.json");
-    private sealed record PanelPosition(int X, int Y);
-
-    private static PointInt32? LoadPosition()
-    {
-        try
-        {
-            if (File.Exists(PositionFile) && JsonSerializer.Deserialize<PanelPosition>(File.ReadAllText(PositionFile)) is { } position)
-                return new PointInt32(position.X, position.Y);
-        }
-        catch (Exception ex) { DevLog.Write("panel", "Could not load panel position", ex); }
-        return null;
-    }
-
     private void SavePosition()
     {
         try
         {
             if (movedPosition is { } position)
-                File.WriteAllText(PositionFile, JsonSerializer.Serialize(new PanelPosition(position.X, position.Y)));
+                updateSettings(settings => settings with { PanelX = position.X, PanelY = position.Y });
         }
         catch (Exception ex) { DevLog.Write("panel", "Could not save panel position", ex); }
     }
 
-    private static string SizeFile => Path.Combine(AppContext.BaseDirectory, "panel-size.json");
     private sealed record PanelSize(double Width, double Height);
-
-    private static (double Width, double Height) LoadSize()
-    {
-        try
-        {
-            if (File.Exists(SizeFile) && JsonSerializer.Deserialize<PanelSize>(File.ReadAllText(SizeFile)) is { } size &&
-                double.IsFinite(size.Width) && double.IsFinite(size.Height))
-                return (Math.Clamp(size.Width, 320, 3000), Math.Clamp(size.Height, 240, 3000));
-        }
-        catch (Exception ex) { DevLog.Write("panel", "Could not load panel size", ex); }
-        return (660, 620);
-    }
 
     private void SaveSize()
     {
         try
         {
             if (resizedSize is not null)
-                File.WriteAllText(SizeFile, JsonSerializer.Serialize(resizedSize));
+                updateSettings(settings => settings with { PanelWidth = resizedSize.Width, PanelHeight = resizedSize.Height });
         }
         catch (Exception ex) { DevLog.Write("panel", "Could not save panel size", ex); }
     }
@@ -427,9 +403,10 @@ internal sealed class LauncherPanel : Window
         catch (Exception ex) { DevLog.Write("panel", "Icon failed", ex); }
     }
 
-    public static void Show(IEnumerable<MenuNode> nodes, Action<MenuNode> execute, Action openEditor, AppSettings settings)
+    public static void Show(IEnumerable<MenuNode> nodes, Action<MenuNode> execute, Action openEditor, AppSettings settings,
+        GlobalSettings globalSettings, Action<Func<GlobalSettings, GlobalSettings>> updateSettings)
     {
-        active?.Close(); active = new LauncherPanel(nodes, execute, openEditor, settings); active.Activate();
+        active?.Close(); active = new LauncherPanel(nodes, execute, openEditor, settings, globalSettings, updateSettings); active.Activate();
     }
 
     [StructLayout(LayoutKind.Sequential)] private struct Point { public int X; public int Y; }

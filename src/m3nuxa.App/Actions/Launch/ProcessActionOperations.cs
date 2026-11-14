@@ -16,12 +16,12 @@ internal static class ProcessActionOperations
         else if (extension is ".bat" or ".cmd")
         {
             executable = Environment.GetEnvironmentVariable("ComSpec") ?? "cmd.exe";
-            prefix.AddRange(["/d", "/s", "/c", path]);
+            prefix.AddRange((string[])["/d", "/s", "/c", path]);
         }
         else if (extension == ".ps1")
         {
             executable = string.IsNullOrWhiteSpace(interpreter) ? "powershell.exe" : interpreter;
-            prefix.AddRange(["-NoProfile", "-File", path]);
+            prefix.AddRange((string[])["-NoProfile", "-File", path]);
         }
         else throw new InvalidOperationException(L.Get("ActionScriptType"));
 

@@ -273,6 +273,7 @@
   <data name="ConfigStep" xml:space="preserve"><value>Шаг</value></data>
   <data name="ConfigDelayInvalid" xml:space="preserve"><value>{0}: задержка не может быть отрицательной.</value></data>
   <data name="ConfigTimeoutInvalid" xml:space="preserve"><value>{0}: тайм-аут должен быть больше нуля.</value></data>
+  <data name="ApplicationLog" xml:space="preserve"><value>Лог приложения</value></data>
   <data name="WorkflowRuns" xml:space="preserve"><value>Выполнение действий</value></data>
   <data name="WorkflowClear" xml:space="preserve"><value>Очистить завершённые</value></data>
   <data name="WorkflowRunning" xml:space="preserve"><value>Выполняется</value></data>
@@ -281,7 +282,7 @@
   <data name="WorkflowFailed" xml:space="preserve"><value>Ошибка</value></data>
   <data name="WorkflowStep" xml:space="preserve"><value>Шаг {0}: {1}</value></data>
   <data name="WorkflowCancel" xml:space="preserve"><value>Отменить</value></data>
-  <data name="WorkflowAlreadyRunning" xml:space="preserve"><value>Это действие уже выполняется. Подробности доступны в окне выполнения через трей.</value></data>
+  <data name="WorkflowAlreadyRunning" xml:space="preserve"><value>Это действие уже выполняется.</value></data>
   <data name="WorkflowSensitiveError" xml:space="preserve"><value>Не удалось выполнить действие. Подробности скрыты, поскольку параметры содержат текст буфера или переменную окружения.</value></data>
   <data name="WorkflowProcessTimeout" xml:space="preserve"><value>Процесс не завершился за установленное время.</value></data>
   <data name="WorkflowProcessExitCode" xml:space="preserve"><value>Процесс завершился с кодом {0}.</value></data>

@@ -65,9 +65,9 @@ Describe the workflow you want — for example, “Create a group for my project
 3. Right-click the tray icon and choose **Edit configuration**. Add a few actions, then click **Apply**.
 4. Press **Ctrl+Alt+Space** and make it your own.
 
-Configurations are stored in `configs` next to `m3nuxa.App.exe` by default. To use another directory, start the application with `--config-dir "C:\path\to\configs"` or set the `M3NUXA_CONFIG_DIR` environment variable. The command-line option takes precedence. Select a configuration in the editor and click **Apply** to activate it; its root contains its name and application settings.
+Menu configurations are stored in `configs` next to `m3nuxa.App.exe` by default. Stable application-wide settings, including the selected profile, are stored in `m3nuxa.App.config` beside the executable, so changing menu profiles does not change the language, MCP state, or launcher panel geometry. To use another directory for menu configurations, start the application with `--config-dir "C:\path\to\configs"` or set the `M3NUXA_CONFIG_DIR` environment variable. The command-line option takes precedence.
 
-The self-contained portable build does not require a separate .NET installation. Keep the whole folder when moving it: the menu tree and application settings are stored together in the configuration file. Paths to external apps and folders must still be valid on the destination computer.
+The self-contained portable build does not require a separate .NET installation. Keep the whole folder when moving it: application settings sit beside the executable, and menu configurations are stored in the configuration directory. Paths to external apps and folders must still be valid on the destination computer.
 
 > **Preview software:** check the release notes for the build you download. The screenshots show the current development interface; an earlier release may look different.
 
@@ -77,13 +77,14 @@ The self-contained portable build does not require a separate .NET installation.
 
 **Current scope:** predefined text insertion is supported. Reading selected text from other applications is not implemented; templates that depend on `selectedText` are not available. Explorer selection and returning focus to another application depend on the Windows environment.
 
-**Build from source:** install the .NET 10 SDK and the Windows/WinUI build prerequisites, then run `./publish-portable.ps1` from the repository root. Save editor changes first: the script stops running instances, publishes both components, and starts the tray app. See the development guide for checks and diagnostics.
+**Build from source:** install the .NET 10 SDK and the Windows/WinUI build prerequisites, then run `./publish-local.ps1` from the repository root when you want to rebuild and launch the app locally. It publishes both components to the stable `dist/m3nuxa` folder, stops running App and Editor processes, and starts the tray app. A shortcut to `dist/m3nuxa/m3nuxa.App.exe` keeps working when you rerun the script, provided the repository and output folder stay in place. See the development guide for checks and diagnostics.
 
 - [User guide: editing, hotkeys, and settings](docs/USER_GUIDE.md)
 - [MCP setup and supported tools](docs/MCP.md)
 - [Development, debugging, and checks](docs/DEVELOPMENT.md)
 - [Included icons and attribution](docs/ICON_PACKS.md)
-- [Previous README and detailed setup in Russian](docs/README-RU.md)
-- [Domain terminology](docs/CONTEXT.md) · [Requirements](docs/REQUIREMENTS.md) · [Product decisions](docs/PRODUCT_DISCOVERY.md)
+- [Полное описание и установка на русском](docs/README-RU.md)
+- [Current scenarios and non-functional requirements](docs/REQUIREMENTS.md)
+- [Domain terminology](docs/CONTEXT.md) · [Product decision history](docs/PRODUCT_DISCOVERY.md)
 
-Most detailed project documentation is currently in Russian. Requirements and research notes record decisions at the time they were written; the current implementation and release notes define what a particular build supports.
+The requirements document describes the current product contract. Product discovery and research documents preserve historical context and are not current implementation status reports.

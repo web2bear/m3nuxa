@@ -1,24 +1,10 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using m3nuxa.App;
 using Keys = Windows.System.VirtualKey;
 
-namespace m3nuxa.App;
-
-public sealed class LegacySettingsException : IOException
-{
-    public string SettingsPath { get; } = "";
-
-    public LegacySettingsException() { }
-    public LegacySettingsException(string message) : base(message) { }
-    public LegacySettingsException(string message, Exception inner) : base(message, inner) { }
-    private LegacySettingsException(string path, string message, Exception inner) : base(message, inner)
-    {
-        SettingsPath = Path.GetFullPath(path);
-    }
-    public static LegacySettingsException ForFile(string path, Exception inner) =>
-        new(path, L.Format("LegacySettingsReadFailed", Path.GetFullPath(path), inner.Message), inner);
-}
+namespace m3nuxa.App.Configuration;
 
 public sealed class ConfigStore
 {
@@ -33,13 +19,16 @@ public sealed class ConfigStore
     private string path;
     private readonly string? selectionFile;
     private readonly string? configDirectory;
+    private readonly GlobalSettingsStore? globalSettings;
     private string? diskFingerprint;
     private AppConfig current = new();
     private long version = 1;
 
-    public ConfigStore(string? path = null, string? selectionFile = null, string? configDirectory = null)
+    public ConfigStore(string? path = null, string? selectionFile = null, string? configDirectory = null,
+        GlobalSettingsStore? globalSettings = null)
     {
         this.selectionFile = selectionFile;
+        this.globalSettings = globalSettings;
         this.configDirectory = configDirectory is null ? null : Path.GetFullPath(configDirectory);
         if (this.configDirectory is not null) Directory.CreateDirectory(this.configDirectory);
         this.path = path ?? StartupPath(selectionFile, this.configDirectory is not null);
@@ -48,16 +37,11 @@ public sealed class ConfigStore
             throw new InvalidDataException($"Configuration file not found: {this.path}");
         if (File.Exists(this.path))
         {
-            current = ReadConfig(this.path, Path.Combine(SettingsDirectory, "settings.json"));
+            current = ReadConfig(this.path);
             var validation = Validate(current);
             if (!validation.IsValid)
                 throw new InvalidDataException($"{this.path}: {string.Join("; ", validation.Errors)}");
             diskFingerprint = Fingerprint(this.path);
-        }
-        else
-        {
-            var legacySettings = Path.Combine(SettingsDirectory, "settings.json");
-            if (File.Exists(legacySettings)) current.Settings = ReadLegacySettings(legacySettings);
         }
     }
 
@@ -83,6 +67,24 @@ public sealed class ConfigStore
         var selected = File.ReadAllText(selectionFile).Trim();
         if (string.IsNullOrWhiteSpace(selected)) throw new InvalidDataException($"Empty configuration selection: {selectionFile}");
         return Path.GetFullPath(selected, Path.GetDirectoryName(Path.GetFullPath(selectionFile))!);
+    }
+
+    public static string StartupCatalogPath(string directory, string? activeProfile)
+    {
+        var catalog = Path.GetFullPath(directory);
+        if (!string.IsNullOrWhiteSpace(activeProfile))
+        {
+            var selected = Path.GetFullPath(activeProfile, catalog);
+            if (!SamePath(Path.GetDirectoryName(selected)!, catalog) || !string.Equals(Path.GetExtension(selected), ".json", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException($"Invalid active menu profile: {activeProfile}");
+            if (!File.Exists(selected)) throw new InvalidDataException($"Configuration file not found: {selected}");
+            return selected;
+        }
+        var defaultPath = Path.Combine(catalog, "config.json");
+        return File.Exists(defaultPath) ? defaultPath : Directory.EnumerateFiles(catalog, "*.json")
+            .OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(Path.GetFileName, StringComparer.Ordinal)
+            .FirstOrDefault() ?? defaultPath;
     }
     public static void OfferLegacyMigration(string directory, string legacySelection, Func<string, string, bool> confirm)
     {
@@ -190,8 +192,8 @@ public sealed class ConfigStore
         lock (gate)
         {
             if (expectedVersion != version) throw new InvalidOperationException(L.Get("ConfigDraftStale"));
-            if (configDirectory is null || selectionFile is null)
-                throw new InvalidOperationException("A configuration directory and selection file are required.");
+            if (configDirectory is null || (selectionFile is null && globalSettings is null))
+                throw new InvalidOperationException("A configuration directory and profile selection store are required.");
             var oldPath = RequireCatalogPath(path);
             if (!File.Exists(oldPath)) throw new FileNotFoundException("Configuration not found.", oldPath);
             if (Fingerprint(oldPath) != diskFingerprint) throw new InvalidOperationException(L.Get("ConfigChangedOutside"));
@@ -207,7 +209,8 @@ public sealed class ConfigStore
             if (!validation.IsValid) throw new InvalidDataException(string.Join("; ", validation.Errors));
             if (preflight?.Invoke(replacement) is { } error) throw new InvalidOperationException(error);
             var nextFingerprint = next is null ? null : Fingerprint(newPath);
-            var previousSelection = File.Exists(selectionFile) ? File.ReadAllBytes(selectionFile) : null;
+            var previousSelection = selectionFile is not null && File.Exists(selectionFile) ? File.ReadAllBytes(selectionFile) : null;
+            var previousActiveProfile = configDirectory is not null ? globalSettings?.GetActiveProfile(configDirectory) : null;
             var created = false;
             var selectionChanged = false;
             try
@@ -236,7 +239,9 @@ public sealed class ConfigStore
                 {
                     if (selectionChanged)
                     {
-                        if (previousSelection is null) File.Delete(selectionFile);
+                        if (globalSettings is not null && configDirectory is not null && previousActiveProfile is not null)
+                            globalSettings.SetActiveProfile(configDirectory, previousActiveProfile);
+                        else if (previousSelection is null) File.Delete(selectionFile!);
                         else WriteSelectionBytes(previousSelection);
                     }
                     if (created && File.Exists(newPath)) File.Delete(newPath);
@@ -247,7 +252,15 @@ public sealed class ConfigStore
         }
     }
 
-    private void WriteSelection(string selected) => WriteSelectionBytes(System.Text.Encoding.UTF8.GetBytes(selected));
+    private void WriteSelection(string selected)
+    {
+        if (globalSettings is not null && configDirectory is not null)
+        {
+            globalSettings.SetActiveProfile(configDirectory, selected);
+            return;
+        }
+        WriteSelectionBytes(System.Text.Encoding.UTF8.GetBytes(selected));
+    }
 
     private void WriteSelectionBytes(byte[] contents)
     {
@@ -311,7 +324,7 @@ public sealed class ConfigStore
             {
                 if (!File.Exists(path) && diskFingerprint is not null)
                     return new(false, $"Configuration file not found: {path}");
-                var candidate = File.Exists(path) ? ReadConfig(path, Path.Combine(SettingsDirectory, "settings.json")) : new AppConfig();
+                var candidate = File.Exists(path) ? ReadConfig(path) : new AppConfig();
                 var check = Validate(candidate);
                 if (!check.IsValid) return new(false, $"{path}: {string.Join("; ", check.Errors)}");
                 current = candidate;
@@ -389,14 +402,23 @@ public sealed class ConfigStore
                     temporary = null;
                 }
 
-                if (!SamePath(target, path) && selectionFile is not null)
+                if (globalSettings is not null || (!SamePath(target, path) && selectionFile is not null))
                 {
-                    var selectionDirectory = Path.GetDirectoryName(Path.GetFullPath(selectionFile))!;
-                    var relative = Path.GetRelativePath(selectionDirectory, target);
-                    var selected = relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal) || Path.IsPathRooted(relative) ? target : relative;
-                    var selectionTemp = selectionFile + "." + Guid.NewGuid().ToString("N") + ".tmp";
-                    try { File.WriteAllText(selectionTemp, selected); File.Move(selectionTemp, selectionFile, true); }
-                    finally { if (File.Exists(selectionTemp)) File.Delete(selectionTemp); }
+                    if (globalSettings is not null)
+                    {
+                        var activeProfile = Path.GetFileName(target);
+                        if (configDirectory is not null && !string.Equals(globalSettings.GetActiveProfile(configDirectory), activeProfile, StringComparison.OrdinalIgnoreCase))
+                            globalSettings.SetActiveProfile(configDirectory, activeProfile);
+                    }
+                    else
+                    {
+                        var selectionDirectory = Path.GetDirectoryName(Path.GetFullPath(selectionFile!))!;
+                        var relative = Path.GetRelativePath(selectionDirectory, target);
+                        var selected = relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal) || Path.IsPathRooted(relative) ? target : relative;
+                        var selectionTemp = selectionFile! + "." + Guid.NewGuid().ToString("N") + ".tmp";
+                        try { File.WriteAllText(selectionTemp, selected); File.Move(selectionTemp, selectionFile!, true); }
+                        finally { if (File.Exists(selectionTemp)) File.Delete(selectionTemp); }
+                    }
                 }
                 path = target;
                 switched = true;
@@ -433,26 +455,20 @@ public sealed class ConfigStore
         }
     }
 
-    public static ConfigStore CreateDefaultAfterInvalid(string? configPath = null, string? selectionFile = null, string? configDirectory = null)
+    public static ConfigStore CreateDefaultAfterInvalid(string? configPath = null, string? selectionFile = null,
+        string? configDirectory = null, GlobalSettingsStore? globalSettings = null)
     {
         var target = configPath ?? Path.Combine(AppContext.BaseDirectory, "config.json");
-        // Do not replace even an invalid config if its separate legacy settings
-        // cannot be migrated; report that file first while preserving both inputs.
-        var settingsDirectory = selectionFile is null
-            ? Path.GetDirectoryName(Path.GetFullPath(target))!
-            : Path.GetDirectoryName(Path.GetFullPath(selectionFile))!;
-        var legacySettings = Path.Combine(settingsDirectory, "settings.json");
-        if (File.Exists(legacySettings)) _ = ReadLegacySettings(legacySettings);
         if (File.Exists(target))
         {
             var copy = $"{target}.invalid-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.bak";
             File.Copy(target, copy);
             File.Delete(target);
         }
-        return new ConfigStore(target, selectionFile, configDirectory);
+        return new ConfigStore(target, selectionFile, configDirectory, globalSettings);
     }
 
-    private static AppConfig ReadConfig(string file, string? legacySettingsPath = null)
+    private static AppConfig ReadConfig(string file)
     {
         var json = File.ReadAllText(file);
         using var document = JsonDocument.Parse(json);
@@ -463,33 +479,14 @@ public sealed class ConfigStore
             ?? throw new InvalidDataException(L.Get("ConfigJsonEmpty"));
         if (!document.RootElement.EnumerateObject().Any(property => property.Name.Equals("Name", StringComparison.OrdinalIgnoreCase)))
             config.Name = Path.GetFileNameWithoutExtension(file);
-        // Legacy settings belong to the active installation only, never an imported file.
-        // Migration remains in memory until Apply creates a backup and saves the complete file.
         if (!hasSettings && (!hasSchema || config.SchemaVersion is 1 or 2))
         {
-            config.Settings = legacySettingsPath is not null && File.Exists(legacySettingsPath)
-                ? ReadLegacySettings(legacySettingsPath)
-                : new AppSettings { MainHotkey = config.MainHotkey };
+            config.Settings = new AppSettings { MainHotkey = config.MainHotkey };
         }
         else if (!hasSettings || config.Settings is null)
             throw new InvalidDataException("Configuration settings are missing.");
         if (config.SchemaVersion is 1 or 2) config.SchemaVersion = 3;
         return config;
-    }
-
-    private static AppSettings ReadLegacySettings(string file)
-    {
-        try
-        {
-            var settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(file), JsonOptions)
-                ?? throw new InvalidDataException(L.Get("Settings/EmptyFile"));
-            SettingsStore.Validate(settings, L.Get);
-            return settings;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidDataException)
-        {
-            throw LegacySettingsException.ForFile(file, ex);
-        }
     }
 
     private static AppConfig Clone(AppConfig value) =>

@@ -28,5 +28,4 @@ if ($Component -ne 'None') {
 }
 if ($Component -in @('Editor', 'Both')) {
     Start-Process -FilePath (Join-Path $output 'm3nuxa.Editor.exe') -WorkingDirectory $output -WindowStyle Hidden
-    & (Join-Path $PSScriptRoot 'Move-TestWindow.ps1')
 }

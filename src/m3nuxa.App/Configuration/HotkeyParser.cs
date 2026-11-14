@@ -1,5 +1,5 @@
 using Windows.System;
-namespace m3nuxa.App;
+namespace m3nuxa.App.Configuration;
 internal static class HotkeyParser
 {
     public static bool IsModifier(uint key) => key is 0x10 or 0x11 or 0x12 or 0x5b or 0x5c or >= 0xa0 and <= 0xa5;
