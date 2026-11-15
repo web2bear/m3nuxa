@@ -198,7 +198,133 @@ public sealed partial class MainPage
         }
     }
 
-    internal void CheckDropAtRelease(bool showPreview)
+    internal async Task CheckExternalTreeDropsAsync()
+    {
+        var failures = new List<string>();
+        var path = Path.GetTempFileName();
+        try
+        {
+            foreach (var zone in new[] { MenuDropZone.Before, MenuDropZone.After, MenuDropZone.Into })
+            {
+                var first = new MenuNode { Name = "First" };
+                var target = new MenuNode { Name = "Target", Kind = MenuNodeKind.Group,
+                    Children = [new MenuNode { Name = "Existing child" }] };
+                var last = new MenuNode { Name = "Last", Kind = MenuNodeKind.Group,
+                    Children = [new MenuNode { Name = "Visible child" }] };
+                draftState.Reset(new AppConfig { Items = [first, target, last] });
+                RefreshTree();
+                FindTreeNode(MenuTree.RootNodes, target.Id)!.IsExpanded = false;
+                await Task.Delay(50);
+                MenuTree.UpdateLayout();
+                var bounds = MenuDropRows().Single(row => row.Id == target.Id).Bounds;
+                var x = bounds.X + bounds.Width / 2;
+                var y = bounds.Y + bounds.Height * (zone == MenuDropZone.Before ? 0.1 : zone == MenuDropZone.After ? 0.9 : 0.5);
+                using (var ole = new EditorOleDropTarget(App.MainWindow, AddDroppedPaths, AddExternalText, "", InternalDragActive, CompleteInternalDrop, UpdateExternalDropIndicator, ClearExternalDropIndicator))
+                {
+                    var point = DropScreenPoint(x, y);
+                    uint effect = 1;
+                    var data = new FileDropData(path);
+                    ole.DragEnter(data, 0, point, ref effect);
+                    ole.DragOver(0, point, ref effect);
+                    if (effect != 1 || DropIndicator.Visibility != Visibility.Visible)
+                        failures.Add($"External {zone} drag has no insertion indicator.");
+                    var externalTop = Canvas.GetTop(DropIndicator);
+                    var externalHeight = DropIndicator.Height;
+                    ShowMenuDropIndicator(first.Id, MenuHit(x, y));
+                    if (externalTop != Canvas.GetTop(DropIndicator) || externalHeight != DropIndicator.Height)
+                        failures.Add($"External {zone} indicator differs from the internal indicator.");
+                    ole.DragLeave();
+                    if (DropIndicator.Visibility != Visibility.Collapsed)
+                        failures.Add("External drag leave did not clear its indicator.");
+                    effect = 1;
+                    // The release position must win over an earlier preview on another row.
+                    var preview = DropScreenPoint(x, bounds.Y + 1);
+                    ole.DragEnter(data, 0, preview, ref effect);
+                    ole.Drop(data, 0, point, ref effect);
+                    if (effect != 1 || DropIndicator.Visibility != Visibility.Collapsed)
+                        failures.Add("External drop did not copy and clear its indicator.");
+                }
+                var items = zone == MenuDropZone.Into ? target.Children : config.Items;
+                var expectedIndex = zone == MenuDropZone.After ? 2 : 1;
+                if (items.Count <= expectedIndex || items[expectedIndex].Action?.Path != path)
+                    failures.Add($"External {zone} drop did not insert at the indicated position.");
+                if (FindTreeNode(MenuTree.RootNodes, target.Id)!.IsExpanded)
+                    failures.Add($"External {zone} drop unexpectedly expanded the collapsed group.");
+                if (!FindTreeNode(MenuTree.RootNodes, last.Id)!.IsExpanded)
+                    failures.Add($"External {zone} drop collapsed an expanded group.");
+                if (draftState.UndoCount != 1 || !draftState.Undo() || config.Items.Count != 3 || config.Items[1].Children.Count != 1)
+                    failures.Add($"External {zone} drop was not one undoable insertion.");
+            }
+            var source = new MenuNode { Name = "Move me" };
+            var closed = new MenuNode { Name = "Closed", Kind = MenuNodeKind.Group,
+                Children = [new MenuNode { Name = "Child" }] };
+            draftState.Reset(new AppConfig { Items = [source, closed] });
+            RefreshTree();
+            FindTreeNode(MenuTree.RootNodes, closed.Id)!.IsExpanded = false;
+            MenuTree.UpdateLayout();
+            var row = MenuDropRows().Single(item => item.Id == closed.Id).Bounds;
+            dragSnapshot = Snapshot(); dragNodeId = source.Id;
+            if (!CompleteInternalDrop(row.X + row.Width / 2, row.Y + row.Height / 2))
+                failures.Add("Internal drop into a collapsed group failed.");
+            MenuTreeDragItemsCompleted(MenuTree, null!);
+            if (FindTreeNode(MenuTree.RootNodes, closed.Id)!.IsExpanded)
+                failures.Add("Internal drop unexpectedly expanded the collapsed group.");
+            MenuTree.RootNodes[0].IsExpanded = false;
+            RefreshTree();
+            if (MenuTree.RootNodes[0].IsExpanded)
+                failures.Add("Tree refresh expanded the collapsed configuration root.");
+        }
+        finally { File.Delete(path); }
+        if (failures.Count > 0) throw new Exception(string.Join(Environment.NewLine, failures));
+    }
+
+    private static EditorDropPoint DropScreenPoint(double x, double y)
+    {
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow);
+        var scale = DropCheckGetDpi(hwnd) / 96.0;
+        var point = new EditorDropPoint { X = (int)(x * scale), Y = (int)(y * scale) };
+        DropCheckClientToScreen(hwnd, ref point);
+        return point;
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "GetDpiForWindow")]
+    private static extern uint DropCheckGetDpi(nint hwnd);
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "ClientToScreen")]
+    private static extern bool DropCheckClientToScreen(nint hwnd, ref EditorDropPoint point);
+
+    private sealed class FileDropData(string path) : System.Runtime.InteropServices.ComTypes.IDataObject
+    {
+        public int QueryGetData(ref System.Runtime.InteropServices.ComTypes.FORMATETC format) => format.cfFormat == 15 ? 0 : unchecked((int)0x80040064);
+        public void GetData(ref System.Runtime.InteropServices.ComTypes.FORMATETC format, out System.Runtime.InteropServices.ComTypes.STGMEDIUM medium)
+        {
+            var bytes = System.Text.Encoding.Unicode.GetBytes(path + '\0' + '\0');
+            var memory = DropCheckGlobalAlloc(0x42, (nuint)(20 + bytes.Length));
+            if (memory == 0) throw new OutOfMemoryException();
+            var pointer = DropCheckGlobalLock(memory);
+            if (pointer == 0) throw new OutOfMemoryException();
+            System.Runtime.InteropServices.Marshal.WriteInt32(pointer, 0, 20);
+            System.Runtime.InteropServices.Marshal.WriteInt32(pointer, 16, 1);
+            System.Runtime.InteropServices.Marshal.Copy(bytes, 0, pointer + 20, bytes.Length);
+            DropCheckGlobalUnlock(memory);
+            medium = new() { tymed = System.Runtime.InteropServices.ComTypes.TYMED.TYMED_HGLOBAL, unionmember = memory };
+        }
+        public void GetDataHere(ref System.Runtime.InteropServices.ComTypes.FORMATETC format, ref System.Runtime.InteropServices.ComTypes.STGMEDIUM medium) => throw new NotSupportedException();
+        public int GetCanonicalFormatEtc(ref System.Runtime.InteropServices.ComTypes.FORMATETC format, out System.Runtime.InteropServices.ComTypes.FORMATETC output) { output = default; return 1; }
+        public void SetData(ref System.Runtime.InteropServices.ComTypes.FORMATETC format, ref System.Runtime.InteropServices.ComTypes.STGMEDIUM medium, bool release) => throw new NotSupportedException();
+        public System.Runtime.InteropServices.ComTypes.IEnumFORMATETC EnumFormatEtc(System.Runtime.InteropServices.ComTypes.DATADIR direction) => throw new NotSupportedException();
+        public int DAdvise(ref System.Runtime.InteropServices.ComTypes.FORMATETC format, System.Runtime.InteropServices.ComTypes.ADVF flags, System.Runtime.InteropServices.ComTypes.IAdviseSink sink, out int connection) { connection = 0; return unchecked((int)0x80040003); }
+        public void DUnadvise(int connection) => throw new NotSupportedException();
+        public int EnumDAdvise(out System.Runtime.InteropServices.ComTypes.IEnumSTATDATA result) { result = null!; return unchecked((int)0x80040003); }
+    }
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", EntryPoint = "GlobalAlloc")]
+    private static extern nint DropCheckGlobalAlloc(uint flags, nuint size);
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", EntryPoint = "GlobalLock")]
+    private static extern nint DropCheckGlobalLock(nint memory);
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", EntryPoint = "GlobalUnlock")]
+    private static extern bool DropCheckGlobalUnlock(nint memory);
+
+    internal void CheckDropAtRelease(bool showPreview, bool simulateNativeReorder = false)
     {
         var source = new MenuNode { Name = "Source" };
         var first = new MenuNode { Name = "Preview group", Kind = MenuNodeKind.Group };
@@ -212,6 +338,17 @@ public sealed partial class MainPage
         var preview = Center(first);
         var release = Center(second);
         if (showPreview) ShowMenuDropIndicator(source.Id, MenuHit(preview.X, preview.Y));
+        if (simulateNativeReorder)
+        {
+            CaptureMenuDropGeometry();
+            // Native TreeView may reparent its visual nodes before drag completion.
+            // The model and the geometry used by the insertion marker still precede that move.
+            var sourceNode = FindTreeNode(MenuTree.RootNodes, source.Id)!;
+            var destinationNode = FindTreeNode(MenuTree.RootNodes, second.Id)!;
+            sourceNode.Parent.Children.Remove(sourceNode);
+            destinationNode.Children.Add(sourceNode);
+            MenuTree.UpdateLayout();
+        }
         if (!CompleteInternalDrop(release.X, release.Y) || second.Children.Single().Id != source.Id || first.Children.Count != 0)
             throw new Exception("Tree drop did not use release coordinates.");
         MenuTreeDragItemsCompleted(MenuTree, null!);

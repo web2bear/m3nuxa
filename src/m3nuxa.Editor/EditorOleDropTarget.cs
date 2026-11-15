@@ -25,9 +25,13 @@ public sealed class EditorOleDropTarget : IEditorDropTarget, IDisposable
     private readonly bool oleInitialized;
     private readonly Func<bool> internalDrag;
     private readonly Func<double, double, bool> onInternalDrop;
-    public EditorOleDropTarget(Window window, Action<IReadOnlyList<string>, double, double> onPaths, Action<string, bool, double, double> onText, string log, Func<bool> internalDrag, Func<double, double, bool> onInternalDrop)
+    private readonly Func<double, double, bool> onExternalDragOver;
+    private readonly Action onExternalDragLeave;
+    private bool externalDataSupported;
+    public EditorOleDropTarget(Window window, Action<IReadOnlyList<string>, double, double> onPaths, Action<string, bool, double, double> onText, string log, Func<bool> internalDrag, Func<double, double, bool> onInternalDrop, Func<double, double, bool> onExternalDragOver, Action onExternalDragLeave)
     {
         root = WindowNative.GetWindowHandle(window); this.onPaths = onPaths; this.onText = onText; this.log = log; this.internalDrag = internalDrag; this.onInternalDrop = onInternalDrop;
+        this.onExternalDragOver = onExternalDragOver; this.onExternalDragLeave = onExternalDragLeave;
         var init = OleInitialize(0);
         oleInitialized = init >= 0;
         Log($"OleInitialize={init:X8}");
@@ -48,19 +52,33 @@ public sealed class EditorOleDropTarget : IEditorDropTarget, IDisposable
         var f = new FORMATETC { cfFormat = 15, dwAspect = DVASPECT.DVASPECT_CONTENT, lindex = -1, tymed = TYMED.TYMED_HGLOBAL };
         var hr = data.QueryGetData(ref f); var text = Supports(data, 13); var url = Supports(data, (short)RegisterClipboardFormat("UniformResourceLocatorW"));
         Log($"enter file={hr:X8} text={text} url={url} effect={effect} at={point.X},{point.Y}");
-        effect = (hr == 0 || text || url) ? effect & 1u : 0; return 0;
+        externalDataSupported = hr == 0 || text || url;
+        return DragOver(keys, point, ref effect);
     }
-    public int DragOver(uint keys, EditorDropPoint point, ref uint effect) { effect &= internalDrag() ? 2u : 1u; return 0; }
-    public int DragLeave() { Log("leave"); return 0; }
+    public int DragOver(uint keys, EditorDropPoint point, ref uint effect)
+    {
+        if (internalDrag()) { effect &= 2u; return 0; }
+        var (x, y) = ClientPoint(point);
+        if (externalDataSupported && (effect & 1u) != 0 && onExternalDragOver(x, y)) effect &= 1u;
+        else { effect = 0; onExternalDragLeave(); }
+        return 0;
+    }
+    public int DragLeave() { externalDataSupported = false; onExternalDragLeave(); Log("leave"); return 0; }
+
+    private (double X, double Y) ClientPoint(EditorDropPoint point)
+    {
+        ScreenToClient(root, ref point);
+        var dpi = GetDpiForWindow(root) / 96.0;
+        return (point.X / dpi, point.Y / dpi);
+    }
     public int Drop(IDataObject data, uint keys, EditorDropPoint point, ref uint effect)
     {
         try
         {
-            var location = point; ScreenToClient(root, ref location);
-            var dpi = GetDpiForWindow(root) / 96.0;
-            var x = location.X / dpi;
-            var y = location.Y / dpi;
+            var (x, y) = ClientPoint(point);
             if (internalDrag()) { effect = onInternalDrop(x, y) ? 2u : 0u; return 0; }
+            if (!externalDataSupported || (effect & 1u) == 0 || !onExternalDragOver(x, y)) { effect = 0; return 0; }
+            effect &= 1u;
             var url = ReadText(data, (short)RegisterClipboardFormat("UniformResourceLocatorW"));
             if (url is not null && Uri.TryCreate(url.Trim(), UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https") { Log("drop url"); onText(url.Trim(), true, x, y); return 0; }
             var f = new FORMATETC { cfFormat = 15, dwAspect = DVASPECT.DVASPECT_CONTENT, lindex = -1, tymed = TYMED.TYMED_HGLOBAL };
@@ -75,12 +93,13 @@ public sealed class EditorOleDropTarget : IEditorDropTarget, IDisposable
             {
                 var count = DragQueryFile(medium.unionmember, uint.MaxValue, null, 0); var paths = new List<string>();
                 for (uint i = 0; i < count; i++) { var n = DragQueryFile(medium.unionmember, i, null, 0); var b = new char[n + 1]; var read = DragQueryFile(medium.unionmember, i, b, (uint)b.Length); if (read != 0) paths.Add(new string(b, 0, (int)read)); }
-                Log($"drop count={paths.Count} at={x},{y} scale={dpi}");
+                Log($"drop count={paths.Count} at={x},{y}");
                 onPaths(paths, x, y);
             }
             finally { ReleaseStgMedium(ref medium); }
         }
         catch (Exception ex) { Log($"drop error {ex}"); effect = 0; }
+        finally { externalDataSupported = false; onExternalDragLeave(); }
         return 0;
     }
     private static bool Supports(IDataObject data, short format) { var f = new FORMATETC { cfFormat = format, dwAspect = DVASPECT.DVASPECT_CONTENT, lindex = -1, tymed = TYMED.TYMED_HGLOBAL }; return data.QueryGetData(ref f) == 0; }
@@ -92,7 +111,7 @@ public sealed class EditorOleDropTarget : IEditorDropTarget, IDisposable
         try { var p = GlobalLock(m.unionmember); if (p == 0) return null; try { return Marshal.PtrToStringUni(p); } finally { GlobalUnlock(m.unionmember); } }
         finally { ReleaseStgMedium(ref m); }
     }
-    public void Dispose() { foreach (var h in windows) RevokeDragDrop(h); if (oleInitialized) OleUninitialize(); }
+    public void Dispose() { onExternalDragLeave(); foreach (var h in windows) RevokeDragDrop(h); if (oleInitialized) OleUninitialize(); }
     private delegate bool EnumProc(nint hwnd, nint param);
     internal static bool TryGetCursorPosition(Window window, out double x, out double y)
     {
