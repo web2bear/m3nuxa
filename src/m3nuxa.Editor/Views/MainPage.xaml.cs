@@ -37,6 +37,8 @@ public sealed partial class MainPage : Page
     private bool allowClose;
     private string? dragSnapshot;
     private string? dragNodeId;
+    private MenuDropRow[]? dragDropRows;
+    private DropBounds dragDropBounds;
     private DragEscapeMonitor? dragEscapeMonitor;
     private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer dropIndicatorTimer;
     private readonly Brush dropAccent;
@@ -84,6 +86,7 @@ public sealed partial class MainPage : Page
         MenuTree.AddHandler(RightTappedEvent, new RightTappedEventHandler(MenuTreeRightTapped), true);
         MenuPanel.AddHandler(DragOverEvent, new DragEventHandler(MenuTreeDragOver), true);
         MenuPanel.AddHandler(DropEvent, new DragEventHandler(MenuTreeDrop), true);
+        MenuPanel.AddHandler(DragLeaveEvent, new DragEventHandler((_, _) => ClearExternalDropIndicator()), true);
         Loaded += MainPageLoaded;
         App.MainWindow.AppWindow.Closing += async (_, args) =>
         {
@@ -407,12 +410,23 @@ public sealed partial class MainPage : Page
 
     private void RefreshTree(string? selectId = null)
     {
+        var expansion = new Dictionary<string, bool>();
+        void Capture(IEnumerable<TreeViewNode> nodes)
+        {
+            foreach (var node in nodes)
+            {
+                if (node.Content is NodeDisplay display) expansion[display.Model.Id] = node.IsExpanded;
+                Capture(node.Children);
+            }
+        }
+        Capture(MenuTree.RootNodes);
+        var rootExpanded = MenuTree.RootNodes.FirstOrDefault()?.IsExpanded ?? true;
         rendering = true;
         try
         {
             MenuTree.RootNodes.Clear();
-            var root = new TreeViewNode { Content = CreateConfigurationDisplay(config.Name), IsExpanded = true };
-            foreach (var node in config.Items) root.Children.Add(BuildNode(node));
+            var root = new TreeViewNode { Content = CreateConfigurationDisplay(config.Name), IsExpanded = rootExpanded };
+            foreach (var node in config.Items) root.Children.Add(BuildNode(node, expansion));
             MenuTree.RootNodes.Add(root);
             MenuTree.SelectedNode = FindTreeNode(root.Children, selectId) ?? root;
         }
@@ -420,11 +434,11 @@ public sealed partial class MainPage : Page
         RenderProperties();
     }
 
-    private TreeViewNode BuildNode(MenuNode model)
+    private TreeViewNode BuildNode(MenuNode model, IReadOnlyDictionary<string, bool> expansion)
     {
         var display = new NodeDisplay(model);
-        var node = new TreeViewNode { Content = display, IsExpanded = true };
-        foreach (var child in model.Children) node.Children.Add(BuildNode(child));
+        var node = new TreeViewNode { Content = display, IsExpanded = !expansion.TryGetValue(model.Id, out var expanded) || expanded };
+        foreach (var child in model.Children) node.Children.Add(BuildNode(child, expansion));
         return node;
     }
 
@@ -1067,9 +1081,13 @@ public sealed partial class MainPage : Page
     }
 
     private List<MenuNode> AddDestination() => selected?.Kind == MenuNodeKind.Group ? selected.Children : SelectedSiblings();
-    private int AddIndex(List<MenuNode> destination) =>
-        selected?.Kind == MenuNodeKind.Group || (MenuTree.SelectedNode is not null && MenuTree.SelectedNode == MenuTree.RootNodes.FirstOrDefault())
-            ? 0 : destination.Count;
+    private int AddIndex(List<MenuNode> destination)
+    {
+        if (selected?.Kind == MenuNodeKind.Group || (MenuTree.SelectedNode is not null && MenuTree.SelectedNode == MenuTree.RootNodes.FirstOrDefault()))
+            return 0;
+        var selectedIndex = selected is null ? -1 : destination.IndexOf(selected);
+        return selectedIndex >= 0 ? selectedIndex + 1 : destination.Count;
+    }
     private void Add(MenuNode node)
     { var destination = AddDestination(); draftState.Insert(destination, AddIndex(destination), [node]); MarkDirty(); RefreshTree(node.Id); }
     private void AddGroupClicked(object sender, RoutedEventArgs args) => Add(new MenuNode { Name = L.Get("Editor_NewGroup_55c687"), Kind = MenuNodeKind.Group });
@@ -1185,6 +1203,7 @@ public sealed partial class MainPage : Page
     }
     internal void AddExternalText(string text, bool isUrl, double x, double y)
     {
+        ClearExternalDropIndicator();
         var (destination, index) = NativeDropDestination(x, y);
         if (index < 0) index = destination.Count;
         if (!isUrl) { AddDroppedText(text, destination, index); return; }
@@ -1200,6 +1219,7 @@ public sealed partial class MainPage : Page
             return;
         }
         DevLog.Write("editor", $"Explorer native drop: {paths.Count} item(s) at {x},{y}");
+        ClearExternalDropIndicator();
         var (destination, index) = NativeDropDestination(x, y);
         ImportPaths(paths, destination, index);
     }
@@ -1441,7 +1461,27 @@ public sealed partial class MainPage : Page
         return await dialog.ShowAsync();
     }
 
-    private void MenuTreeDragItemsStarting(TreeView sender, TreeViewDragItemsStartingEventArgs args) { if (args.Items.FirstOrDefault() is not TreeViewNode { Content: NodeDisplay }) { args.Cancel = true; return; } dragEscapeMonitor?.Dispose(); dragEscapeMonitor = new DragEscapeMonitor(); draftState.CommitPending(); dragSnapshot = Snapshot(); dragNodeId = args.Items.FirstOrDefault() is TreeViewNode node ? Model(node).Id : null; sender.CanReorderItems = false; dropIndicatorTimer.Start(); }
+    private void MenuTreeDragItemsStarting(TreeView sender, TreeViewDragItemsStartingEventArgs args)
+    {
+        if (args.Items.FirstOrDefault() is not TreeViewNode { Content: NodeDisplay } node) { args.Cancel = true; return; }
+        dragEscapeMonitor?.Dispose();
+        dragEscapeMonitor = new DragEscapeMonitor();
+        draftState.CommitPending();
+        dragSnapshot = Snapshot();
+        dragNodeId = Model(node).Id;
+        CaptureMenuDropGeometry();
+        sender.CanReorderItems = false;
+        dropIndicatorTimer.Start();
+    }
+
+    private void CaptureMenuDropGeometry()
+    {
+        dragDropBounds = BoundsInWindow(MenuTree);
+        dragDropRows = MenuDropRows().ToArray();
+    }
+
+    private MenuDropHit InternalMenuHit(double x, double y) => dragDropRows is { } rows
+        ? DropGeometry.Menu(x, y, dragDropBounds, rows) : MenuHit(x, y);
     internal bool InternalDragActive() => (dragSnapshot is not null && dragNodeId is not null) || (stepDragItem is not null && draggedStep is not null);
     private void UpdateDropIndicator()
     {
@@ -1451,15 +1491,29 @@ public sealed partial class MainPage : Page
             UpdateStepDropIndicator(stepX, stepY);
         else if (stepDropIndicator is not null) stepDropIndicator.Visibility = Visibility.Collapsed;
         if (dragNodeId is null || dragSnapshot is null || dragEscapeMonitor?.Cancelled == true || !EditorOleDropTarget.TryGetCursorPosition(App.MainWindow, out var x, out var y)) return;
-        ShowMenuDropIndicator(dragNodeId, MenuHit(x, y));
+        // Keep the last geometry shown while dragging: TreeView may reparent nodes on release
+        // before DragItemsCompleted runs. Refresh while held so scrolling remains reflected.
+        if (EditorOleDropTarget.IsDragButtonDown()) CaptureMenuDropGeometry();
+        ShowMenuDropIndicator(dragNodeId, InternalMenuHit(x, y));
     }
 
     private (List<MenuNode> Items, int Index)? InternalDestination(MenuDropHit hit) =>
         hit.Zone == MenuDropZone.Empty ? (config.Items, config.Items.Count) : RowDestination(hit);
 
-    private void ShowMenuDropIndicator(string sourceId, MenuDropHit hit)
+    internal bool UpdateExternalDropIndicator(double x, double y)
     {
-        if (InternalDestination(hit) is not { } destination || !draftState.CanMove(sourceId, destination.Items)) return;
+        ClearExternalDropIndicator();
+        var hit = MenuHit(x, y);
+        if (InternalDestination(hit) is null) return false;
+        ShowMenuDropIndicator(null, hit);
+        return true;
+    }
+
+    internal void ClearExternalDropIndicator() => DropIndicator.Visibility = Visibility.Collapsed;
+
+    private void ShowMenuDropIndicator(string? sourceId, MenuDropHit hit)
+    {
+        if (InternalDestination(hit) is not { } destination || (sourceId is not null && !draftState.CanMove(sourceId, destination.Items))) return;
         var overlay = BoundsInWindow(DropOverlay);
         var anchor = hit.MarkerAnchor;
         var inside = hit.Zone == MenuDropZone.Into;
@@ -1485,7 +1539,7 @@ public sealed partial class MainPage : Page
         if (stepDragItem is { } item && draggedStep is { } step && stepList is { } list)
             return CompleteStepDrop(item, step, list, x, y);
         if (dragNodeId is not { } id) return false;
-        var hit = MenuHit(x, y);
+        var hit = InternalMenuHit(x, y);
         dragSnapshot = null;
         dragNodeId = null;
         if (dragEscapeMonitor?.Cancelled == true || !MoveToHit(id, hit)) return false;
@@ -1546,7 +1600,7 @@ public sealed partial class MainPage : Page
     {
         dropIndicatorTimer.Stop(); DropIndicator.Visibility = Visibility.Collapsed;
         sender.CanReorderItems = true;
-        if (dragSnapshot is null) { dragEscapeMonitor?.Dispose(); dragEscapeMonitor = null; return; }
+        if (dragSnapshot is null) { dragDropRows = null; dragEscapeMonitor?.Dispose(); dragEscapeMonitor = null; return; }
         try
         {
             // TreeView can apply a different drop position than the one shown by our indicator.
@@ -1557,7 +1611,7 @@ public sealed partial class MainPage : Page
                 double dropX = 0, dropY = 0;
                 var canDrop = !monitor.Cancelled && !EditorOleDropTarget.IsDragButtonDown()
                     && EditorOleDropTarget.TryGetCursorPosition(App.MainWindow, out dropX, out dropY);
-                var hit = canDrop ? MenuHit(dropX, dropY) : default;
+                var hit = canDrop ? InternalMenuHit(dropX, dropY) : default;
                 draftState.Restore(dragSnapshot);
                 if (canDrop) MoveToHit(id, hit);
                 RefreshTree(id);
@@ -1575,7 +1629,7 @@ public sealed partial class MainPage : Page
             DispatcherQueue.TryEnqueue(() => RefreshTree(selectedId));
         }
         catch (Exception ex) { draftState.Restore(dragSnapshot); RefreshTree(); ShowNotice(ex.Message, InfoBarSeverity.Warning); }
-        finally { dragSnapshot = null; dragNodeId = null; dragEscapeMonitor?.Dispose(); dragEscapeMonitor = null; }
+        finally { dragSnapshot = null; dragNodeId = null; dragDropRows = null; dragEscapeMonitor?.Dispose(); dragEscapeMonitor = null; }
     }
 
     private void MenuTreeDragOver(object sender, DragEventArgs args)
@@ -1592,12 +1646,15 @@ public sealed partial class MainPage : Page
             dragOverLogged = true;
         }
         if (dragSnapshot is not null || (!args.DataView.Contains(StandardDataFormats.StorageItems) && !args.DataView.Contains(StandardDataFormats.Text))) return;
+        var point = args.GetPosition(null);
+        if (!UpdateExternalDropIndicator(point.X, point.Y)) { args.AcceptedOperation = DataPackageOperation.None; args.Handled = true; return; }
         args.AcceptedOperation = DataPackageOperation.Copy;
         args.DragUIOverride.Caption = L.Get("Editor_AddToMenu_2887bc");
         args.Handled = true;
     }
     private async void MenuTreeDrop(object sender, DragEventArgs args)
     {
+        ClearExternalDropIndicator();
         dragOverLogged = false;
         if (InternalDragActive())
         {

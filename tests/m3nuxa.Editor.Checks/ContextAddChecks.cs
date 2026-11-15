@@ -25,5 +25,37 @@ public sealed partial class MainPage
             throw new Exception("New action must be selected on its steps tab with a default name and no steps");
         if (!CurrentPropertyElements().OfType<Grid>().SelectMany(grid => grid.Children).OfType<Button>().Any(button => Equals(button.Content, L.Get("Workflow_AddStep"))))
             throw new Exception("New action must allow adding its first step");
+        CheckSeparatorInsertion();
+    }
+
+    private void CheckSeparatorInsertion()
+    {
+        foreach (var nested in new[] { false, true })
+        foreach (var kind in new[] { MenuNodeKind.Action, MenuNodeKind.Separator })
+        foreach (var atEnd in new[] { false, true })
+        {
+            var before = new MenuNode { Name = "Before" };
+            var anchor = new MenuNode { Name = "Selected", Kind = kind };
+            var after = new MenuNode { Name = "After" };
+            var siblings = new List<MenuNode> { before, anchor };
+            if (!atEnd) siblings.Add(after);
+            draftState.Reset(new AppConfig { Items = nested
+                ? [new MenuNode { Name = "Parent", Kind = MenuNodeKind.Group, Children = siblings }]
+                : siblings });
+            RefreshTree(anchor.Id);
+            var original = Snapshot();
+
+            AddSeparatorClicked(this, null!);
+            if (siblings.Count != (atEnd ? 3 : 4) || siblings[2].Kind != MenuNodeKind.Separator ||
+                siblings[1].Id != anchor.Id || (!atEnd && siblings[3].Id != after.Id))
+                throw new Exception($"Separator must immediately follow the selected {kind} at {(nested ? "nested" : "root")} level (atEnd={atEnd}).");
+            var insertedId = siblings[2].Id;
+            if (selected?.Id != insertedId)
+                throw new Exception("Inserted separator must be selected.");
+            var changed = Snapshot();
+            if (draftState.UndoCount != 1 || !draftState.Undo() || Snapshot() != original ||
+                !draftState.Redo() || Snapshot() != changed)
+                throw new Exception("Separator insertion must be one undoable change with working Redo.");
+        }
     }
 }

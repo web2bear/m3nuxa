@@ -71,7 +71,7 @@ public partial class App : Application
         void AttachDropHook()
         {
             dropHook?.Dispose();
-            dropHook = new EditorOleDropTarget(MainWindow, page.AddDroppedPaths, page.AddExternalText, "", page.InternalDragActive, page.CompleteInternalDrop);
+            dropHook = new EditorOleDropTarget(MainWindow, page.AddDroppedPaths, page.AddExternalText, "", page.InternalDragActive, page.CompleteInternalDrop, page.UpdateExternalDropIndicator, page.ClearExternalDropIndicator);
             DevLog.Write("editor", "OLE drop target attached");
         }
         DevLog.Write("editor", "Activating window");

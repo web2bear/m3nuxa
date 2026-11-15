@@ -30,6 +30,12 @@ public partial class App : Application
             MainWindow.Content = page;
             MainWindow.Activate();
             await Task.Delay(100);
+            if (Environment.GetEnvironmentVariable("m3nuxa_TREE_DROP_CHECK") is not null)
+            {
+                await page.CheckExternalTreeDropsAsync();
+                await File.WriteAllTextAsync(resultPath, "PASS: external insertion positions and tree expansion state.");
+                Environment.Exit(0);
+            }
             if (additionalDisplay is not null)
             {
                 var work = additionalDisplay.WorkArea;
@@ -47,7 +53,7 @@ public partial class App : Application
             {
                 page.SetupDropChecks();
                 var log = Environment.GetEnvironmentVariable("m3nuxa_OLE_PROBE") ?? "";
-                IDisposable hook = new EditorOleDropTarget(MainWindow, page.AddDroppedPaths, page.AddProbeText, log, page.InternalDragActive, page.CompleteInternalDrop);
+                IDisposable hook = new EditorOleDropTarget(MainWindow, page.AddDroppedPaths, page.AddProbeText, log, page.InternalDragActive, page.CompleteInternalDrop, page.UpdateExternalDropIndicator, page.ClearExternalDropIndicator);
                 using (hook)
                 while (true)
                 {
@@ -77,6 +83,7 @@ public partial class App : Application
             await page.CheckExplorerIconsAsync();
             page.CheckDropAtRelease(showPreview: false);
             page.CheckDropAtRelease(showPreview: true);
+            page.CheckDropAtRelease(showPreview: true, simulateNativeReorder: true);
             await page.CheckTreeReorderAsync();
             page.CheckApplyAvailability();
             await page.CheckShortcutRecordingAsync();
