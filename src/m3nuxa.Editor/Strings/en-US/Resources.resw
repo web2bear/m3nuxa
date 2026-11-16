@@ -503,4 +503,8 @@ or select an existing item.</value>
   <data name="Icon_Confirm" xml:space="preserve"><value>Select</value></data>
   <data name="Icon_Preview" xml:space="preserve"><value>Selected icon</value></data>
   <data name="Icon_ColorBundledOnly" xml:space="preserve"><value>Color is available for built-in icons.</value></data>
+  <data name="Workflow_ActivateWindow" xml:space="preserve"><value>Activate window (prototype)</value></data>
+  <data name="Workflow_WindowProcess" xml:space="preserve"><value>Process name (e.g. Taskmgr.exe)</value></data>
+  <data name="Workflow_WindowTitle" xml:space="preserve"><value>Window title contains (optional)</value></data>
+  <data name="Workflow_WindowTimeout" xml:space="preserve"><value>Wait for window, ms</value></data>
 </root>

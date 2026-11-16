@@ -45,7 +45,7 @@ internal static class ClipboardOperations
 
     internal static async Task PasteTextAsync(string text, InvocationContext context, bool restore, CancellationToken token)
     {
-        if (context.SourceWindow == IntPtr.Zero || !NativeMethods.IsWindow(context.SourceWindow))
+        if (context.InputWindow == IntPtr.Zero || !NativeMethods.IsWindow(context.InputWindow))
             throw new WorkflowSafeException(L.Get("ActionSourceWindowClosed"));
         nint previous = 0;
         var captured = false;
@@ -59,7 +59,7 @@ internal static class ClipboardOperations
             }
             await SetTextAsync(text, token);
             written = GetClipboardSequenceNumber();
-            if (!NativeMethods.SetForegroundWindow(context.SourceWindow) || NativeMethods.GetForegroundWindow() != context.SourceWindow)
+            if (!NativeMethods.SetForegroundWindow(context.InputWindow) || NativeMethods.GetForegroundWindow() != context.InputWindow)
                 throw new WorkflowSafeException(L.Get("ActionTextFocusFailed"));
             KeyboardSender.Send("Ctrl+V");
             // Once Ctrl+V is sent, cancellation must not restore the clipboard early.

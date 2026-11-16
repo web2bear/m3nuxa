@@ -341,4 +341,10 @@ Cancel — exit.</value>
   <data name="DefaultShowDesktop" xml:space="preserve"><value>Show desktop</value></data>
   <data name="DefaultNextDesktop" xml:space="preserve"><value>Next virtual desktop</value></data>
   <data name="DefaultSnapRight" xml:space="preserve"><value>Snap window right</value></data>
+  <data name="WorkflowKindActivateWindow" xml:space="preserve"><value>Activate window</value></data>
+  <data name="WindowNotFound" xml:space="preserve"><value>Window not found before timeout.</value></data>
+  <data name="WindowMultiple" xml:space="preserve"><value>More than one window matches. Specify part of its title.</value></data>
+  <data name="WindowFocusFailed" xml:space="preserve"><value>Could not activate the selected window.</value></data>
+  <data name="WindowElevated" xml:space="preserve"><value>The selected window runs with higher privileges. Input was not sent.</value></data>
+  <data name="WindowIntegrityUnknown" xml:space="preserve"><value>Could not verify the selected window’s privilege level. Input was not sent.</value></data>
 </root>

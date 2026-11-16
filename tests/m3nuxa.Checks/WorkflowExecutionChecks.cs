@@ -10,8 +10,25 @@ internal static class WorkflowExecutionChecks
         var directory = Path.Combine(root, "workflow-execution");
         Directory.CreateDirectory(directory);
         var context = new InvocationContext(IntPtr.Zero, [], null);
+        Check(IntegrityLevel.Read((uint)Environment.ProcessId) > 0, "current process integrity is readable");
         var empty = await WorkflowExecutor.RunAsync([], context, CancellationToken.None);
         Check(!empty.Success && empty.StepIndex == -1 && empty.Error == L.Get("WorkflowNoSteps"), "empty sequence reports an error on invocation");
+        var missingWindow = await WorkflowExecutor.RunAsync([
+            new MenuAction { Kind = ActionKind.ActivateWindow, Path = "m3nuxa-no-such-process.exe", TimeoutMilliseconds = 100 },
+            new MenuAction { Kind = ActionKind.Delay }
+        ], context, CancellationToken.None);
+        Check(!missingWindow.Success && missingWindow.StepIndex == 0 && missingWindow.Error == L.Get("WindowNotFound"), "missing window times out and stops sequence");
+        using (var cancelWindow = new CancellationTokenSource())
+        {
+            var pending = WorkflowExecutor.RunAsync([
+                new MenuAction { Kind = ActionKind.ActivateWindow, Path = "m3nuxa-no-such-process.exe", TimeoutMilliseconds = 30000 }
+            ], context, cancelWindow.Token);
+            await Task.Delay(100);
+            Check(await WorkflowExecutor.InputGate.WaitAsync(1000), "window search does not block other input");
+            WorkflowExecutor.InputGate.Release();
+            cancelWindow.Cancel();
+            Check((await pending.WaitAsync(TimeSpan.FromSeconds(5))).Cancelled, "window search is cancellable");
+        }
         foreach (var invalid in new[] { new MenuAction { Kind = ActionKind.OpenFolder }, new MenuAction { Kind = ActionKind.Delay, DelayMilliseconds = -1 }, new MenuAction { Kind = ActionKind.SendShortcut }, new MenuAction { Kind = ActionKind.InsertText }, new MenuAction { Kind = ActionKind.RunProgram, Path = "x", TimeoutMilliseconds = 0 } })
         {
             var invalidResult = await WorkflowExecutor.RunAsync([invalid], context, CancellationToken.None);

@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace m3nuxa.App.Configuration;
 
 public enum MenuNodeKind { Group, Action, Separator }
-public enum ActionKind { OpenFolder, RunProgram, RunScript, SendShortcut, CopySelection, MoveSelection, InsertText, OpenItem, Delay, SetClipboardText, PasteText }
+public enum ActionKind { OpenFolder, RunProgram, RunScript, SendShortcut, CopySelection, MoveSelection, InsertText, OpenItem, Delay, SetClipboardText, PasteText, ActivateWindow }
 
 public sealed class MenuAction
 {

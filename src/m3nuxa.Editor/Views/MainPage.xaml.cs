@@ -550,6 +550,14 @@ public sealed partial class MainPage : Page
                 restore.Toggled += (_, _) => { if (rendering) return; Remember(); action.RestoreClipboard = restore.IsOn; MarkDirty(); };
                 PropertiesPanel.Children.Add(restore);
             }
+            if (action.Kind == ActionKind.ActivateWindow)
+            {
+                AddText(L.Get("Workflow_WindowProcess"), action.Path, value => action.Path = value, placeholder: "Taskmgr.exe");
+                AddText(L.Get("Workflow_WindowTitle"), action.Text, value => action.Text = value);
+                var timeout = new NumberBox { Header = L.Get("Workflow_WindowTimeout"), Minimum = 1, Maximum = 600000, Value = action.TimeoutMilliseconds ?? 10000 };
+                timeout.ValueChanged += (_, args) => { if (rendering || double.IsNaN(args.NewValue) || args.NewValue < 1) return; Remember(); action.TimeoutMilliseconds = (int)args.NewValue; MarkDirty(); };
+                PropertiesPanel.Children.Add(timeout);
+            }
             if (action.Kind == ActionKind.Delay) AddDuration(action);
             if (action.Kind is ActionKind.RunProgram or ActionKind.RunScript) AddProcessWait(action);
             var stepName = ActionChoices().FirstOrDefault(choice => choice.Kind == action.Kind)?.Label ?? action.Kind.ToString();
@@ -1707,7 +1715,7 @@ public sealed partial class MainPage : Page
     }
 
     private static ActionChoice[] ActionChoices() =>
-    [new(ActionKind.OpenItem, L.Get("Editor_OpenAFileOrLink_5464f3")), new(ActionKind.OpenFolder, L.Get("Editor_OpenFolder_54724f")), new(ActionKind.RunProgram, L.Get("Editor_RunAProgram_079b79")), new(ActionKind.RunScript, L.Get("Editor_RunAScript_3fa155")), new(ActionKind.SendShortcut, L.Get("Editor_SendShortcut_9a9f31")), new(ActionKind.CopySelection, L.Get("Editor_CopySelectedItems_427b62")), new(ActionKind.MoveSelection, L.Get("Editor_MoveSelectedItems_457829")), new(ActionKind.InsertText, L.Get("Workflow_TypeText")), new(ActionKind.Delay, L.Get("Workflow_Delay")), new(ActionKind.SetClipboardText, L.Get("Workflow_SetClipboard")), new(ActionKind.PasteText, L.Get("Workflow_PasteText"))];
+    [new(ActionKind.OpenItem, L.Get("Editor_OpenAFileOrLink_5464f3")), new(ActionKind.OpenFolder, L.Get("Editor_OpenFolder_54724f")), new(ActionKind.RunProgram, L.Get("Editor_RunAProgram_079b79")), new(ActionKind.RunScript, L.Get("Editor_RunAScript_3fa155")), new(ActionKind.SendShortcut, L.Get("Editor_SendShortcut_9a9f31")), new(ActionKind.CopySelection, L.Get("Editor_CopySelectedItems_427b62")), new(ActionKind.MoveSelection, L.Get("Editor_MoveSelectedItems_457829")), new(ActionKind.InsertText, L.Get("Workflow_TypeText")), new(ActionKind.Delay, L.Get("Workflow_Delay")), new(ActionKind.ActivateWindow, L.Get("Workflow_ActivateWindow")), new(ActionKind.SetClipboardText, L.Get("Workflow_SetClipboard")), new(ActionKind.PasteText, L.Get("Workflow_PasteText"))];
     private sealed record ActionChoice(ActionKind Kind, string Label);
     private static FrameworkElement CreateItemIcon(MenuNode node, int size)
     {

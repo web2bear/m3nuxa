@@ -503,4 +503,8 @@
   <data name="Icon_Confirm" xml:space="preserve"><value>Выбрать</value></data>
   <data name="Icon_Preview" xml:space="preserve"><value>Выбранная иконка</value></data>
   <data name="Icon_ColorBundledOnly" xml:space="preserve"><value>Цвет доступен для встроенных иконок.</value></data>
+  <data name="Workflow_ActivateWindow" xml:space="preserve"><value>Активировать окно (прототип)</value></data>
+  <data name="Workflow_WindowProcess" xml:space="preserve"><value>Имя процесса (например, Taskmgr.exe)</value></data>
+  <data name="Workflow_WindowTitle" xml:space="preserve"><value>Заголовок содержит (необязательно)</value></data>
+  <data name="Workflow_WindowTimeout" xml:space="preserve"><value>Ожидание окна, мс</value></data>
 </root>
