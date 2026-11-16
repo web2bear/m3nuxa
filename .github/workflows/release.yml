@@ -22,7 +22,10 @@ jobs:
           dotnet-version: 10.0.x
       - name: Build portable application
         shell: pwsh
-        run: ./publish-portable.ps1 -RuntimeIdentifier '${{ matrix.runtime }}' -OutputDirectory '${{ runner.temp }}/m3nuxa' -NoStop -NoLaunch
+        run: ./publish-local.ps1 -RuntimeIdentifier '${{ matrix.runtime }}' -OutputDirectory '${{ runner.temp }}/m3nuxa' -NoStop -NoLaunch
+      - name: Validate portable contents
+        shell: pwsh
+        run: ./tools/Test-PortableContents.ps1 -Directory '${{ runner.temp }}/m3nuxa' -ExpectedVersion '${{ github.ref_name }}'
       - name: Create archive
         shell: pwsh
         run: Compress-Archive -Path '${{ runner.temp }}/m3nuxa/*' -DestinationPath 'm3nuxa-${{ github.ref_name }}-${{ matrix.runtime }}.zip'
