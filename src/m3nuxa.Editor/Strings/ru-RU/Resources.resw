@@ -413,7 +413,7 @@
     <value>Рабочая папка</value>
   </data>
   <data name="Editor_ImportDesktop" xml:space="preserve">
-    <value>Импортировать рабочий стол…</value>
+    <value>Импортировать папку…</value>
   </data>
   <data name="Editor_DesktopFoldersAsGroups" xml:space="preserve">
     <value>Папки как группы</value>
@@ -422,7 +422,7 @@
     <value>Папки как действия открытия</value>
   </data>
   <data name="Editor_PreviewDesktop" xml:space="preserve">
-    <value>Предпросмотр импорта</value>
+    <value>Предпросмотр импорта папки</value>
   </data>
   <data name="Editor_DesktopGroup" xml:space="preserve">
     <value>Рабочий стол</value>

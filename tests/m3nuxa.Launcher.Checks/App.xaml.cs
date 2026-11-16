@@ -28,7 +28,7 @@ public partial class App : Application
                 Environment.Exit(0);
             }
             var config = new ConfigStore(Path.Combine(root, "config.json"));
-            tray = new TrayApplication(config);
+            tray = new TrayApplication(config, new GlobalSettingsStore());
             await CheckSettingsAsync(tray, config);
             var displays = Microsoft.UI.Windowing.DisplayArea.FindAll();
             var testArea = displays[0].WorkArea;

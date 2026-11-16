@@ -58,7 +58,10 @@ public partial class App : Microsoft.UI.Xaml.Application
             }
             if (choice != DialogResult.No) { Exit(); return; }
             store = ConfigStore.CreateDefaultAfterInvalid(path, configDirectory: configDirectory, globalSettings: globalSettings);
-            var result = store.Apply(store.CreateDraft());
+            L.SetLanguage(globalSettings.Current.Language);
+            var reset = store.CreateDraft();
+            reset.Config = DefaultConfiguration.Create(L.Get);
+            var result = store.Apply(reset);
             if (!result.Success) { MessageBox.Show(result.Error, "m3nuxa"); Exit(); return; }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -71,7 +74,9 @@ public partial class App : Microsoft.UI.Xaml.Application
         L.SetLanguage(globalSettings.Current.Language);
         if (!File.Exists(store.FilePath))
         {
-            var initial = store.Apply(store.CreateDraft());
+            var draft = store.CreateDraft();
+            draft.Config = DefaultConfiguration.Create(L.Get);
+            var initial = store.Apply(draft);
             if (!initial.Success)
             {
                 MessageBox.Show(initial.Error ?? L.Get("AppCreateConfigFailed"), "m3nuxa");

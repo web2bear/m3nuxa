@@ -310,4 +310,35 @@
   <data name="ConfigPathUnchecked" xml:space="preserve"><value>{0}: доступность пути будет проверена при выполнении действия: {1}</value></data>
   <data name="AppMigrateConfig" xml:space="preserve"><value>Скопировать существующую конфигурацию из {0} в новую папку конфигураций {1}? Исходный файл будет сохранён.</value></data>
   <data name="TrayLanguage" xml:space="preserve"><value>Язык</value></data>
+  <data name="DefaultCut" xml:space="preserve"><value>Вырезать</value></data>
+  <data name="Workflow_Profile" xml:space="preserve"><value>Папка пользователя</value></data>
+  <data name="DefaultCommandPrompt" xml:space="preserve"><value>Командная строка</value></data>
+  <data name="Workflow_Music" xml:space="preserve"><value>Музыка</value></data>
+  <data name="DefaultFolders" xml:space="preserve"><value>Папки</value></data>
+  <data name="Workflow_Videos" xml:space="preserve"><value>Видео</value></data>
+  <data name="Workflow_Desktop" xml:space="preserve"><value>Рабочий стол</value></data>
+  <data name="DefaultUndo" xml:space="preserve"><value>Отменить</value></data>
+  <data name="DefaultShortcuts" xml:space="preserve"><value>Сочетания клавиш</value></data>
+  <data name="DefaultPrograms" xml:space="preserve"><value>Программы Windows</value></data>
+  <data name="DefaultPaste" xml:space="preserve"><value>Вставить</value></data>
+  <data name="Workflow_Pictures" xml:space="preserve"><value>Изображения</value></data>
+  <data name="DefaultCopy" xml:space="preserve"><value>Копировать</value></data>
+  <data name="DefaultExplorer" xml:space="preserve"><value>Проводник</value></data>
+  <data name="DefaultSelectAll" xml:space="preserve"><value>Выделить всё</value></data>
+  <data name="DefaultSave" xml:space="preserve"><value>Сохранить</value></data>
+  <data name="DefaultTaskManager" xml:space="preserve"><value>Диспетчер задач</value></data>
+  <data name="Workflow_Documents" xml:space="preserve"><value>Документы</value></data>
+  <data name="DefaultNotepad" xml:space="preserve"><value>Блокнот</value></data>
+  <data name="Workflow_Downloads" xml:space="preserve"><value>Загрузки</value></data>
+  <data name="DefaultFind" xml:space="preserve"><value>Найти</value></data>
+  <data name="DefaultScreenshot" xml:space="preserve"><value>Фрагмент экрана</value></data>
+  <data name="DefaultClipboardHistory" xml:space="preserve"><value>Журнал буфера обмена</value></data>
+  <data name="DefaultPreviousDesktop" xml:space="preserve"><value>Предыдущий рабочий стол</value></data>
+  <data name="DefaultNewDesktop" xml:space="preserve"><value>Создать рабочий стол</value></data>
+  <data name="DefaultSnapLeft" xml:space="preserve"><value>Окно слева</value></data>
+  <data name="DefaultCloseDesktop" xml:space="preserve"><value>Закрыть рабочий стол</value></data>
+  <data name="DefaultTaskView" xml:space="preserve"><value>Представление задач</value></data>
+  <data name="DefaultShowDesktop" xml:space="preserve"><value>Показать рабочий стол</value></data>
+  <data name="DefaultNextDesktop" xml:space="preserve"><value>Следующий рабочий стол</value></data>
+  <data name="DefaultSnapRight" xml:space="preserve"><value>Окно справа</value></data>
 </root>

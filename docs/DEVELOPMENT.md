@@ -28,10 +28,16 @@
 
 Получение выделенного текста из сторонних приложений пока не включено. Переменная `selectedText` выдаёт явную ошибку отсутствующего контекста. Поведение UI, выделения Проводника, возврата фокуса и открытия нового окна Проводника требует проверки на целевой Windows 11.
 
-Проверки конфигурации и настроек:
+Автоматический запуск проверок конфигурации и настроек через Test SDK:
 
 ```powershell
-dotnet run --project .\tests\m3nuxa.Checks\m3nuxa.Checks.csproj
+dotnet test .\tests\m3nuxa.Checks\m3nuxa.Checks.csproj --configuration Release -p:Platform=x64
+```
+
+Тот же набор можно запустить напрямую, чтобы увидеть подробный вывод проверок:
+
+```powershell
+dotnet run --project .\tests\m3nuxa.Checks\m3nuxa.Checks.csproj --configuration Release -p:Platform=x64
 ```
 
 Проверки меню и окна настроек:

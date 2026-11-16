@@ -51,6 +51,7 @@
         <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260921001" />
         <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
         <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2705" />
+        <PackageReference Include="Microsoft.Windows.SDK.BuildTools.WinUIAnalyzer" Version="0.8.0" PrivateAssets="all" />
 
         <Manifest Include="$(ApplicationManifest)" />
     </ItemGroup>

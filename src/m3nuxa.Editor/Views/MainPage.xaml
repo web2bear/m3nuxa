@@ -77,7 +77,7 @@
                 <AppBarButton.Icon><SymbolIcon Symbol="Save" Foreground="{ThemeResource ToolbarGreenBrush}" /></AppBarButton.Icon>
             </AppBarButton>
             <AppBarSeparator />
-            <AppBarButton AutomationProperties.AutomationId="ImportDesktop" MinWidth="40" Label="{x:Bind Localize('Editor_ImportDesktop')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_ImportDesktop')}" Click="ImportDesktopClicked">
+            <AppBarButton AutomationProperties.AutomationId="ImportFolder" MinWidth="40" Label="{x:Bind Localize('Editor_ImportDesktop')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_ImportDesktop')}" Click="ImportFolderClicked">
                 <AppBarButton.Icon><SymbolIcon Symbol="Import" Foreground="{ThemeResource ToolbarGreenBrush}" /></AppBarButton.Icon>
             </AppBarButton>
             <AppBarSeparator />
