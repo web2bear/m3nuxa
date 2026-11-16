@@ -36,14 +36,13 @@ foreach ($name in @('m3nuxa.Mcp.exe', 'm3nuxa.Mcp.pdb')) {
 
 # dotnet publish не удаляет ресурсы, оставшиеся от предыдущей публикации.
 $allowedLanguages = @('en-US', 'ru-RU')
-$cultures = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-foreach ($culture in [System.Globalization.CultureInfo]::GetCultures([System.Globalization.CultureTypes]::AllCultures)) {
-    if ($culture.Name) { [void]$cultures.Add($culture.Name) }
-}
 foreach ($directory in Get-ChildItem -LiteralPath $output -Directory) {
-    if (-not $cultures.Contains($directory.Name) -or $directory.Name -in $allowedLanguages) { continue }
-    $files = @(Get-ChildItem -LiteralPath $directory.FullName -Recurse -File)
-    if ($files.Where({ $_.Name -notlike '*.mui' -and $_.Name -notlike '*.resources.dll' }).Count -gt 0) {
+    try { $culture = [System.Globalization.CultureInfo]::GetCultureInfo([string]$directory.Name) }
+    catch { if ($_.Exception.InnerException -is [System.Globalization.CultureNotFoundException]) { continue }; throw }
+    if ($culture.Name -in $allowedLanguages) { continue }
+    $entries = @(Get-ChildItem -LiteralPath $directory.FullName -Force)
+    $knownMui = @('Microsoft.UI.Xaml.dll.mui', 'Microsoft.UI.Xaml.Phone.dll.mui')
+    if ($entries.Where({ $_.PSIsContainer -or $_.Name -notin $knownMui }).Count -gt 0) {
         throw "Языковая папка содержит неожиданные файлы: $($directory.FullName)"
     }
     if ([System.IO.Path]::GetDirectoryName([System.IO.Path]::GetFullPath($directory.FullName)) -ne [System.IO.Path]::GetFullPath($output)) {
