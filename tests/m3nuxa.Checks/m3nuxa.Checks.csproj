@@ -2,12 +2,15 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <IsTestProject>true</IsTestProject>
+    <GenerateProgramFile>false</GenerateProgramFile>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
   </PropertyGroup>
   <ItemGroup><Using Include="m3nuxa.App.Configuration" /><Using Include="m3nuxa.Editor.Configuration" /></ItemGroup>
-  <ItemGroup><EmbeddedResource Include="../../src/m3nuxa.App/Strings/en-US/Resources.resw" LogicalName="Test.Resources.resw" /><EmbeddedResource Include="../../src/m3nuxa.App/Strings/en-US/Settings.resw" LogicalName="Test.Settings.resw" /><Compile Include="../../src/m3nuxa.App/Configuration/SettingsStore.cs" Link="Configuration/SettingsStore.cs" /><Compile Include="../../src/m3nuxa.App/Configuration/ConfigModels.cs" Link="Configuration/ConfigModels.cs" /><Compile Include="../../src/m3nuxa.App/Configuration/GlobalSettingsStore.cs" Link="Configuration/GlobalSettingsStore.cs" /><Compile Include="../../src/m3nuxa.App/Configuration/ConfigStore.cs" Link="Configuration/ConfigStore.cs" /><Compile Include="../../src/m3nuxa.App/ItemIcon.cs" Link="ItemIcon.cs" /><Compile Include="../../src/m3nuxa.App/Configuration/HotkeyParser.cs" Link="Configuration/HotkeyParser.cs" /><PackageReference Include="System.Drawing.Common" Version="9.0.6" /></ItemGroup>
+  <ItemGroup><Compile Include="../../src/m3nuxa.App/Configuration/DefaultConfiguration.cs" Link="Configuration/DefaultConfiguration.cs" /></ItemGroup>
+  <ItemGroup><EmbeddedResource Include="../../src/m3nuxa.App/Strings/en-US/Resources.resw" LogicalName="Test.Resources.resw" /><EmbeddedResource Include="../../src/m3nuxa.App/Strings/en-US/Settings.resw" LogicalName="Test.Settings.resw" /><Compile Include="../../src/m3nuxa.App/Configuration/SettingsStore.cs" Link="Configuration/SettingsStore.cs" /><Compile Include="../../src/m3nuxa.App/Configuration/ConfigModels.cs" Link="Configuration/ConfigModels.cs" /><Compile Include="../../src/m3nuxa.App/Configuration/GlobalSettingsStore.cs" Link="Configuration/GlobalSettingsStore.cs" /><Compile Include="../../src/m3nuxa.App/Configuration/ConfigStore.cs" Link="Configuration/ConfigStore.cs" /><Compile Include="../../src/m3nuxa.App/ItemIcon.cs" Link="ItemIcon.cs" /><Compile Include="../../src/m3nuxa.App/Configuration/HotkeyParser.cs" Link="Configuration/HotkeyParser.cs" /><PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.12.0" /><PackageReference Include="MSTest.TestAdapter" Version="4.5.3" /><PackageReference Include="MSTest.TestFramework" Version="4.5.3" /><PackageReference Include="System.Drawing.Common" Version="9.0.6" /></ItemGroup>
   <ItemGroup><Compile Include="../../src/m3nuxa.App/Actions/**/*.cs" Exclude="../../src/m3nuxa.App/Actions/Files/FileOperationProgressDialog.cs" Link="Actions/%(RecursiveDir)%(Filename)%(Extension)" /><Compile Include="../../src/m3nuxa.App/WorkflowExecutor.cs" Link="WorkflowExecutor.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../../src/m3nuxa.App/AgentPipe.cs" Link="AgentPipe.cs" /><Compile Include="../../src/m3nuxa.App/AgentPipeProtocol.cs" Link="AgentPipeProtocol.cs" /><Compile Include="../../src/m3nuxa.App/DevLog.cs" Link="DevLog.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../../src/m3nuxa.Editor/DropGeometry.cs" Link="DropGeometry.cs" />

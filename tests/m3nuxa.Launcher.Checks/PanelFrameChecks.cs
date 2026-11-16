@@ -29,7 +29,7 @@ public partial class App
         var backgroundWindow = new Window { Content = new Microsoft.UI.Xaml.Controls.Grid { Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Red) } };
         backgroundWindow.AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(opacityArea.X + 100, opacityArea.Y + 60, 800, 600));
         backgroundWindow.Activate();
-        LauncherPanel.Show(new[] { group }, _ => { }, () => { }, new AppSettings { PanelOpacity = 40, PanelBackground = "#202020" });
+        LauncherPanel.Show(new[] { group }, _ => { }, () => { }, new AppSettings { PanelOpacity = 40, PanelBackground = "#202020" }, new GlobalSettings(), _ => { });
         await Task.Delay(100);
         var translucent = (Window)typeof(LauncherPanel).GetField("active", BindingFlags.Static | BindingFlags.NonPublic)!.GetValue(null)!;
         if (translucent.SystemBackdrop is not WinUIEx.TransparentTintBackdrop { TintColor.A: 102 })
@@ -44,7 +44,7 @@ public partial class App
             return image.GetPixel(0, 0);
         }
         var partialPixel = ScreenPixel(opacityArea.X + 600, opacityArea.Y + 300);
-        LauncherPanel.Show(new[] { group }, _ => { }, () => { }, new AppSettings { PanelOpacity = 100, PanelBackground = "#202020" });
+        LauncherPanel.Show(new[] { group }, _ => { }, () => { }, new AppSettings { PanelOpacity = 100, PanelBackground = "#202020" }, new GlobalSettings(), _ => { });
         var opaque = (Window)typeof(LauncherPanel).GetField("active", BindingFlags.Static | BindingFlags.NonPublic)!.GetValue(null)!;
         opaque.AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(opacityArea.X + 150, opacityArea.Y + 100, 500, 400));
         await Task.Delay(400);
@@ -52,7 +52,7 @@ public partial class App
         backgroundWindow.Close();
         if (partialPixel.R < opaquePixel.R + 35)
             throw new Exception($"Launcher transparency not visible: 40%={partialPixel}, 100%={opaquePixel}");
-        LauncherPanel.Show(new[] { group, other, longName }, _ => { }, () => { }, new AppSettings());
+        LauncherPanel.Show(new[] { group, other, longName }, _ => { }, () => { }, new AppSettings(), new GlobalSettings(), _ => { });
         await Task.Delay(300);
         var panel = (Window)typeof(LauncherPanel).GetField("active", BindingFlags.Static | BindingFlags.NonPublic)!.GetValue(null)!;
         var panelGrid = (Microsoft.UI.Xaml.Controls.GridView)typeof(LauncherPanel).GetField("grid", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(panel)!;

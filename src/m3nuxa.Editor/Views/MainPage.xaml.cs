@@ -1115,8 +1115,13 @@ public sealed partial class MainPage : Page
         catch (Exception ex) { ShowNotice(ex.Message, InfoBarSeverity.Error); }
     }
 
-    private async void ImportDesktopClicked(object sender, RoutedEventArgs args)
+    private async void ImportFolderClicked(object sender, RoutedEventArgs args)
     {
+        var picker = new FolderPicker(); picker.FileTypeFilter.Add("*"); InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindow));
+        Windows.Storage.StorageFolder? folder;
+        try { folder = await picker.PickSingleFolderAsync(); }
+        catch (Exception ex) { ShowNotice(ex.Message, InfoBarSeverity.Error); return; }
+        if (folder is null) return;
         var choice = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
         choice.Items.Add(L.Get("Editor_DesktopFoldersAsGroups"));
         choice.Items.Add(L.Get("Editor_DesktopFoldersAsLinks"));
@@ -1127,8 +1132,7 @@ public sealed partial class MainPage : Page
         try
         {
             var errors = new List<string>();
-            var root = new MenuNode { Name = L.Get("Editor_DesktopGroup"), Kind = MenuNodeKind.Group };
-            var roots = new[] { Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory) }.Where(p => !string.IsNullOrWhiteSpace(p)).Distinct(StringComparer.OrdinalIgnoreCase);
+            var root = new MenuNode { Name = folder.Name, Kind = MenuNodeKind.Group };
             var groupFolders = choice.SelectedIndex == 0;
             var limitMessage = L.Get("Editor_DesktopLimit");
             IsEnabled = false;
@@ -1137,7 +1141,7 @@ public sealed partial class MainPage : Page
                 await Task.Run(() =>
                 {
                     var remaining = 500;
-                    foreach (var path in roots) ImportDesktopDirectory(path, root.Children, groupFolders, errors, 0, ref remaining, limitMessage);
+                    ImportFolderDirectory(folder.Path, root.Children, groupFolders, errors, 0, ref remaining, limitMessage);
                 });
             }
             finally { IsEnabled = true; }
@@ -1156,7 +1160,7 @@ public sealed partial class MainPage : Page
         catch (Exception ex) { ShowNotice(ex.Message, InfoBarSeverity.Error); }
     }
 
-    private static void ImportDesktopDirectory(string path, List<MenuNode> destination, bool groupFolders, List<string> errors, int depth, ref int remaining, string limitMessage)
+    private static void ImportFolderDirectory(string path, List<MenuNode> destination, bool groupFolders, List<string> errors, int depth, ref int remaining, string limitMessage)
     {
         if (depth > 32) { errors.Add(path); return; }
         string[] entries;
@@ -1175,7 +1179,7 @@ public sealed partial class MainPage : Page
                 if ((attributes & FileAttributes.Directory) != 0 && groupFolders)
                 {
                     var group = new MenuNode { Name = Path.GetFileName(entry), Kind = MenuNodeKind.Group };
-                    ImportDesktopDirectory(entry, group.Children, true, errors, depth + 1, ref remaining, limitMessage);
+                    ImportFolderDirectory(entry, group.Children, true, errors, depth + 1, ref remaining, limitMessage);
                     destination.Add(group);
                 }
                 else if ((attributes & FileAttributes.Directory) == 0 && Path.GetExtension(entry).Equals(".url", StringComparison.OrdinalIgnoreCase))

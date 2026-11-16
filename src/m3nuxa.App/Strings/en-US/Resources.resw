@@ -310,4 +310,35 @@ Cancel — exit.</value>
   <data name="ConfigPathUnchecked" xml:space="preserve"><value>{0}: path availability will be checked when the action runs: {1}</value></data>
   <data name="AppMigrateConfig" xml:space="preserve"><value>Copy the existing configuration from {0} to the new configuration folder {1}? The original file will be kept.</value></data>
   <data name="TrayLanguage" xml:space="preserve"><value>Language</value></data>
+  <data name="DefaultCut" xml:space="preserve"><value>Cut</value></data>
+  <data name="Workflow_Profile" xml:space="preserve"><value>User profile</value></data>
+  <data name="DefaultCommandPrompt" xml:space="preserve"><value>Command Prompt</value></data>
+  <data name="Workflow_Music" xml:space="preserve"><value>Music</value></data>
+  <data name="DefaultFolders" xml:space="preserve"><value>Folders</value></data>
+  <data name="Workflow_Videos" xml:space="preserve"><value>Videos</value></data>
+  <data name="Workflow_Desktop" xml:space="preserve"><value>Desktop</value></data>
+  <data name="DefaultUndo" xml:space="preserve"><value>Undo</value></data>
+  <data name="DefaultShortcuts" xml:space="preserve"><value>Shortcuts</value></data>
+  <data name="DefaultPrograms" xml:space="preserve"><value>Windows programs</value></data>
+  <data name="DefaultPaste" xml:space="preserve"><value>Paste</value></data>
+  <data name="Workflow_Pictures" xml:space="preserve"><value>Pictures</value></data>
+  <data name="DefaultCopy" xml:space="preserve"><value>Copy</value></data>
+  <data name="DefaultExplorer" xml:space="preserve"><value>File Explorer</value></data>
+  <data name="DefaultSelectAll" xml:space="preserve"><value>Select all</value></data>
+  <data name="DefaultSave" xml:space="preserve"><value>Save</value></data>
+  <data name="DefaultTaskManager" xml:space="preserve"><value>Task Manager</value></data>
+  <data name="Workflow_Documents" xml:space="preserve"><value>Documents</value></data>
+  <data name="DefaultNotepad" xml:space="preserve"><value>Notepad</value></data>
+  <data name="Workflow_Downloads" xml:space="preserve"><value>Downloads</value></data>
+  <data name="DefaultFind" xml:space="preserve"><value>Find</value></data>
+  <data name="DefaultScreenshot" xml:space="preserve"><value>Screen snip</value></data>
+  <data name="DefaultClipboardHistory" xml:space="preserve"><value>Clipboard history</value></data>
+  <data name="DefaultPreviousDesktop" xml:space="preserve"><value>Previous virtual desktop</value></data>
+  <data name="DefaultNewDesktop" xml:space="preserve"><value>New virtual desktop</value></data>
+  <data name="DefaultSnapLeft" xml:space="preserve"><value>Snap window left</value></data>
+  <data name="DefaultCloseDesktop" xml:space="preserve"><value>Close virtual desktop</value></data>
+  <data name="DefaultTaskView" xml:space="preserve"><value>Task view</value></data>
+  <data name="DefaultShowDesktop" xml:space="preserve"><value>Show desktop</value></data>
+  <data name="DefaultNextDesktop" xml:space="preserve"><value>Next virtual desktop</value></data>
+  <data name="DefaultSnapRight" xml:space="preserve"><value>Snap window right</value></data>
 </root>

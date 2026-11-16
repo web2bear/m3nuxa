@@ -413,7 +413,7 @@ or select an existing item.</value>
     <value>Working directory</value>
   </data>
   <data name="Editor_ImportDesktop" xml:space="preserve">
-    <value>Import desktop…</value>
+    <value>Import folder…</value>
   </data>
   <data name="Editor_DesktopFoldersAsGroups" xml:space="preserve">
     <value>Folders as groups</value>
@@ -422,7 +422,7 @@ or select an existing item.</value>
     <value>Folders as open-folder actions</value>
   </data>
   <data name="Editor_PreviewDesktop" xml:space="preserve">
-    <value>Preview desktop import</value>
+    <value>Preview folder import</value>
   </data>
   <data name="Editor_DesktopGroup" xml:space="preserve">
     <value>Desktop</value>
