@@ -198,6 +198,7 @@ Cancel — exit.</value>
   <data name="ConfigDraftOverwrite" xml:space="preserve">
     <value>A draft cannot overwrite the active configuration.</value>
   </data>
+  <data name="ConfigUnsavedSourceReplacement" xml:space="preserve"><value>The source would become the primary configuration. Save or discard changes in Configuration 2 before deleting this configuration.</value></data>
   <data name="ConfigDraftStale" xml:space="preserve">
     <value>The draft is out of date. Save it separately or load the current configuration.</value>
   </data>

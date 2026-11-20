@@ -29,6 +29,125 @@ public sealed partial class MainPage
             !menuFields.Children.OfType<Microsoft.UI.Xaml.Controls.NumberBox>().Any())
             throw new Exception("Selecting the menu section did not show its settings.");
     }
+
+    internal void SetupSourcePaneChecks()
+    {
+        draftReady = true;
+        draftState.Reset(new AppConfig { Name = "Primary fixture", Items = [new MenuNode { Name = "Destination", Kind = MenuNodeKind.Group }] });
+        sourceDraft.Reset(new AppConfig { Name = "Source fixture", Items =
+        [
+            new MenuNode { Name = "Source group", Kind = MenuNodeKind.Group, Children =
+            [
+                new MenuNode { Name = "Source action", Kind = MenuNodeKind.Action, Steps = [new() { Kind = ActionKind.InsertText, Text = "payload" }] },
+                new MenuNode { Kind = MenuNodeKind.Separator }
+            ] }
+        ] });
+        draftConfigurationPath = "primary.json";
+        sourcePath = "source.json";
+        RefreshTree(config.Items[0].Id);
+        RefreshSource(sourceDraft.Config.Items[0].Id);
+        UpdateConfigurationSelector();
+        UpdateApplyState();
+        WorkspaceTabs.SelectedItem = SourceTab;
+    }
+
+    internal async Task CheckSourcePaneAsync()
+    {
+        SetupSourcePaneChecks();
+        try
+        {
+            var sourceGroup = sourceDraft.Config.Items.Single();
+            sourceDraft.Insert(sourceGroup.Children, 0, [new MenuNode { Kind = MenuNodeKind.Separator }]);
+            RefreshSource(sourceGroup.Id);
+            var originalSourceSelection = SourceTree.SelectedNode;
+            var sourceSnapshot = sourceDraft.Snapshot();
+            await Task.Delay(80);
+            if (MenuPanel.ActualWidth != SourcePanel.ActualWidth || MenuPanel.ActualHeight != SourcePanel.ActualHeight ||
+                ConfigurationSelector.ActualWidth != SourceSelector.ActualWidth || MenuTree.ActualHeight != SourceTree.ActualHeight ||
+                ImportButton.ActualWidth != SourceImportButton.ActualWidth || ApplyButton.ActualWidth != SourceSaveButton.ActualWidth)
+                throw new Exception("The two tree panes must have matching dimensions.");
+            var sourcePageBounds = BoundsInWindow(SourcePage);
+            var primarySelection = MenuTree.SelectedNode;
+            WorkspaceTabs.SelectedItem = PropertiesTab;
+            await Task.Delay(80);
+            if (BoundsInWindow(DetailsPanel) != sourcePageBounds) throw new Exception("Switching tabs changes the right pane geometry.");
+            WorkspaceTabs.SelectedItem = SourceTab;
+            await Task.Delay(80);
+            if (MenuTree.SelectedNode != primarySelection || SourceTree.SelectedNode != originalSourceSelection ||
+                !sourceDraft.IsDirty || !SourceSaveButton.IsEnabled)
+                throw new Exception("Tab switching must preserve selection and source changes.");
+
+            var confirmed = true;
+            var pending = RunConfigurationActionAsync(async () => confirmed = await ConfirmLeavingAsync(source: true));
+            await Task.Delay(150);
+            var confirmation = VisualTreeHelper.GetOpenPopupsForXamlRoot(XamlRoot)
+                .SelectMany(popup => new[] { popup.Child }.Concat(Descendants(popup.Child))).OfType<ContentDialog>()
+                .FirstOrDefault();
+            if (confirmation is null) throw new Exception("Switching a dirty source must open a confirmation.");
+            InvokeDialogButton(confirmation, "CloseButton");
+            await pending;
+            if (confirmed || !IsEnabled || sourceSnapshot != sourceDraft.Snapshot())
+                throw new Exception("Cancelling a source switch must preserve the draft and restore interaction.");
+
+            await SwitchConfigurationAsync(source: false, path: sourcePath);
+            if (draftConfigurationPath != "primary.json" || sourcePath != "source.json")
+                throw new Exception("A duplicate selection changed one of the open configurations.");
+            Notice.IsOpen = false;
+            var target = config.Items.Single();
+            var bounds = MenuDropRows().Single(row => row.Id == target.Id).Bounds;
+            var point = DropScreenPoint(bounds.X + bounds.Width / 2, bounds.Y + bounds.Height / 2);
+            using var ole = new EditorOleDropTarget(App.MainWindow, AddDroppedPaths, AddExternalText, "", InternalDragActive,
+                CompleteInternalDrop, UpdateExternalDropIndicator, ClearExternalDropIndicator, InternalDropOperation);
+            var data = new FileDropData("");
+            paneDrag = (sourceGroup, true);
+            uint effect = 2;
+            ole.Drop(data, 0, DropScreenPoint(sourcePageBounds.X + 10, sourcePageBounds.Y + 100), ref effect);
+            if (effect != 0 || dirty) throw new Exception("Drop outside the primary tree should do nothing.");
+            effect = 1;
+            ole.Drop(data, 0, point, ref effect);
+            if (effect != 0 || dirty) throw new Exception("A copy-only OLE operation cannot move from the source.");
+            effect = 2;
+            ole.DragOver(0, point, ref effect);
+            ole.Drop(data, 0, point, ref effect);
+            var moved = target.Children.Single();
+            if (effect != 2 || !dirty || moved.Id != sourceGroup.Id || moved.Children.Count != 3 ||
+                moved.Children[1].Steps.Single().Text != "payload" || sourceDraft.Config.Items.Count != 0)
+                throw new Exception("OLE source drop must move the subtree and remove the original.");
+            UndoClicked(this, null!);
+            if (config.Items.Single().Children.Count != 0 || dirty || sourceDraft.Snapshot() != sourceSnapshot)
+                throw new Exception("One Undo must undo both sides of the move.");
+            RestoreSourceHistory(redo: true);
+            if (config.Items.Single().Children.Single().Id != moved.Id || sourceDraft.Config.Items.Count != 0 || WorkspaceTabs.SelectedItem != SourceTab)
+                throw new Exception("Redo in the other tree must restore both sides of the move.");
+
+            var sourceBounds = BoundsInWindow(SourceTree);
+            var sourcePoint = DropScreenPoint(sourceBounds.X + sourceBounds.Width / 2, sourceBounds.Y + sourceBounds.Height / 2);
+            paneDrag = (config.Items.Single().Children.Single(), false);
+            effect = 2;
+            ole.DragOver(0, sourcePoint, ref effect);
+            ole.Drop(data, 0, sourcePoint, ref effect);
+            if (effect != 2 || dirty || config.Items.Single().Children.Count != 0 || sourceDraft.Snapshot() != sourceSnapshot)
+                throw new Exception("The reverse drop must move the subtree back to the secondary root.");
+
+            var primarySnapshot = Snapshot();
+            var newProfile = new EditorResponse(true, null, System.Text.Json.JsonSerializer.SerializeToNode(new
+            {
+                version = 1L,
+                config = new AppConfig { Name = "New secondary fixture" },
+                configPath = "new-secondary.json"
+            }));
+            OpenSourceDraft(newProfile, isNew: true);
+            if (sourceDraft.IsDirty || !SourceHasUnsavedChanges || !SourceSaveButton.IsEnabled || !SourceImportButton.IsEnabled ||
+                !Equals(SourceSelector.Content, "New secondary fixture") || Snapshot() != primarySnapshot)
+                throw new Exception("A new empty secondary draft must be selectable and saveable without changing the primary draft.");
+        }
+        finally
+        {
+            paneDrag = null;
+            ClearSource();
+            WorkspaceTabs.SelectedItem = PropertiesTab;
+        }
+    }
     private IEnumerable<UIElement> PropertyElements() => PropertiesPanel.Children.SelectMany(child =>
         child is Border { Child: StackPanel section } ? section.Children.Cast<UIElement>() : Enumerable.Repeat(child, 1));
 
@@ -70,19 +189,17 @@ public sealed partial class MainPage
         if (L.Language != expectedLanguage) throw new Exception($"Expected language {expectedLanguage}, got {L.Language}.");
         var expectedApply = expectedLanguage == "ru-RU" ? "Сохранить" : "Save";
         var expectedPath = expectedLanguage == "ru-RU" ? "Путь" : "Path";
-        if (L.Get("Editor_Apply_768af6") != expectedApply || ApplyButton.Label != expectedApply)
+        if (L.Get("Editor_Apply_768af6") != expectedApply || !Equals(ApplyButton.Content, expectedApply) ||
+            !Equals(SourceSaveButton.Content, expectedApply))
             throw new Exception("The localized Apply resource was not loaded into XAML.");
         if (L.Get("Editor_Path_1b46c6") != expectedPath)
             throw new Exception("The localized Path resource was not loaded from the editor PRI.");
-        var commands = MainCommandBar.PrimaryCommands.OfType<Microsoft.UI.Xaml.Controls.AppBarButton>().ToArray();
-        if (commands.Length < 1 || commands[0].Label != expectedApply ||
-            commands[0].Icon is not Microsoft.UI.Xaml.Controls.SymbolIcon { Symbol: Microsoft.UI.Xaml.Controls.Symbol.Save })
-            throw new Exception("Save command is missing.");
-        if (commands.Any(command => Microsoft.UI.Xaml.Automation.AutomationProperties.GetAutomationId(command) is "SaveDraft" or "LoadConfiguration"))
-            throw new Exception("Obsolete configuration commands are still present.");
+        if (VisualTreeHelper.GetParent(ApplyButton) is not StackPanel actions ||
+            actions.Children.Count != 2 || actions.Children[0] != ImportButton || actions.Children[1] != ApplyButton ||
+            ApplyButton.ContentTemplate != SourceSaveButton.ContentTemplate)
+            throw new Exception("The primary and source panes must share the import/save arrangement.");
         if (Microsoft.UI.Xaml.Automation.AutomationProperties.GetAutomationId(ConfigurationSelector) != "ConfigurationSelector")
             throw new Exception("Configuration selector is missing.");
-        if (commands.Any(command => Microsoft.UI.Xaml.Automation.AutomationProperties.GetAutomationId(command) == "ReloadConfiguration")) throw new Exception("Reload command still exists.");
     }
 
     internal void SetupDropChecks()
@@ -219,7 +336,7 @@ public sealed partial class MainPage
                 var bounds = MenuDropRows().Single(row => row.Id == target.Id).Bounds;
                 var x = bounds.X + bounds.Width / 2;
                 var y = bounds.Y + bounds.Height * (zone == MenuDropZone.Before ? 0.1 : zone == MenuDropZone.After ? 0.9 : 0.5);
-                using (var ole = new EditorOleDropTarget(App.MainWindow, AddDroppedPaths, AddExternalText, "", InternalDragActive, CompleteInternalDrop, UpdateExternalDropIndicator, ClearExternalDropIndicator))
+                using (var ole = new EditorOleDropTarget(App.MainWindow, AddDroppedPaths, AddExternalText, "", InternalDragActive, CompleteInternalDrop, UpdateExternalDropIndicator, ClearExternalDropIndicator, InternalDropOperation))
                 {
                     var point = DropScreenPoint(x, y);
                     uint effect = 1;

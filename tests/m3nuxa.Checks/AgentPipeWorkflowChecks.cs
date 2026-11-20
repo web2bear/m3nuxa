@@ -7,7 +7,11 @@ internal static class AgentPipeWorkflowChecks
     {
         var previous = SynchronizationContext.Current;
         SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
-        try { RunAsync(root).GetAwaiter().GetResult(); }
+        try
+        {
+            RunAsync(root).GetAwaiter().GetResult();
+            CheckSourceSaveAsync(root).GetAwaiter().GetResult();
+        }
         finally { SynchronizationContext.SetSynchronizationContext(previous); }
     }
 
@@ -100,6 +104,53 @@ internal static class AgentPipeWorkflowChecks
         await limitedPipe.ExecuteAsync("mcp-after-expiry", "begin");
         await RejectCode(() => limitedPipe.ExecuteAsync("mcp-1", "validate"), "draft_not_started", "expired MCP draft released");
         await limitedPipe.ExecuteAsync("mcp-2", "validate");
+    }
+
+    private static async Task CheckSourceSaveAsync(string root)
+    {
+        var catalog = Path.Combine(root, "dual-profile");
+        Directory.CreateDirectory(catalog);
+        var primaryPath = Path.Combine(catalog, "primary.json");
+        var sourcePath = Path.Combine(catalog, "source.json");
+        File.WriteAllText(primaryPath, """{"Name":"Primary","Items":[]}""");
+        var originalSource = """{"Name":"Source","Items":[]}""";
+        File.WriteAllText(sourcePath, originalSource);
+        var selection = Path.Combine(catalog, "active-config.txt");
+        File.WriteAllText(selection, "primary.json");
+        var store = new ConfigStore(primaryPath, selection, catalog);
+        var applies = 0;
+        using var pipe = new AgentPipe(store, () => applies++);
+        JsonObject Profile(string path) => new() { ["path"] = path };
+        JsonObject Pair() => new() { ["primarySession"] = "primary" };
+        var source = await pipe.ExecuteAsync("source", "loadConfig", Profile(sourcePath));
+        Check(source["configPath"]?.GetValue<string>() == sourcePath, "profile load returns its canonical path");
+        await pipe.ExecuteAsync("primary", "begin");
+        await pipe.ExecuteAsync("primary", "create", JsonNode.Parse("""{"node":{"Name":"Primary edit","Kind":"Group"}}""")!.AsObject());
+        await pipe.ExecuteAsync("source", "create", JsonNode.Parse("""{"node":{"Name":"Source edit","Kind":"Group"}}""")!.AsObject());
+        Check((await pipe.ExecuteAsync("source", "saveProfile", Pair()))["Success"]!.GetValue<bool>(), "source saves while inactive");
+        Check(store.FilePath == primaryPath && applies == 0 && File.ReadAllText(selection) == "primary.json" &&
+            store.Current.Items.Count == 0 && new ConfigStore(sourcePath).Current.Items.Single().Name == "Source edit" &&
+            Directory.GetFiles(Path.Combine(catalog, "backups")).Any(file => File.ReadAllText(file) == originalSource),
+            "source save makes a backup without activation, reload, or committing the primary draft");
+        await pipe.ExecuteAsync("source", "create", JsonNode.Parse("""{"node":{"Name":"Pending source edit","Kind":"Group"}}""")!.AsObject());
+        Check((await pipe.ExecuteAsync("primary", "apply"))["Success"]!.GetValue<bool>() && store.Current.Items.Single().Name == "Primary edit",
+            "saving the source leaves the pending primary draft applicable");
+        Check(new ConfigStore(sourcePath).Current.Items.Count == 1, "applying the primary leaves pending source changes unsaved");
+        Check((await pipe.ExecuteAsync("source", "saveProfile", Pair()))["Success"]!.GetValue<bool>() &&
+            new ConfigStore(sourcePath).Current.Items.Count == 2 && store.FilePath == primaryPath,
+            "an inactive source can still be saved after the primary advances the active version");
+
+        await pipe.ExecuteAsync("primary", "loadConfig", Profile(sourcePath));
+        await pipe.ExecuteAsync("source", "loadConfig", Profile(primaryPath));
+        await pipe.ExecuteAsync("source", "create", JsonNode.Parse("""{"node":{"Name":"Running profile edit","Kind":"Group"}}""")!.AsObject());
+        var currentVersion = store.Version;
+        Check((await pipe.ExecuteAsync("source", "saveProfile", Pair()))["activeVersion"]!.GetValue<long>() == currentVersion + 1 &&
+            store.FilePath == primaryPath && store.Current.Items.Count == 2 && applies == 2,
+            "saving an already active source refreshes the running menu without switching profiles");
+        Check((await pipe.ExecuteAsync("primary", "apply"))["Success"]!.GetValue<bool>() && store.FilePath == sourcePath,
+            "the paired primary remains applicable after refreshing an already active source");
+        File.AppendAllText(primaryPath, "\n");
+        await Reject(() => pipe.ExecuteAsync("source", "saveProfile", Pair()), "external source change blocks overwrite after a primary activation");
     }
 
     private static async Task RejectCode(Func<Task<JsonNode>> operation, string expectedCode, string name)

@@ -198,6 +198,7 @@
   <data name="ConfigDraftOverwrite" xml:space="preserve">
     <value>Черновик нельзя записать поверх действующей конфигурации.</value>
   </data>
+  <data name="ConfigUnsavedSourceReplacement" xml:space="preserve"><value>Источник стал бы основной конфигурацией. Перед удалением сохраните или отбросьте изменения в конфигурации 2.</value></data>
   <data name="ConfigDraftStale" xml:space="preserve">
     <value>Черновик устарел. Сохраните его отдельно или загрузите актуальную конфигурацию.</value>
   </data>

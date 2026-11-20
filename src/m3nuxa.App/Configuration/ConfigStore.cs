@@ -187,7 +187,7 @@ public sealed class ConfigStore
         }
     }
 
-    public void DeleteActiveConfiguration(long expectedVersion, Func<AppConfig, string?>? preflight = null)
+    public void DeleteActiveConfiguration(long expectedVersion, Func<AppConfig, string?>? preflight = null, string? protectedReplacement = null)
     {
         lock (gate)
         {
@@ -203,6 +203,8 @@ public sealed class ConfigStore
                 .ThenBy(entry => entry.Name, StringComparer.Ordinal)
                 .ThenBy(entry => entry.Path, StringComparer.OrdinalIgnoreCase).FirstOrDefault();
             var newPath = next?.Path ?? Path.Combine(configDirectory, $"{Guid.NewGuid():N}.json");
+            if (protectedReplacement is not null && SamePath(newPath, protectedReplacement))
+                throw new InvalidOperationException(L.Get("ConfigUnsavedSourceReplacement"));
             if (next?.Error is not null) throw new InvalidDataException($"{next.Path}: {next.Error}");
             var replacement = next is null ? new AppConfig() : ReadConfig(newPath);
             var validation = Validate(replacement);
@@ -338,14 +340,18 @@ public sealed class ConfigStore
 
     public ApplyResult Apply(ConfigDraft draft) => ApplyTo(draft, null);
     public ApplyResult SaveAs(ConfigDraft draft, string destinationPath) => ApplyTo(draft, destinationPath);
+    internal ApplyResult SaveProfile(ConfigDraft draft, Func<AppConfig, string?>? preflight) =>
+        ApplyTo(draft, null, activate: false, preflight);
 
-    private ApplyResult ApplyTo(ConfigDraft draft, string? destinationPath)
+    private ApplyResult ApplyTo(ConfigDraft draft, string? destinationPath, bool activate = true, Func<AppConfig, string?>? preflight = null)
     {
         lock (gate)
         {
             var check = Validate(draft.Config);
             if (!check.IsValid) return ApplyResult.Failed(string.Join("; ", check.Errors), check);
-            if (draft.BaseVersion != version)
+            if (activate && draft.BaseVersion != version)
+                return ApplyResult.Failed(L.Get("ConfigDraftStale"), check);
+            if (!activate && (configDirectory is null || draft.SourcePath is null))
                 return ApplyResult.Failed(L.Get("ConfigDraftStale"), check);
 
             string? temporary = null;
@@ -355,10 +361,6 @@ public sealed class ConfigStore
             bool switched = false;
             try
             {
-                var actualFingerprint = File.Exists(path) ? Fingerprint(path) : null;
-                if (actualFingerprint != diskFingerprint)
-                    return ApplyResult.Failed(L.Get("ConfigChangedOutside"), check);
-
                 if (draft.OriginPath is not null)
                 {
                     var origin = configDirectory is null ? Path.GetFullPath(draft.OriginPath) : RequireCatalogPath(draft.OriginPath);
@@ -374,6 +376,13 @@ public sealed class ConfigStore
                     if (destinationPath is null && draft.SourcePath is not null &&
                         (File.Exists(target) ? Fingerprint(target) : null) != draft.SourceFingerprint)
                         return ApplyResult.Failed(L.Get("ConfigChangedOutside"), check);
+                }
+                var updateRunningProfile = activate || SamePath(target, path);
+                if (updateRunningProfile)
+                {
+                    if ((File.Exists(path) ? Fingerprint(path) : null) != diskFingerprint)
+                        return ApplyResult.Failed(L.Get("ConfigChangedOutside"), check);
+                    if (preflight?.Invoke(draft.Config) is { } error) return ApplyResult.Failed(error, check);
                 }
                 savedTarget = target;
                 var directory = Path.GetDirectoryName(target)!;
@@ -402,7 +411,7 @@ public sealed class ConfigStore
                     temporary = null;
                 }
 
-                if (globalSettings is not null || (!SamePath(target, path) && selectionFile is not null))
+                if (activate && (globalSettings is not null || (!SamePath(target, path) && selectionFile is not null)))
                 {
                     if (globalSettings is not null)
                     {
@@ -420,11 +429,19 @@ public sealed class ConfigStore
                         finally { if (File.Exists(selectionTemp)) File.Delete(selectionTemp); }
                     }
                 }
-                path = target;
-                switched = true;
-                current = replacementConfig;
-                diskFingerprint = replacementFingerprint;
-                version++;
+                if (updateRunningProfile)
+                {
+                    path = target;
+                    switched = true;
+                    current = replacementConfig;
+                    diskFingerprint = replacementFingerprint;
+                    version++;
+                }
+                if (!activate)
+                {
+                    draft.SourceFingerprint = replacementFingerprint;
+                    draft.BaseVersion = version;
+                }
                 return new(true, null, check);
             }
             catch (Exception ex)

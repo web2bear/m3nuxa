@@ -61,6 +61,7 @@ public sealed partial class MainPage : Page
         DevLog.Write("editor", "MainPage constructor started");
         InitializeComponent();
         DetailsTabs.SelectedItem = DetailsSettingsItem;
+        InitializeSourcePane();
         dropAccent = DropIndicator.Background;
         dropIndicatorTimer = DispatcherQueue.CreateTimer();
         dropIndicatorTimer.Interval = TimeSpan.FromMilliseconds(40);
@@ -92,15 +93,23 @@ public sealed partial class MainPage : Page
         {
             if (allowClose) return;
             args.Cancel = true;
-            if (activeShortcut is not null) await activeShortcut.StopAsync();
-            if (!HasUnsavedChanges) { allowClose = true; App.MainWindow.Close(); return; }
-            var answer = await ConfirmAsync(L.Get("Editor_UnsavedChanges_70d744"), L.Get("Editor_ApplyChangesBeforeClosing_c969f8"), L.Get("Editor_Apply_768af6"), L.Get("Editor_Discard_941d9e"));
-            if (answer == ContentDialogResult.Primary && !await ApplyAsync()) return;
-            if (answer == ContentDialogResult.None) return;
-            allowClose = true;
-            App.MainWindow.Close();
+            await RunConfigurationActionAsync(async () =>
+            {
+                if (activeShortcut is not null) await activeShortcut.StopAsync();
+                if (!await ConfirmLeavingAsync(source: false, closing: true) ||
+                    !await ConfirmLeavingAsync(source: true, closing: true)) return;
+                await Task.WhenAll(client.SendAsync("discard"), sourceClient.SendAsync("discard"));
+                allowClose = true;
+                App.MainWindow.Close();
+            });
         };
-        ToolTipService.SetToolTip(DropHint, L.Get("Editor_FileExplorerAndTheEditor_36ca57"));
+        ToolTipService.SetToolTip(MenuTree, L.Get("Editor_FileExplorerAndTheEditor_36ca57"));
+    }
+
+    internal void AttachTitleBar(Window window)
+    {
+        window.ExtendsContentIntoTitleBar = true;
+        window.SetTitleBar(EditorTitleBar);
     }
 
     private void AddTreeAccelerator(Windows.System.VirtualKey key, Windows.System.VirtualKeyModifiers modifiers, RoutedEventHandler action)
@@ -110,12 +119,14 @@ public sealed partial class MainPage : Page
         MenuTree.KeyboardAccelerators.Add(accelerator);
     }
 
-    private void MenuTreeRightTapped(object sender, RightTappedRoutedEventArgs args)
+    private void MenuTreeRightTapped(object sender, RightTappedRoutedEventArgs args) => SelectRightTappedNode(MenuTree, args);
+
+    private static void SelectRightTappedNode(TreeView tree, RightTappedRoutedEventArgs args)
     {
         var element = args.OriginalSource as DependencyObject;
-        while (element is not null && element != MenuTree && element is not TreeViewItem)
+        while (element is not null && element != tree && element is not TreeViewItem)
             element = VisualTreeHelper.GetParent(element);
-        MenuTree.SelectedNode = element is TreeViewItem item ? MenuTree.NodeFromContainer(item) : null;
+        tree.SelectedNode = element is TreeViewItem item ? tree.NodeFromContainer(item) : null;
     }
 
     private void PinClicked(object sender, RoutedEventArgs args)
@@ -127,15 +138,13 @@ public sealed partial class MainPage : Page
         }
     }
 
-    private void SettingsClicked(object sender, RoutedEventArgs args) => ShowSettings();
-    private void MenuSectionClicked(object sender, RoutedEventArgs args) => ShowMenuSection();
-
     public void ShowSettings()
     {
+        ShowMenuSection();
         if (MenuTree.RootNodes.Count > 0) MenuTree.SelectedNode = MenuTree.RootNodes[0];
     }
 
-    private void ShowMenuSection() { }
+    private void ShowMenuSection() => WorkspaceTabs.SelectedItem = PropertiesTab;
 
     private void RenderSettings()
     {
@@ -163,8 +172,8 @@ public sealed partial class MainPage : Page
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(menuItem, "MenuAppearanceTab");
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(panelItem, "PanelAppearanceTab");
             navigation.MenuItems.Add(menuItem); navigation.MenuItems.Add(panelItem);
-            var menu = new StackPanel { Spacing = 12 };
-            var panel = new StackPanel { Spacing = 12 };
+            var menu = new StackPanel { Spacing = 8 };
+            var panel = new StackPanel { Spacing = 8 };
             PropertiesPanel.Children.Add(navigation);
             menu.Children.Add(CreateShortcutEditor("SettingsHotkey", L.Get("Editor_SettingsMenuShortcut"), "",
                 () => config.Settings.MainHotkey, value => config.Settings = config.Settings with { MainHotkey = value }, null, main: true));
@@ -203,7 +212,7 @@ public sealed partial class MainPage : Page
             var panelPreview = new StackPanel { Spacing = 6, Margin = new Thickness(0, 16, 0, 0) };
             Grid PreviewLayout(StackPanel fields, StackPanel preview)
             {
-                var layout = new Grid { Padding = new Thickness(16), ColumnSpacing = 20, RowSpacing = 8 };
+            var layout = new Grid { Padding = new Thickness(10), ColumnSpacing = 12, RowSpacing = 8 };
                 layout.ColumnDefinitions.Add(new ColumnDefinition());
                 layout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -335,7 +344,7 @@ public sealed partial class MainPage : Page
             HorizontalAlignment = HorizontalAlignment.Left, MinWidth = 220, Child = surface });
     }
 
-    private async void MainPageLoaded(object sender, RoutedEventArgs args) => await LoadCurrentAsync();
+    private async void MainPageLoaded(object sender, RoutedEventArgs args) => await RunConfigurationActionAsync(LoadCurrentAsync);
 
     private async Task LoadCurrentAsync()
     {
@@ -374,6 +383,7 @@ public sealed partial class MainPage : Page
         var title = L.Get("Editor_M3nuxaMenuEditor_652d6b");
         if (!string.IsNullOrWhiteSpace(sourcePath)) title += $" — {sourcePath}";
         App.MainWindow.Title = title;
+        EditorTitleBar.Title = title;
     }
 
     public void SelectMenuItem(string id)
@@ -396,6 +406,7 @@ public sealed partial class MainPage : Page
     }
     private void UpdateApplyState()
     {
+        ImportButton.IsEnabled = draftReady;
         ApplyButton.IsEnabled = dirty || pendingActivation;
         ToolTipService.SetToolTip(ApplyButton, dirty ? L.Get("Editor_ThereAreUnsavedChangesApply_226d2b") : pendingActivation
             ? T("Apply and activate this configuration", "Применить и активировать эту конфигурацию")
@@ -410,6 +421,14 @@ public sealed partial class MainPage : Page
 
     private void RefreshTree(string? selectId = null)
     {
+        rendering = true;
+        try { PopulateTree(MenuTree, config, selectId); }
+        finally { rendering = false; }
+        RenderProperties();
+    }
+
+    private void PopulateTree(TreeView tree, AppConfig profile, string? selectId)
+    {
         var expansion = new Dictionary<string, bool>();
         void Capture(IEnumerable<TreeViewNode> nodes)
         {
@@ -419,26 +438,23 @@ public sealed partial class MainPage : Page
                 Capture(node.Children);
             }
         }
-        Capture(MenuTree.RootNodes);
-        var rootExpanded = MenuTree.RootNodes.FirstOrDefault()?.IsExpanded ?? true;
-        rendering = true;
-        try
-        {
-            MenuTree.RootNodes.Clear();
-            var root = new TreeViewNode { Content = CreateConfigurationDisplay(config.Name), IsExpanded = rootExpanded };
-            foreach (var node in config.Items) root.Children.Add(BuildNode(node, expansion));
-            MenuTree.RootNodes.Add(root);
-            MenuTree.SelectedNode = FindTreeNode(root.Children, selectId) ?? root;
-        }
-        finally { rendering = false; }
-        RenderProperties();
+        Capture(tree.RootNodes);
+        var root = new TreeViewNode { Content = CreateConfigurationDisplay(profile.Name), IsExpanded = tree.RootNodes.FirstOrDefault()?.IsExpanded ?? true };
+        foreach (var node in profile.Items) root.Children.Add(BuildNode(node, expansion, tree == SourceTree));
+        tree.RootNodes.Clear();
+        tree.RootNodes.Add(root);
+        tree.SelectedNode = FindTreeNode(root.Children, selectId) ?? root;
     }
 
-    private TreeViewNode BuildNode(MenuNode model, IReadOnlyDictionary<string, bool> expansion)
+    private TreeViewNode BuildNode(MenuNode model, IReadOnlyDictionary<string, bool> expansion, bool source)
     {
         var display = new NodeDisplay(model);
+        display.CanDrag = source || WorkspaceTabs.SelectedItem == SourceTab;
+        display.Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+        display.DragStarting += (sender, args) => PaneDragStarting(sender, args, source);
+        display.DropCompleted += PaneDragCompleted;
         var node = new TreeViewNode { Content = display, IsExpanded = !expansion.TryGetValue(model.Id, out var expanded) || expanded };
-        foreach (var child in model.Children) node.Children.Add(BuildNode(child, expansion));
+        foreach (var child in model.Children) node.Children.Add(BuildNode(child, expansion, source));
         return node;
     }
 
@@ -586,7 +602,7 @@ public sealed partial class MainPage : Page
 
     private void WrapPropertiesSection(int start, string? title)
     {
-        var section = new StackPanel { Spacing = 10 };
+        var section = new StackPanel { Spacing = 6 };
         if (title is not null) section.Children.Add(new TextBlock { Text = title, FontSize = 16,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
         while (PropertiesPanel.Children.Count > start)
@@ -610,7 +626,7 @@ public sealed partial class MainPage : Page
         foreach (var step in items)
         {
             var name = StepDisplayName(item, list.Items.Count);
-            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             var handle = new FontIcon { Glyph = "\uE76F", FontSize = 14, Opacity = .65 };
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetAccessibilityView(handle, Microsoft.UI.Xaml.Automation.Peers.AccessibilityView.Raw);
             row.Children.Add(handle);
@@ -849,7 +865,7 @@ public sealed partial class MainPage : Page
         if (browse is not null)
         {
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            var browseButton = new Button { Content = "…", VerticalAlignment = VerticalAlignment.Bottom, Width = 36, Height = 32 };
+            var browseButton = new Button { Content = "…", VerticalAlignment = VerticalAlignment.Bottom, MinWidth = 32 };
             var browseLabel = browse == "folder" ? L.Get("Editor_ChooseFolder_14a658") : L.Get("Editor_ChooseFile_2e31da");
             ToolTipService.SetToolTip(browseButton, browseLabel);
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(browseButton, browseLabel + ": " + label);
@@ -878,7 +894,7 @@ public sealed partial class MainPage : Page
             Grid.SetColumn(browseButton, 1); row.Children.Add(browseButton);
         }
         if (!variables) { PropertiesPanel.Children.Add(row); if (required) PropertiesPanel.Children.Add(error); return; }
-        var picker = new Button { Content = new FontIcon { Glyph = "\uE8EF", FontSize = 14 }, VerticalAlignment = VerticalAlignment.Bottom, Width = 36, Height = 32, Padding = new Thickness(0) };
+        var picker = new Button { Content = new FontIcon { Glyph = "\uE8EF", FontSize = 14 }, VerticalAlignment = VerticalAlignment.Bottom, MinWidth = 32 };
         ToolTipService.SetToolTip(picker, L.Get("Editor_InsertContextVariable_65542b"));
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(picker, L.Get("Editor_InsertContextVariable_cdf409") + label);
         picker.Click += async (_, _) =>
@@ -1056,7 +1072,7 @@ public sealed partial class MainPage : Page
         }
         if (copiedNode is null) return;
         var clone = JsonSerializer.Deserialize<MenuNode>(copiedNode, JsonOptions)!;
-        AssignNewIds(clone);
+        EditorDraft.AssignNewIds(clone);
         clone.Name += L.Get("Editor_Copy_7d4e5c");
         var copyDestination = AddDestination();
         draftState.Insert(copyDestination, copyDestination.Count, [clone]); MarkDirty(); RefreshTree(clone.Id);
@@ -1082,12 +1098,6 @@ public sealed partial class MainPage : Page
         return null;
     }
 
-    private static void AssignNewIds(MenuNode node)
-    {
-        node.Id = Guid.NewGuid().ToString("N");
-        foreach (var child in node.Children) AssignNewIds(child);
-    }
-
     private List<MenuNode> AddDestination() => selected?.Kind == MenuNodeKind.Group ? selected.Children : SelectedSiblings();
     private int AddIndex(List<MenuNode> destination)
     {
@@ -1095,6 +1105,11 @@ public sealed partial class MainPage : Page
             return 0;
         var selectedIndex = selected is null ? -1 : destination.IndexOf(selected);
         return selectedIndex >= 0 ? selectedIndex + 1 : destination.Count;
+    }
+    private (List<MenuNode> Items, int Index) PrimaryInsertion()
+    {
+        var destination = AddDestination();
+        return (destination, AddIndex(destination));
     }
     private void Add(MenuNode node)
     { var destination = AddDestination(); draftState.Insert(destination, AddIndex(destination), [node]); MarkDirty(); RefreshTree(node.Id); }
@@ -1123,8 +1138,12 @@ public sealed partial class MainPage : Page
         catch (Exception ex) { ShowNotice(ex.Message, InfoBarSeverity.Error); }
     }
 
-    private async void ImportFolderClicked(object sender, RoutedEventArgs args)
+    private async void ImportFolderClicked(object sender, RoutedEventArgs args) =>
+        await RunConfigurationActionAsync(() => ImportFolderAsync(ReferenceEquals(sender, SourceImportButton)));
+
+    private async Task ImportFolderAsync(bool source)
     {
+        if (source ? sourcePath is null : !draftReady) return;
         var picker = new FolderPicker(); picker.FileTypeFilter.Add("*"); InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindow));
         Windows.Storage.StorageFolder? folder;
         try { folder = await picker.PickSingleFolderAsync(); }
@@ -1136,23 +1155,18 @@ public sealed partial class MainPage : Page
         choice.SelectedIndex = 0;
         var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = L.Get("Editor_ImportDesktop"), Content = choice, PrimaryButtonText = L.Get("Editor_PreviewDesktop"), CloseButtonText = L.Get("Editor_Cancel_0ec753") };
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
-        var destination = AddDestination(); var index = AddIndex(destination);
+        var (destination, index) = source ? SourceInsertion() : PrimaryInsertion();
         try
         {
             var errors = new List<string>();
             var root = new MenuNode { Name = folder.Name, Kind = MenuNodeKind.Group };
             var groupFolders = choice.SelectedIndex == 0;
             var limitMessage = L.Get("Editor_DesktopLimit");
-            IsEnabled = false;
-            try
+            await Task.Run(() =>
             {
-                await Task.Run(() =>
-                {
-                    var remaining = 500;
-                    ImportFolderDirectory(folder.Path, root.Children, groupFolders, errors, 0, ref remaining, limitMessage);
-                });
-            }
-            finally { IsEnabled = true; }
+                var remaining = 500;
+                ImportFolderDirectory(folder.Path, root.Children, groupFolders, errors, 0, ref remaining, limitMessage);
+            });
             if (!IsLoaded) return;
             var lines = new List<string>();
             void Describe(IEnumerable<MenuNode> nodes, int depth) { foreach (var node in nodes) { lines.Add(new string(' ', depth * 2) + node.Name); if (node.Kind == MenuNodeKind.Group) Describe(node.Children, depth + 1); } }
@@ -1162,7 +1176,9 @@ public sealed partial class MainPage : Page
             var confirm = new ContentDialog { XamlRoot = XamlRoot, Title = L.Get("Editor_PreviewDesktop"), Content = preview, PrimaryButtonText = L.Get("Editor_DesktopAdd"), CloseButtonText = L.Get("Editor_Cancel_0ec753"), IsPrimaryButtonEnabled = root.Children.Count > 0 };
             if (await confirm.ShowAsync() == ContentDialogResult.Primary)
             {
-                draftState.Insert(destination, index, [root]); MarkDirty(); RefreshTree(root.Id);
+                (source ? sourceDraft : draftState).Insert(destination, index, [root]);
+                if (source) RefreshSource(root.Id);
+                else { MarkDirty(); RefreshTree(root.Id); }
             }
         }
         catch (Exception ex) { ShowNotice(ex.Message, InfoBarSeverity.Error); }
@@ -1242,11 +1258,12 @@ public sealed partial class MainPage : Page
         return new(origin.X, origin.Y, element.ActualWidth, element.ActualHeight);
     }
 
-    private IEnumerable<MenuDropRow> MenuDropRows()
+    private IEnumerable<MenuDropRow> MenuDropRows(TreeView? tree = null)
     {
-        foreach (var node in VisibleNodes(MenuTree.RootNodes))
+        tree ??= MenuTree;
+        foreach (var node in VisibleNodes(tree.RootNodes))
         {
-            if (MenuTree.ContainerFromNode(node) is not TreeViewItem container) continue;
+            if (tree.ContainerFromNode(node) is not TreeViewItem container) continue;
             if (node.Content is not NodeDisplay display) continue;
             var model = display.Model;
             yield return new(model.Id, model.Kind == MenuNodeKind.Group, BoundsInWindow(container));
@@ -1256,9 +1273,10 @@ public sealed partial class MainPage : Page
     private MenuDropHit MenuHit(double x, double y) =>
         DropGeometry.Menu(x, y, BoundsInWindow(MenuTree), MenuDropRows());
 
-    private (List<MenuNode> Items, int Index)? RowDestination(MenuDropHit hit)
+    private (List<MenuNode> Items, int Index)? RowDestination(MenuDropHit hit, bool intoSource = false)
     {
-        if (hit.TargetId is not { } id || FindSiblings(config.Items, id) is not { } siblings) return null;
+        var items = intoSource ? sourceDraft.Config.Items : config.Items;
+        if (hit.TargetId is not { } id || FindSiblings(items, id) is not { } siblings) return null;
         var index = siblings.FindIndex(node => node.Id == id);
         var target = siblings[index];
         return hit.Zone == MenuDropZone.Into
@@ -1299,18 +1317,21 @@ public sealed partial class MainPage : Page
     {
         if (selected is null) return;
         var clone = JsonSerializer.Deserialize<MenuNode>(JsonSerializer.Serialize(selected, JsonOptions), JsonOptions)!;
-        AssignNewIds(clone); clone.Name += L.Get("Editor_Copy_7d4e5c"); var siblings = SelectedSiblings(); draftState.Insert(siblings, siblings.IndexOf(selected) + 1, [clone]); MarkDirty(); RefreshTree(clone.Id);
+        EditorDraft.AssignNewIds(clone); clone.Name += L.Get("Editor_Copy_7d4e5c"); var siblings = SelectedSiblings(); draftState.Insert(siblings, siblings.IndexOf(selected) + 1, [clone]); MarkDirty(); RefreshTree(clone.Id);
     }
     private void DeleteClicked(object sender, RoutedEventArgs args)
     { if (selected is null || !draftState.Delete(selected.Id)) return; MarkDirty(); RefreshTree(); }
     private void UndoClicked(object sender, RoutedEventArgs args)
-    { var id = selected?.Id; if (!draftState.Undo()) return; ShowConfigurationTitle(activeConfigurationPath); MarkDirty(); RefreshTree(id); if (SettingsPage.Visibility == Visibility.Visible) RenderSettings(); }
+        => RestorePaneHistory(source: false, redo: false);
     private void RedoClicked(object sender, RoutedEventArgs args)
-    { var id = selected?.Id; if (!draftState.Redo()) return; ShowConfigurationTitle(activeConfigurationPath); MarkDirty(); RefreshTree(id); if (SettingsPage.Visibility == Visibility.Visible) RenderSettings(); }
+        => RestorePaneHistory(source: false, redo: true);
 
-    private async void ApplyClicked(object sender, RoutedEventArgs args) => await ApplyAsync();
-    private async Task<bool> ApplyAsync(string? destinationPath = null)
+    private async void ApplyClicked(object sender, RoutedEventArgs args) =>
+        await RunConfigurationActionAsync(async () => { await ApplyAsync(); });
+
+    private async Task<bool> ApplyAsync()
     {
+        if (!await ConfirmSavingTransferOriginAsync(source: false)) return false;
         if (activeShortcut is not null) await activeShortcut.StopAsync();
         if (!draftReady && !await RestoreDraftAsync()) return false;
         var original = baseSnapshot is null ? null : JsonSerializer.Deserialize<AppConfig>(baseSnapshot, JsonOptions);
@@ -1336,16 +1357,16 @@ public sealed partial class MainPage : Page
             var copied = await client.SendAsync("saveAs", new JsonObject { ["name"] = config.Name });
             if (!copied.Success) { ShowNotice(copied.Message ?? T("Could not create a copy", "Не удалось создать копию"), InfoBarSeverity.Error); return false; }
             unsavedNewConfiguration = true;
-            draftConfigurationPath = null;
+            draftConfigurationPath = copied.Data?["configPath"]?.GetValue<string>();
         }
-        var response = destinationPath is null ? await client.ApplyAsync() : await client.SaveAsAsync(destinationPath);
+        var response = await client.ApplyAsync();
         ShowHotkeyAvailability(response);
         if (!response.Success) { ShowNotice(response.Message ?? L.Get("Editor_CouldNotApplyTheConfiguration_9f63ee"), InfoBarSeverity.Error); return false; }
+        draftState.SetBaseline();
         draftReady = false;
         var begin = await client.BeginAsync();
         var draft = EditorPipeClient.ReadDraft(begin);
         if (draft is not null) { UpdateConfigurationTitle(begin); draftState.Reset(draft.Config); draftReady = true; RefreshTree(selected?.Id); if (SettingsPage.Visibility == Visibility.Visible) RenderSettings(); }
-        else draftState.SetBaseline();
         pendingActivation = false;
         unsavedNewConfiguration = false;
         UpdateApplyState(); UpdateConfigurationSelector(); Notice.IsOpen = false;
@@ -1356,14 +1377,18 @@ public sealed partial class MainPage : Page
 
     private async Task<bool> RestoreDraftAsync()
     {
-        var response = await client.BeginAsync();
+        var response = unsavedNewConfiguration ? new EditorResponse(false, null, null) :
+            pendingActivation && draftConfigurationPath is { } path
+                ? await client.SendAsync("loadConfig", new JsonObject { ["path"] = path })
+                : await client.BeginAsync();
         var draft = EditorPipeClient.ReadDraft(response);
         if (draft is null)
         {
             ShowNotice(response.Message ?? L.Get("Editor_CouldNotOpenTheDraft_64ddf1"), InfoBarSeverity.Error);
             return false;
         }
-        if (JsonSerializer.Serialize(draft.Config, JsonOptions) != baseSnapshot)
+        if (!SameConfiguration(response.Data?["configPath"]?.GetValue<string>(), draftConfigurationPath) ||
+            JsonSerializer.Serialize(draft.Config, JsonOptions) != baseSnapshot)
         {
             ShowNotice(L.Get("Editor_TheActiveConfigurationChangedAfter_f05617"), InfoBarSeverity.Warning);
             return false;
@@ -1371,22 +1396,13 @@ public sealed partial class MainPage : Page
         draftReady = true;
         return true;
     }
-    private async Task<bool> ConfirmSwitchAsync()
-    {
-        if (!HasUnsavedChanges) return true;
-        var answer = await ConfirmAsync(T("Unsaved changes", "Несохранённые изменения"),
-            T("Apply changes before switching?", "Применить изменения перед переключением?"),
-            L.Get("Editor_Apply_768af6"), L.Get("Editor_Discard_941d9e"));
-        return answer == ContentDialogResult.Secondary || (answer == ContentDialogResult.Primary && await ApplyAsync());
-    }
-
     private void OpenDraft(EditorResponse response, string? path = null, bool isNew = false)
     {
         var draft = EditorPipeClient.ReadDraft(response);
         if (draft is null) { ShowNotice(response.Message ?? T("Could not open configuration", "Не удалось открыть конфигурацию"), InfoBarSeverity.Error); return; }
         draftState.Reset(draft.Config);
-        draftConfigurationPath = path;
-        ShowConfigurationTitle(path);
+        draftConfigurationPath = response.Data?["configPath"]?.GetValue<string>() ?? path;
+        ShowConfigurationTitle(isNew ? null : draftConfigurationPath);
         pendingActivation = true;
         unsavedNewConfiguration = isNew;
         draftReady = true;
@@ -1399,14 +1415,17 @@ public sealed partial class MainPage : Page
 
     private async void ConfigurationsFlyoutOpening(object sender, object args)
     {
-        ConfigurationsFlyout.Items.Clear();
+        if (sender is not MenuFlyout flyout) return;
+        var source = flyout == SourceFlyout;
+        flyout.Items.Clear();
         var loading = new MenuFlyoutItem { Text = T("Loading…", "Загрузка…"), IsEnabled = false };
-        ConfigurationsFlyout.Items.Add(loading);
+        flyout.Items.Add(loading);
         var response = await client.SendAsync("listConfigs");
-        ConfigurationsFlyout.Items.Clear();
+        if (!flyout.Items.Contains(loading)) return;
+        flyout.Items.Clear();
         if (!response.Success)
         {
-            ConfigurationsFlyout.Items.Add(new MenuFlyoutItem { Text = response.Message ?? "Error", IsEnabled = false });
+            flyout.Items.Add(new MenuFlyoutItem { Text = response.Message ?? "Error", IsEnabled = false });
             return;
         }
         if (response.Data?["configs"] is JsonArray entries) foreach (var entry in entries)
@@ -1417,25 +1436,32 @@ public sealed partial class MainPage : Page
             var error = entry["error"]?.GetValue<string>() ?? entry["Error"]?.GetValue<string>();
             var active = entry["isActive"]?.GetValue<bool>() ?? entry["IsActive"]?.GetValue<bool>() ?? false;
             var label = name + (active ? T(" (active)", " (активна)") : "");
+            var usedInOtherPane = SameConfiguration(path, source ? draftConfigurationPath : sourcePath);
+            if (usedInOtherPane) label += L.Get("Editor_UsedInOtherPane");
             var option = new ToggleMenuFlyoutItem { Text = error is null ? label : label + " — " + error,
-                IsChecked = string.Equals(path, draftConfigurationPath, StringComparison.OrdinalIgnoreCase), IsEnabled = error is null };
-            option.Click += async (_, _) =>
-            {
-                if (string.Equals(path, draftConfigurationPath, StringComparison.OrdinalIgnoreCase)) return;
-                if (!await ConfirmSwitchAsync()) return;
-                OpenDraft(await client.SendAsync("loadConfig", new JsonObject { ["path"] = path }), path);
-            };
-            ConfigurationsFlyout.Items.Add(option);
+                IsChecked = SameConfiguration(path, source ? sourcePath : draftConfigurationPath), IsEnabled = error is null && !usedInOtherPane };
+            option.Click += async (_, _) => await RunConfigurationActionAsync(() => SwitchConfigurationAsync(source, path));
+            flyout.Items.Add(option);
         }
-        ConfigurationsFlyout.Items.Add(new MenuFlyoutSeparator());
-        var create = new MenuFlyoutItem { Text = T("New configuration…", "Новая конфигурация…") };
-        create.Click += async (_, _) =>
+        flyout.Items.Add(new MenuFlyoutSeparator());
+        var createTitle = source ? L.Get("Editor_NewSourceConfiguration") : T("New configuration", "Новая конфигурация");
+        var create = new MenuFlyoutItem { Text = createTitle + "…" };
+        create.Click += async (_, _) => await RunConfigurationActionAsync(async () =>
         {
-            if (!await ConfirmSwitchAsync()) return;
-            var name = await AskConfigurationNameAsync(T("New configuration", "Новая конфигурация"));
-            if (name is not null) OpenDraft(await client.SendAsync("newConfig", new JsonObject { ["name"] = name }), isNew: true);
-        };
-        ConfigurationsFlyout.Items.Add(create);
+            if (!await ConfirmLeavingAsync(source)) return;
+            var name = await AskConfigurationNameAsync(createTitle);
+            if (name is null) return;
+            var response = await (source ? sourceClient : client).SendAsync("newConfig", new JsonObject { ["name"] = name });
+            if (source) OpenSourceDraft(response, isNew: true);
+            else OpenDraft(response, isNew: true);
+        });
+        flyout.Items.Add(create);
+        if (source && sourcePath is not null)
+        {
+            var clear = new MenuFlyoutItem { Text = L.Get("Editor_ClearSource") };
+            clear.Click += async (_, _) => await RunConfigurationActionAsync(() => SwitchConfigurationAsync(source: true, path: null));
+            flyout.Items.Add(clear);
+        }
     }
 
     private async Task<string?> AskConfigurationNameAsync(string title)
@@ -1446,30 +1472,39 @@ public sealed partial class MainPage : Page
         return await dialog.ShowAsync() == ContentDialogResult.Primary ? input.Text : null;
     }
 
-    private async void DeleteConfigurationClicked(object sender, RoutedEventArgs args)
+    private async void DeleteConfigurationClicked(object sender, RoutedEventArgs args) =>
+        await RunConfigurationActionAsync(DeleteConfigurationAsync);
+
+    private async Task DeleteConfigurationAsync()
     {
         if (!string.Equals(draftConfigurationPath, activeConfigurationPath, StringComparison.OrdinalIgnoreCase) || unsavedNewConfiguration) return;
         var requestedPath = activeConfigurationPath;
         if (await ConfirmAsync(T("Delete configuration", "Удалить конфигурацию"),
             T("Delete the active configuration?", "Удалить активную конфигурацию?"), L.Get("Editor_Delete_86ea33")) != ContentDialogResult.Primary) return;
-        if (!await ConfirmSwitchAsync()) return;
+        if (!await ConfirmLeavingAsync(source: false)) return;
         if (!string.Equals(requestedPath, activeConfigurationPath, StringComparison.OrdinalIgnoreCase))
         {
             ShowNotice(T("The active configuration changed; deletion was cancelled.", "Активная конфигурация изменилась; удаление отменено."), InfoBarSeverity.Warning);
             return;
         }
-        var response = await client.SendAsync("deleteActiveConfig", new JsonObject { ["version"] = activeConfigurationVersion });
+        var response = await client.SendAsync("deleteActiveConfig", new JsonObject
+        {
+            ["version"] = activeConfigurationVersion,
+            ["protectedReplacement"] = sourceDraft.IsDirty ? sourcePath : null
+        });
         var draft = EditorPipeClient.ReadDraft(response);
         if (draft is null) { ShowNotice(response.Message ?? T("Could not delete configuration", "Не удалось удалить конфигурацию"), InfoBarSeverity.Error); return; }
         UpdateConfigurationTitle(response);
+        if (sourcePath is not null && SameConfiguration(sourcePath, draftConfigurationPath)) ClearSource();
         draftState.Reset(draft.Config);
         pendingActivation = false; unsavedNewConfiguration = false; draftReady = true;
         RefreshTree(); UpdateApplyState(); UpdateConfigurationSelector();
     }
 
-    private async Task<ContentDialogResult> ConfirmAsync(string title, string message, string primary, string secondary = "")
+    private async Task<ContentDialogResult> ConfirmAsync(string title, string message, string primary, string secondary = "",
+        ContentDialogButton defaultButton = ContentDialogButton.Primary)
     {
-        var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = title, Content = message, PrimaryButtonText = primary, CloseButtonText = L.Get("Editor_Cancel_0ec753"), SecondaryButtonText = secondary, DefaultButton = ContentDialogButton.Primary };
+        var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = title, Content = message, PrimaryButtonText = primary, CloseButtonText = L.Get("Editor_Cancel_0ec753"), SecondaryButtonText = secondary, DefaultButton = defaultButton };
         return await dialog.ShowAsync();
     }
 
@@ -1494,10 +1529,26 @@ public sealed partial class MainPage : Page
 
     private MenuDropHit InternalMenuHit(double x, double y) => dragDropRows is { } rows
         ? DropGeometry.Menu(x, y, dragDropBounds, rows) : MenuHit(x, y);
-    internal bool InternalDragActive() => (dragSnapshot is not null && dragNodeId is not null) || (stepDragItem is not null && draggedStep is not null);
+    internal bool InternalDragActive() => paneDrag is not null ||
+        (dragSnapshot is not null && dragNodeId is not null) || (stepDragItem is not null && draggedStep is not null);
+
+    internal DataPackageOperation InternalDropOperation(double x, double y)
+    {
+        if (paneDrag is { } drag && (dragEscapeMonitor?.Cancelled == true || PaneDestination(drag, x, y) is null))
+            return DataPackageOperation.None;
+        return DataPackageOperation.Move;
+    }
+
     private void UpdateDropIndicator()
     {
-        DropIndicator.Visibility = Visibility.Collapsed;
+        ClearExternalDropIndicator();
+        if (paneDrag is { } drag)
+        {
+            if (dragEscapeMonitor?.Cancelled != true && EditorOleDropTarget.TryGetCursorPosition(App.MainWindow, out var paneX, out var paneY) &&
+                PaneDestination(drag, paneX, paneY) is { } destination)
+                ShowMenuDropIndicator(null, destination.Hit, destination.IntoSource);
+            return;
+        }
         if (stepDragItem is not null && draggedStep is not null &&
             EditorOleDropTarget.TryGetCursorPosition(App.MainWindow, out var stepX, out var stepY))
             UpdateStepDropIndicator(stepX, stepY);
@@ -1509,32 +1560,41 @@ public sealed partial class MainPage : Page
         ShowMenuDropIndicator(dragNodeId, InternalMenuHit(x, y));
     }
 
-    private (List<MenuNode> Items, int Index)? InternalDestination(MenuDropHit hit) =>
-        hit.Zone == MenuDropZone.Empty ? (config.Items, config.Items.Count) : RowDestination(hit);
+    private (List<MenuNode> Items, int Index)? InternalDestination(MenuDropHit hit, bool intoSource = false)
+    {
+        var items = intoSource ? sourceDraft.Config.Items : config.Items;
+        return hit.Zone == MenuDropZone.Empty ? (items, items.Count) : RowDestination(hit, intoSource);
+    }
 
     internal bool UpdateExternalDropIndicator(double x, double y)
     {
         ClearExternalDropIndicator();
+        if (configurationActionInProgress) return false;
         var hit = MenuHit(x, y);
         if (InternalDestination(hit) is null) return false;
         ShowMenuDropIndicator(null, hit);
         return true;
     }
 
-    internal void ClearExternalDropIndicator() => DropIndicator.Visibility = Visibility.Collapsed;
-
-    private void ShowMenuDropIndicator(string? sourceId, MenuDropHit hit)
+    internal void ClearExternalDropIndicator()
     {
-        if (InternalDestination(hit) is not { } destination || (sourceId is not null && !draftState.CanMove(sourceId, destination.Items))) return;
-        var overlay = BoundsInWindow(DropOverlay);
+        DropIndicator.Visibility = Visibility.Collapsed;
+        SourceDropIndicator.Visibility = Visibility.Collapsed;
+    }
+
+    private void ShowMenuDropIndicator(string? sourceId, MenuDropHit hit, bool intoSource = false)
+    {
+        if (InternalDestination(hit, intoSource) is not { } destination || (sourceId is not null && !draftState.CanMove(sourceId, destination.Items))) return;
+        var overlay = BoundsInWindow(intoSource ? SourceDropOverlay : DropOverlay);
+        var indicator = intoSource ? SourceDropIndicator : DropIndicator;
         var anchor = hit.MarkerAnchor;
         var inside = hit.Zone == MenuDropZone.Into;
-        DropIndicator.Background = inside ? null : dropAccent;
-        DropIndicator.BorderBrush = dropAccent;
-        DropIndicator.BorderThickness = new Thickness(inside ? 2 : 0);
-        DropIndicator.Width = Math.Max(0, anchor.Width - (inside ? 4 : 8));
-        DropIndicator.Height = inside ? Math.Max(0, anchor.Height - 4) : 3;
-        Canvas.SetLeft(DropIndicator, anchor.X - overlay.X + (inside ? 2 : 4));
+        indicator.Background = inside ? null : dropAccent;
+        indicator.BorderBrush = dropAccent;
+        indicator.BorderThickness = new Thickness(inside ? 2 : 0);
+        indicator.Width = Math.Max(0, anchor.Width - (inside ? 4 : 8));
+        indicator.Height = inside ? Math.Max(0, anchor.Height - 4) : 3;
+        Canvas.SetLeft(indicator, anchor.X - overlay.X + (inside ? 2 : 4));
         var top = hit.Zone switch
         {
             MenuDropZone.Into => anchor.Y + 2,
@@ -1542,12 +1602,23 @@ public sealed partial class MainPage : Page
             MenuDropZone.After => anchor.Bottom - 1,
             _ => anchor.Y
         };
-        Canvas.SetTop(DropIndicator, top - overlay.Y);
-        DropIndicator.Visibility = Visibility.Visible;
+        Canvas.SetTop(indicator, top - overlay.Y);
+        indicator.Visibility = Visibility.Visible;
     }
 
     internal bool CompleteInternalDrop(double x, double y)
     {
+        if (paneDrag is { } drag)
+        {
+            if (dragEscapeMonitor?.Cancelled == true || PaneDestination(drag, x, y) is not { } destination) return false;
+            paneDrag = null;
+            ClearExternalDropIndicator();
+            if (drag.FromSource != destination.IntoSource)
+                return MoveBetweenPanes(drag.Item, destination.Target, drag.FromSource);
+            if (!MoveToHit(drag.Item.Id, destination.Hit)) return false;
+            RefreshTree(drag.Item.Id);
+            return true;
+        }
         if (stepDragItem is { } item && draggedStep is { } step && stepList is { } list)
             return CompleteStepDrop(item, step, list, x, y);
         if (dragNodeId is not { } id) return false;
@@ -1557,6 +1628,18 @@ public sealed partial class MainPage : Page
         if (dragEscapeMonitor?.Cancelled == true || !MoveToHit(id, hit)) return false;
         RefreshTree(id);
         return true;
+    }
+
+    private (MenuDropHit Hit, bool IntoSource, (List<MenuNode> Items, int Index) Target)? PaneDestination(
+        (MenuNode Item, bool FromSource) drag, double x, double y)
+    {
+        if (configurationActionInProgress || !draftReady) return null;
+        if (!drag.FromSource && SourceTreeHit(x, y) is { Zone: not MenuDropZone.Outside } sourceHit &&
+            InternalDestination(sourceHit, intoSource: true) is { } sourceTarget)
+            return (sourceHit, true, sourceTarget);
+        var hit = MenuHit(x, y);
+        return InternalDestination(hit) is { } primaryTarget && (drag.FromSource || draftState.CanMove(drag.Item.Id, primaryTarget.Items))
+            ? (hit, false, primaryTarget) : null;
     }
 
     private bool MoveToHit(string id, MenuDropHit hit)
@@ -1610,7 +1693,7 @@ public sealed partial class MainPage : Page
 
     private void MenuTreeDragItemsCompleted(TreeView sender, TreeViewDragItemsCompletedEventArgs args)
     {
-        dropIndicatorTimer.Stop(); DropIndicator.Visibility = Visibility.Collapsed;
+        dropIndicatorTimer.Stop(); ClearExternalDropIndicator();
         sender.CanReorderItems = true;
         if (dragSnapshot is null) { dragDropRows = null; dragEscapeMonitor?.Dispose(); dragEscapeMonitor = null; return; }
         try
@@ -1648,10 +1731,12 @@ public sealed partial class MainPage : Page
     {
         if (InternalDragActive())
         {
-            args.AcceptedOperation = DataPackageOperation.Move;
+            var position = args.GetPosition(null);
+            args.AcceptedOperation = InternalDropOperation(position.X, position.Y);
             args.Handled = true;
             return;
         }
+        if (ReferenceEquals(sender, SourcePanel)) return;
         if (!dragOverLogged)
         {
             DevLog.Write("editor", $"External DragOver: storageItems={args.DataView.Contains(StandardDataFormats.StorageItems)}");
@@ -1666,15 +1751,18 @@ public sealed partial class MainPage : Page
     }
     private async void MenuTreeDrop(object sender, DragEventArgs args)
     {
+        if (configurationActionInProgress) { args.Handled = true; return; }
         ClearExternalDropIndicator();
         dragOverLogged = false;
         if (InternalDragActive())
         {
             var point = args.GetPosition(null);
             args.Handled = true;
-            CompleteInternalDrop(point.X, point.Y);
+            var operation = InternalDropOperation(point.X, point.Y);
+            args.AcceptedOperation = CompleteInternalDrop(point.X, point.Y) ? operation : DataPackageOperation.None;
             return;
         }
+        if (ReferenceEquals(sender, SourcePanel)) return;
         DevLog.Write("editor", $"External Drop: storageItems={args.DataView.Contains(StandardDataFormats.StorageItems)}");
         if (dragSnapshot is not null || (!args.DataView.Contains(StandardDataFormats.StorageItems) && !args.DataView.Contains(StandardDataFormats.Text))) return;
         var deferral = args.GetDeferral(); args.Handled = true;
@@ -1744,7 +1832,7 @@ public sealed partial class MainPage : Page
     private static Symbol SymbolFor(MenuNode item) => item.Kind == MenuNodeKind.Group ? Symbol.Folder : item.Action?.Kind == ActionKind.InsertText ? Symbol.Paste : Symbol.Document;
     private static StackPanel CreateConfigurationDisplay(string name)
     {
-        var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
+        var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(panel, name);
         panel.Children.Add(new SymbolIcon(Symbol.Setting) { Width = 20, Height = 20 });
         panel.Children.Add(new TextBlock { Text = name, VerticalAlignment = VerticalAlignment.Center, MaxWidth = 190, TextTrimming = TextTrimming.CharacterEllipsis });
@@ -1757,7 +1845,7 @@ public sealed partial class MainPage : Page
         private readonly TextBlock label;
         public NodeDisplay(MenuNode model)
         {
-            Model = model; Orientation = Orientation.Horizontal; Spacing = 10;
+            Model = model; Orientation = Orientation.Horizontal; Spacing = 8;
             Children.Add(CreateItemIcon(model, 20));
             label = new TextBlock { VerticalAlignment = VerticalAlignment.Center, MaxWidth = 190, TextTrimming = TextTrimming.CharacterEllipsis }; Children.Add(label); Update();
         }

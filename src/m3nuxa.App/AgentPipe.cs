@@ -163,7 +163,7 @@ internal sealed class AgentPipe : IDisposable
                 if (request["session"]?.GetValue<string>() is null || request["operation"]?.GetValue<string>() is null)
                     throw new ProtocolException("invalid_request", "Request must include session and operation.");
                 var data = Handle(request);
-                if (request["operation"]?.GetValue<string>() is "apply" or "reload")
+                if (request["operation"]?.GetValue<string>() is "apply" or "reload" or "saveProfile")
                 {
                     var succeeded = data["Success"]?.GetValue<bool>() == true;
                     if (!succeeded)
@@ -263,7 +263,7 @@ internal sealed class AgentPipe : IDisposable
     private JsonNode DeleteActiveConfiguration(string session, JsonObject args)
     {
         var expectedVersion = args["version"]?.GetValue<long>() ?? throw new ArgumentException("The version field is required.");
-        _store.DeleteActiveConfiguration(expectedVersion, _preflight);
+        _store.DeleteActiveConfiguration(expectedVersion, _preflight, args["protectedReplacement"]?.GetValue<string>());
         _applied();
         return BeginDraft(session);
     }
@@ -275,7 +275,7 @@ internal sealed class AgentPipe : IDisposable
             throw new ProtocolException("draft_limit", "Too many active drafts. Discard an unused draft first.");
         _drafts[session] = draft;
         _draftActivity[session] = DateTime.UtcNow;
-        return JsonSerializer.SerializeToNode(new { version = draft.BaseVersion, config = draft.Config }, JsonOptions)!;
+        return JsonSerializer.SerializeToNode(new { version = draft.BaseVersion, config = draft.Config, configPath = draft.SourcePath }, JsonOptions)!;
     }
 
     private JsonNode BeginDraft(string session)
@@ -314,6 +314,7 @@ internal sealed class AgentPipe : IDisposable
             "discard" => DiscardDraft(session),
             "validate" => ValidateDraft(draft),
             "apply" => ApplyDraft(session, draft),
+            "saveProfile" => SaveProfile(draft, args["primarySession"]?.GetValue<string>()),
             "saveAs" => SaveDraftAs(session, draft, args),
             "create" => CreateMenuItem(draft.Config.Items, args),
             "update" => UpdateMenuItem(draft.Config.Items, args),
@@ -342,6 +343,27 @@ internal sealed class AgentPipe : IDisposable
         JsonSerializer.SerializeToNode(_store.Validate(draft.Config), JsonOptions)!;
 
     private JsonNode ApplyDraft(string session, ConfigDraft draft) => SaveDraft(session, draft, null);
+
+    private JsonNode SaveProfile(ConfigDraft draft, string? primarySession)
+    {
+        var previousVersion = _store.Version;
+        var result = _store.SaveProfile(draft, _preflight);
+        var response = JsonSerializer.SerializeToNode(result, JsonOptions)!;
+        if (!result.Success) return response;
+
+        var version = _store.Version;
+        if (version != previousVersion)
+        {
+            if (primarySession is not null &&
+                _drafts.TryGetValue(primarySession, out var primary) && primary.BaseVersion == previousVersion &&
+                !string.Equals(primary.SourcePath, draft.SourcePath, StringComparison.OrdinalIgnoreCase))
+                primary.BaseVersion = version;
+            _applied();
+        }
+        response["previousVersion"] = previousVersion;
+        response["activeVersion"] = version;
+        return response;
+    }
 
     private JsonNode SaveDraftAs(string session, ConfigDraft draft, JsonObject args)
     {

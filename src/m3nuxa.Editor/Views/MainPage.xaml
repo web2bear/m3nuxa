@@ -57,62 +57,66 @@
                 <Setter Property="BorderBrush" Value="{ThemeResource SectionStrokeBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
                 <Setter Property="CornerRadius" Value="10" />
-                <Setter Property="Padding" Value="18,16" />
-                <Setter Property="Margin" Value="0,2,0,4" />
+                <Setter Property="Padding" Value="12,10" />
             </Style>
             <Style x:Key="WorkflowStepStyle" TargetType="ListViewItem" BasedOn="{StaticResource DefaultListViewItemStyle}">
                 <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorSecondaryBrush}" />
                 <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
                 <Setter Property="CornerRadius" Value="4" />
-                <Setter Property="Margin" Value="0,0,0,5" />
-                <Setter Property="Padding" Value="12,8" />
+                <Setter Property="Margin" Value="0,0,0,4" />
+                <Setter Property="Padding" Value="8,4" />
             </Style>
+            <DataTemplate x:Key="MenuTreeItemTemplate">
+                <TreeViewItem Content="{Binding Content}" MinHeight="26" Padding="0,2" />
+            </DataTemplate>
+            <DataTemplate x:Key="ImportLabel">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <SymbolIcon Symbol="Import" />
+                    <TextBlock Text="{Binding}" />
+                </StackPanel>
+            </DataTemplate>
+            <DataTemplate x:Key="SaveLabel">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="{Binding}" />
+                    <SymbolIcon Symbol="Save" />
+                </StackPanel>
+            </DataTemplate>
         </ResourceDictionary>
     </Page.Resources>
     <Grid Background="{ThemeResource EditorBackgroundBrush}" RowDefinitions="Auto,*,Auto">
-        <Border Grid.Row="0" Margin="16,8,16,10" Padding="6,2" HorizontalAlignment="Stretch" Background="{ThemeResource ToolbarSurfaceBrush}" BorderBrush="{ThemeResource WorkspaceStrokeBrush}" BorderThickness="1" CornerRadius="10">
-        <CommandBar x:Name="MainCommandBar" HorizontalAlignment="Left" Background="Transparent" DefaultLabelPosition="Right" IsDynamicOverflowEnabled="True">
-            <AppBarButton x:Name="ApplyButton" MinWidth="40" Label="{x:Bind Localize('Editor_Apply_768af6')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_Apply_768af6')}" Click="ApplyClicked" IsEnabled="False">
-                <AppBarButton.Icon><SymbolIcon Symbol="Save" Foreground="{ThemeResource ToolbarGreenBrush}" /></AppBarButton.Icon>
-            </AppBarButton>
-            <AppBarSeparator />
-            <AppBarButton AutomationProperties.AutomationId="ImportFolder" MinWidth="40" Label="{x:Bind Localize('Editor_ImportDesktop')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_ImportDesktop')}" Click="ImportFolderClicked">
-                <AppBarButton.Icon><SymbolIcon Symbol="Import" Foreground="{ThemeResource ToolbarGreenBrush}" /></AppBarButton.Icon>
-            </AppBarButton>
-            <AppBarSeparator />
-            <AppBarToggleButton x:Name="PinButton" MinWidth="40" Label="{x:Bind Localize('Editor_AlwaysOnTop_1bee89')}" AutomationProperties.Name="{x:Bind Localize('Editor_KeepTheEditorOnTop_3e7cbb')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_KeepTheEditorAboveOther_eb06b1')}" Click="PinClicked">
-                <AppBarToggleButton.Icon><SymbolIcon Symbol="Pin" /></AppBarToggleButton.Icon>
-            </AppBarToggleButton>
-            <AppBarButton x:Name="OpenSettingsButton" Visibility="Collapsed" AutomationProperties.AutomationId="OpenSettings" MinWidth="40" Label="{x:Bind Localize('Editor_Settings_7f17c7')}" ToolTipService.ToolTip="{x:Bind Localize('Editor_Settings_7f17c7')}" Click="SettingsClicked">
-                <AppBarButton.Icon><SymbolIcon Symbol="Setting" Foreground="{ThemeResource ToolbarGrayBrush}" /></AppBarButton.Icon>
-            </AppBarButton>
-            <AppBarButton x:Name="OpenMenuButton" AutomationProperties.AutomationId="OpenMenu" MinWidth="40" Label="{x:Bind Localize('Editor_MenuSection')}" Click="MenuSectionClicked" Visibility="Collapsed">
-                <AppBarButton.Icon><SymbolIcon Symbol="Back" /></AppBarButton.Icon>
-            </AppBarButton>
-        </CommandBar>
-        </Border>
+        <TitleBar x:Name="EditorTitleBar" Title="{x:Bind Localize('Editor_M3nuxaMenuEditor_652d6b')}" Margin="0,0,0,4">
+            <TitleBar.IconSource><ImageIconSource ImageSource="ms-appx:///Assets/EditorIcon.ico" /></TitleBar.IconSource>
+            <TitleBar.RightHeader>
+                <ToggleButton x:Name="PinButton" AutomationProperties.AutomationId="PinButton"
+                              AutomationProperties.Name="{x:Bind Localize('Editor_KeepTheEditorOnTop_3e7cbb')}"
+                              ToolTipService.ToolTip="{x:Bind Localize('Editor_KeepTheEditorAboveOther_eb06b1')}"
+                              Background="Transparent" BorderThickness="0" Click="PinClicked">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <SymbolIcon Symbol="Pin" />
+                        <TextBlock Text="{x:Bind Localize('Editor_AlwaysOnTop_1bee89')}" />
+                    </StackPanel>
+                </ToggleButton>
+            </TitleBar.RightHeader>
+        </TitleBar>
 
-        <Grid x:Name="WorkspaceGrid" Grid.Row="1" Padding="8,0,16,0" ColumnSpacing="8">
+        <Grid x:Name="WorkspaceGrid" Grid.Row="1" Padding="12,0,12,8" ColumnSpacing="8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="0" />
                 <ColumnDefinition Width="320" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
             <Grid x:Name="MenuPanel" Grid.Column="1" RowDefinitions="Auto,*,Auto" AllowDrop="True" Background="{ThemeResource WorkspacePanelBrush}" BorderBrush="{ThemeResource WorkspaceStrokeBrush}" BorderThickness="1" CornerRadius="12">
-                <Grid Padding="12,10,12,6">
-                    <DropDownButton x:Name="ConfigurationSelector" AutomationProperties.AutomationId="ConfigurationSelector" HorizontalAlignment="Stretch" AutomationProperties.Name="Configurations">
+                <Grid Padding="8,6,8,4">
+                    <DropDownButton x:Name="ConfigurationSelector" AutomationProperties.AutomationId="ConfigurationSelector" HorizontalAlignment="Stretch"
+                                    AutomationProperties.Name="{x:Bind Localize('Editor_PrimaryConfiguration')}">
                         <DropDownButton.Flyout><MenuFlyout x:Name="ConfigurationsFlyout" Opening="ConfigurationsFlyoutOpening" /></DropDownButton.Flyout>
                     </DropDownButton>
                 </Grid>
-                <TreeView x:Name="MenuTree" Grid.Row="1" Margin="8,2,8,4" SelectionMode="Single"
+                <TreeView x:Name="MenuTree" Grid.Row="1" Margin="6,0,6,2" SelectionMode="Single"
                           CanDragItems="True" CanReorderItems="True" SelectionChanged="MenuTreeSelectionChanged"
+                          ItemTemplate="{StaticResource MenuTreeItemTemplate}"
                           DragItemsStarting="MenuTreeDragItemsStarting" DragItemsCompleted="MenuTreeDragItemsCompleted" AllowDrop="True">
-                    <TreeView.ItemTemplate>
-                        <DataTemplate>
-                            <TreeViewItem Content="{Binding Content}" MinHeight="30" Padding="0,2" />
-                        </DataTemplate>
-                    </TreeView.ItemTemplate>
                     <TreeView.ContextFlyout>
                         <MenuFlyout>
                             <MenuFlyoutSubItem Text="{x:Bind Localize('Workflow_Add')}">
@@ -138,20 +142,28 @@
                 <Canvas x:Name="DropOverlay" Grid.Row="1" IsHitTestVisible="False" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                     <Border x:Name="DropIndicator" Visibility="Collapsed" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="2" />
                 </Canvas>
-                <TextBlock Grid.Row="2" x:Name="DropHint" Margin="12,6,12,10" Text="{x:Bind Localize('Editor_DragFilesFoldersOrText_2e21d1')}" FontSize="12" Opacity="0.6" TextWrapping="Wrap" />
+                <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="8,4,8,6" Spacing="6">
+                    <Button x:Name="ImportButton" AutomationProperties.AutomationId="ImportFolder" MinWidth="106"
+                            Content="{x:Bind Localize('Editor_Import')}" ContentTemplate="{StaticResource ImportLabel}"
+                            ToolTipService.ToolTip="{x:Bind Localize('Editor_ImportDesktop')}" Click="ImportFolderClicked" />
+                    <Button x:Name="ApplyButton" AutomationProperties.AutomationId="ApplyButton" MinWidth="106"
+                            Content="{x:Bind Localize('Editor_Apply_768af6')}" ContentTemplate="{StaticResource SaveLabel}"
+                            Click="ApplyClicked" IsEnabled="False" />
+                </StackPanel>
             </Grid>
-            <Grid x:Name="DetailsPanel" Grid.Column="2" RowDefinitions="Auto,*" Background="{ThemeResource WorkspacePanelBrush}" BorderBrush="{ThemeResource WorkspaceStrokeBrush}" BorderThickness="1" CornerRadius="12">
-                <Grid Padding="14,10,14,8" ColumnDefinitions="Auto,*" ColumnSpacing="10">
+            <Grid Grid.Column="2" ColumnDefinitions="*,44">
+            <Grid x:Name="DetailsPanel" RowDefinitions="Auto,*" Background="{ThemeResource WorkspacePanelBrush}" BorderBrush="{ThemeResource WorkspaceStrokeBrush}" BorderThickness="1" CornerRadius="12">
+                <Grid Padding="10,6,10,4" ColumnDefinitions="Auto,*" ColumnSpacing="8">
                     <Button x:Name="PropertiesIcon" VerticalAlignment="Center" Click="PropertiesIconClicked" AutomationProperties.Name="{x:Bind Localize('Icon_ChooseBundled')}" />
-                    <SymbolIcon x:Name="ConfigurationPropertiesIcon" Symbol="Setting" Width="24" Height="24" Margin="12,8" VerticalAlignment="Center" Visibility="Collapsed" />
+                    <SymbolIcon x:Name="ConfigurationPropertiesIcon" Symbol="Setting" Width="24" Height="24" Margin="8,4" VerticalAlignment="Center" Visibility="Collapsed" />
                     <StackPanel Grid.Column="1" VerticalAlignment="Stretch" Spacing="0">
-                        <TextBlock x:Name="PropertiesHint" Text="{x:Bind Localize('Editor_SelectAnItemOnThe_2c92bb')}" FontSize="18" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Name="PropertiesHint" Text="{x:Bind Localize('Editor_SelectAnItemOnThe_2c92bb')}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                         <TextBlock x:Name="PropertiesType" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
                 </Grid>
                 <ScrollViewer Grid.Row="1" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
                     <StackPanel>
-                        <NavigationView x:Name="DetailsTabs" Margin="14,0,14,4" PaneDisplayMode="Top"
+                        <NavigationView x:Name="DetailsTabs" Margin="10,0,10,4" PaneDisplayMode="Top"
                                         IsBackButtonVisible="Collapsed" IsSettingsVisible="False" IsPaneToggleButtonVisible="False"
                                         SelectionFollowsFocus="Enabled" SelectionChanged="DetailsTabsSelectionChanged" Visibility="Collapsed">
                             <NavigationView.MenuItems>
@@ -159,14 +171,57 @@
                                 <NavigationViewItem x:Name="DetailsStepsItem" Content="{x:Bind Localize('Workflow_Steps')}" Icon="List" />
                             </NavigationView.MenuItems>
                         </NavigationView>
-                        <StackPanel x:Name="PropertiesPanel" Padding="14,2,14,14" Spacing="12" HorizontalAlignment="Stretch" />
+                        <StackPanel x:Name="PropertiesPanel" Padding="10,2,10,10" Spacing="8" HorizontalAlignment="Stretch" />
                     </StackPanel>
                 </ScrollViewer>
             </Grid>
+            <Grid x:Name="SourcePage" Visibility="Collapsed" ColumnDefinitions="320,*">
+                <Grid x:Name="SourcePanel" RowDefinitions="Auto,*,Auto" AllowDrop="True" Background="{ThemeResource WorkspacePanelBrush}"
+                      BorderBrush="{ThemeResource WorkspaceStrokeBrush}" BorderThickness="1" CornerRadius="12">
+                    <Grid Padding="8,6,8,4">
+                        <DropDownButton x:Name="SourceSelector" AutomationProperties.AutomationId="SourceSelector" HorizontalAlignment="Stretch"
+                                        AutomationProperties.Name="{x:Bind Localize('Editor_SecondConfiguration')}" Content="{x:Bind Localize('Editor_SelectSource')}">
+                            <DropDownButton.Flyout><MenuFlyout x:Name="SourceFlyout" Opening="ConfigurationsFlyoutOpening" /></DropDownButton.Flyout>
+                        </DropDownButton>
+                    </Grid>
+                    <TreeView x:Name="SourceTree" Grid.Row="1" Margin="6,0,6,2" SelectionMode="Single"
+                              AutomationProperties.AutomationId="SourceTree" AutomationProperties.Name="{x:Bind Localize('Editor_SecondConfiguration')}"
+                              ItemTemplate="{StaticResource MenuTreeItemTemplate}" CanDragItems="False" CanReorderItems="False">
+                        <TreeView.ContextFlyout>
+                            <MenuFlyout>
+                                <MenuFlyoutItem x:Name="CopySourceItem" Text="{x:Bind Localize('Editor_CopyToPrimary')}" Click="CopySourceClicked" />
+                            </MenuFlyout>
+                        </TreeView.ContextFlyout>
+                    </TreeView>
+                    <Canvas x:Name="SourceDropOverlay" Grid.Row="1" IsHitTestVisible="False" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                        <Border x:Name="SourceDropIndicator" Visibility="Collapsed" CornerRadius="2" />
+                    </Canvas>
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="8,4,8,6" Spacing="6">
+                        <Button x:Name="SourceImportButton" AutomationProperties.AutomationId="SourceImportFolder" MinWidth="106"
+                                Content="{x:Bind Localize('Editor_Import')}" ContentTemplate="{StaticResource ImportLabel}"
+                                ToolTipService.ToolTip="{x:Bind Localize('Editor_ImportDesktop')}" Click="ImportFolderClicked" IsEnabled="False" />
+                        <Button x:Name="SourceSaveButton" AutomationProperties.AutomationId="SourceSaveButton" MinWidth="106"
+                                Content="{x:Bind Localize('Editor_Apply_768af6')}" ContentTemplate="{StaticResource SaveLabel}"
+                                Click="SourceSaveClicked" IsEnabled="False" />
+                    </StackPanel>
+                </Grid>
+                <TextBlock Grid.Column="1" Margin="10,10,8,0" VerticalAlignment="Top" TextWrapping="Wrap"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind Localize('Editor_SourceExplanation')}" />
+            </Grid>
+            <Canvas Grid.Column="1" Margin="0,8,0,0">
+                <SelectorBar x:Name="WorkspaceTabs" Canvas.Left="44" SelectionChanged="WorkspaceTabsChanged">
+                    <SelectorBar.RenderTransform><RotateTransform Angle="90" /></SelectorBar.RenderTransform>
+                    <SelectorBarItem x:Name="PropertiesTab" AutomationProperties.AutomationId="PropertiesTab"
+                                     Text="{x:Bind Localize('Editor_PropertiesTab')}" />
+                    <SelectorBarItem x:Name="SourceTab" AutomationProperties.AutomationId="SourceTab"
+                                     Text="{x:Bind Localize('Editor_SecondConfiguration')}" />
+                </SelectorBar>
+            </Canvas>
+            </Grid>
         </Grid>
-        <ScrollViewer x:Name="SettingsPage" Grid.Row="1" Margin="16,0,16,0" Visibility="Collapsed" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-            <StackPanel x:Name="SettingsContents" Padding="22,16" Spacing="16" MaxWidth="680" HorizontalAlignment="Left" />
+        <ScrollViewer x:Name="SettingsPage" Grid.Row="1" Margin="12,0,12,0" Visibility="Collapsed" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="SettingsContents" Padding="14,10" Spacing="10" MaxWidth="680" HorizontalAlignment="Left" />
         </ScrollViewer>
-        <InfoBar x:Name="Notice" Grid.Row="2" IsOpen="False" IsClosable="True" Margin="20,12" Severity="Informational" />
+        <InfoBar x:Name="Notice" Grid.Row="2" IsOpen="False" IsClosable="True" Margin="12,6" Severity="Informational" />
     </Grid>
 </Page>

@@ -1,6 +1,6 @@
 ---
 name: winui-setup
-description: "Install and verify WinUI 3 prerequisites — .NET SDK 8.0.100+, WinApp CLI 0.7+, and Developer Mode; identify additional Native AOT and Windows Sandbox requirements. Use when the user asks to set up or repair the toolchain, or when another WinUI skill finds a missing or outdated prerequisite."
+description: "Install and verify WinUI 3 prerequisites — .NET SDK 8.0.100+, WinApp CLI 0.7+, and Developer Mode; identify additional Native AOT requirements. Use when the user asks to set up or repair the toolchain, or when another WinUI skill finds a missing or outdated prerequisite."
 ---
 
 ### Purpose
@@ -8,7 +8,7 @@ description: "Install and verify WinUI 3 prerequisites — .NET SDK 8.0.100+, Wi
 Install and verify the prerequisites every other `winui-*` skill assumes. WinApp CLI 0.7 owns WinUI template discovery and installation through `winapp new`; **do not install the template pack separately**. The project's target framework may require a newer .NET SDK than the CLI's minimum.
 
 > [!IMPORTANT]
-> Install per-user prerequisites (WinApp CLI) without asking, and tell the user what changed. **Ask before anything that needs admin rights (UAC) or a large toolchain** — the .NET SDK, Developer Mode, and Native AOT build tools. Windows Sandbox enablement is the user's to do.
+> Install per-user prerequisites (WinApp CLI) without asking, and tell the user what changed. **Ask before anything that needs admin rights (UAC) or a large toolchain** — the .NET SDK, Developer Mode, and Native AOT build tools.
 
 This skill is idempotent: detect everything first, install or upgrade only what is needed, and print one final summary.
 
@@ -128,19 +128,8 @@ If the user declines or dismisses UAC, continue to the summary and print the com
 | Workflow | Additional requirements |
 |---|---|
 | Native AOT publish/run | Windows native compiler/linker toolchain: Visual Studio or Build Tools with **Desktop development with C++**, including the target architecture's tools and Windows SDK. See [Native AOT prerequisites](https://learn.microsoft.com/dotnet/core/deploying/native-aot/). These are not required for normal JIT iteration. |
-| Windows Sandbox app runs and UI automation (preferred when available) | WinApp's integration requires Windows 11 24H2+, hardware virtualization, and a working Windows Sandbox feature/client. Supported editions include **Pro, Enterprise, and Education; not Home**. Input/capture needs an unlocked host and a connected, non-minimized client. See [WinApp Sandbox prerequisites](https://github.com/microsoft/winappCli/blob/main/docs/sandbox-execution.md#prerequisites). |
 
-Report these separately from the base toolchain. `winapp target snapshot sandbox --json` inspects an existing
-guest without starting or repairing it; "no target running" alone does not
-mean the Windows feature is unavailable. `winui-ui-testing`
-Step 1 defines what to do when Windows Sandbox is unavailable.
-
-Enabling Windows Sandbox is a **user action** (admin plus a reboot): ask the user
-to open **Turn Windows features on or off**, select **Windows Sandbox**, and
-restart if prompted. Hardware virtualization must be enabled; a VM may also
-require nested virtualization. See Microsoft's
-[supported editions](https://learn.microsoft.com/windows/security/application-security/application-isolation/windows-sandbox/)
-and [installation steps](https://learn.microsoft.com/windows/security/application-security/application-isolation/windows-sandbox/windows-sandbox-install).
+Report additional requirements separately from the base toolchain. For UI testing, use the current interactive Windows session in the Hyper-V VM; remote input and screenshots require that session to be available and unlocked.
 
 ### Final summary
 
