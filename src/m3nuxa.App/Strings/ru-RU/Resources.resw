@@ -198,6 +198,7 @@
   <data name="ConfigDraftOverwrite" xml:space="preserve">
     <value>Черновик нельзя записать поверх действующей конфигурации.</value>
   </data>
+  <data name="ConfigUnsavedSourceReplacement" xml:space="preserve"><value>Источник стал бы основной конфигурацией. Перед удалением сохраните или отбросьте изменения в конфигурации 2.</value></data>
   <data name="ConfigDraftStale" xml:space="preserve">
     <value>Черновик устарел. Сохраните его отдельно или загрузите актуальную конфигурацию.</value>
   </data>
@@ -341,4 +342,10 @@
   <data name="DefaultShowDesktop" xml:space="preserve"><value>Показать рабочий стол</value></data>
   <data name="DefaultNextDesktop" xml:space="preserve"><value>Следующий рабочий стол</value></data>
   <data name="DefaultSnapRight" xml:space="preserve"><value>Окно справа</value></data>
+  <data name="WorkflowKindActivateWindow" xml:space="preserve"><value>Активировать окно</value></data>
+  <data name="WindowNotFound" xml:space="preserve"><value>Окно не найдено за отведённое время.</value></data>
+  <data name="WindowMultiple" xml:space="preserve"><value>Найдено несколько окон. Укажите часть заголовка.</value></data>
+  <data name="WindowFocusFailed" xml:space="preserve"><value>Не удалось активировать выбранное окно.</value></data>
+  <data name="WindowElevated" xml:space="preserve"><value>Выбранное окно работает с повышенными правами. Ввод не отправлен.</value></data>
+  <data name="WindowIntegrityUnknown" xml:space="preserve"><value>Не удалось проверить права выбранного окна. Ввод не отправлен.</value></data>
 </root>

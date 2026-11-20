@@ -28,6 +28,7 @@ public partial class App : Application
             var page = new Views.MainPage();
             page.DisableConfigurationLoadForChecks();
             MainWindow.Content = page;
+            page.AttachTitleBar(MainWindow);
             MainWindow.Activate();
             await Task.Delay(100);
             if (Environment.GetEnvironmentVariable("m3nuxa_TREE_DROP_CHECK") is not null)
@@ -51,13 +52,15 @@ public partial class App : Application
             page.CheckNewDraftRequiresConfirmation();
             if (Environment.GetEnvironmentVariable("m3nuxa_DROP_CHECK") is { } snapshotPath)
             {
-                page.SetupDropChecks();
+                if (Environment.GetEnvironmentVariable("m3nuxa_SOURCE_DROP_CHECK") is not null) page.SetupSourcePaneChecks();
+                else page.SetupDropChecks();
                 var log = Environment.GetEnvironmentVariable("m3nuxa_OLE_PROBE") ?? "";
-                IDisposable hook = new EditorOleDropTarget(MainWindow, page.AddDroppedPaths, page.AddProbeText, log, page.InternalDragActive, page.CompleteInternalDrop, page.UpdateExternalDropIndicator, page.ClearExternalDropIndicator);
+                IDisposable hook = new EditorOleDropTarget(MainWindow, page.AddDroppedPaths, page.AddProbeText, log, page.InternalDragActive, page.CompleteInternalDrop, page.UpdateExternalDropIndicator, page.ClearExternalDropIndicator, page.InternalDropOperation);
                 using (hook)
                 while (true)
                 {
-                    await File.WriteAllTextAsync(snapshotPath, page.DropCheckSnapshot());
+                    try { await File.WriteAllTextAsync(snapshotPath, page.DropCheckSnapshot()); }
+                    catch (IOException ex) when ((ex.HResult & 0xffff) == 32) { }
                     await Task.Delay(200);
                 }
             }
@@ -76,6 +79,7 @@ public partial class App : Application
             }
             finally { Directory.Delete(pickerRoot, true); }
             await page.CheckPropertyPanelLayoutAsync();
+            await page.CheckSourcePaneAsync();
             await page.CheckContextVariablesAsync();
             await page.CheckIconSelectionAsync();
             await page.CheckWorkflowStepsAsync();

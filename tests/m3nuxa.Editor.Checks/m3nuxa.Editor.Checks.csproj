@@ -26,6 +26,7 @@
     <ApplicationDefinition Include="../../src/m3nuxa.Editor/App.xaml" Link="App.xaml" />
     <Page Include="../../src/m3nuxa.Editor/Views/MainPage.xaml" Link="Views/MainPage.xaml" />
     <Compile Include="../../src/m3nuxa.Editor/Views/MainPage.xaml.cs" Link="Views/MainPage.xaml.cs" />
+    <Compile Include="../../src/m3nuxa.Editor/Views/MainPage.Source.cs" Link="Views/MainPage.Source.cs" />
     <Compile Include="../../src/m3nuxa.Editor/EditorOleDropTarget.cs" Link="EditorOleDropTarget.cs" />
     <Compile Include="../../src/m3nuxa.Editor/ExplorerFileDropHook.cs" Link="ExplorerFileDropHook.cs" />
     <Compile Include="../../src/m3nuxa.Editor/Imports.cs" Link="Imports.cs" />
@@ -40,6 +41,7 @@
     <Compile Include="../../src/m3nuxa.App/Configuration/HotkeyParser.cs" Link="Configuration/HotkeyParser.cs" />
     <Compile Include="../../src/m3nuxa.Editor/IconSelectionDialog.cs" Link="IconSelectionDialog.cs" />
     <Content Include="../../assets/icon-packs/Boxicons/**/*.png" Link="icon-packs/Boxicons/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../src/m3nuxa.Editor/Assets/EditorIcon.ico" Link="Assets/EditorIcon.ico" CopyToOutputDirectory="PreserveNewest" />
     <Compile Include="../../src/m3nuxa.Editor/IconFilePicker.cs" Link="IconFilePicker.cs" />
     <Compile Include="../../src/m3nuxa.App/Configuration/ConfigModels.cs" Link="Configuration/ConfigModels.cs" />
     <Compile Include="../../src/m3nuxa.App/DevLog.cs" Link="DevLog.cs" />

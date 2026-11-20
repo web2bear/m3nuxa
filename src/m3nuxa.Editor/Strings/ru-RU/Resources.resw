@@ -43,6 +43,28 @@
   <data name="Editor_AnItemCannotContainItself_756ab5" xml:space="preserve">
     <value>Нельзя вложить пункт в самого себя или его дочернюю группу.</value>
   </data>
+  <data name="Editor_PrimaryConfiguration" xml:space="preserve"><value>Основная конфигурация</value></data>
+  <data name="Editor_SecondConfiguration" xml:space="preserve"><value>Конфигурация 2</value></data>
+  <data name="Editor_PropertiesTab" xml:space="preserve"><value>Свойства</value></data>
+  <data name="Editor_Import" xml:space="preserve"><value>Импорт</value></data>
+  <data name="Editor_SelectSource" xml:space="preserve"><value>Выберите конфигурацию</value></data>
+  <data name="Editor_SourceExplanation" xml:space="preserve"><value>Перетаскивайте пункты и группы между деревьями, чтобы перенести их. Чтобы сохранить изменения, сохраните обе конфигурации.</value></data>
+  <data name="Editor_TransferDrafts" xml:space="preserve"><value>Пункт перенесён. Чтобы сохранить перенос, сохраните обе конфигурации.</value></data>
+  <data name="Editor_TransferHistoryOrder" xml:space="preserve"><value>Сначала отмените или повторите ожидающие изменения в другой конфигурации.</value></data>
+  <data name="Editor_SaveTransferOrigin" xml:space="preserve"><value>Перенесённые пункты ещё не сохранены в другой конфигурации. Чтобы не потерять их, сначала сохраните другую конфигурацию. Всё равно сохранить эту?</value></data>
+  <data name="Editor_NewSourceConfiguration" xml:space="preserve"><value>Новая конфигурация 2</value></data>
+  <data name="Editor_RestoreDiscardedTransfer" xml:space="preserve"><value>В другой конфигурации больше нет перенесённых элементов. Отмените перенос здесь, прежде чем сохранять.</value></data>
+  <data name="Editor_KeepTransferredItems" xml:space="preserve"><value>Перенесённые элементы остались только в этой конфигурации. Сохраните их перед выходом.</value></data>
+  <data name="Editor_SaveBeforeMovingAgain" xml:space="preserve"><value>Сохраните эту конфигурацию, прежде чем переносить элемент снова. В исходной конфигурации он уже удалён.</value></data>
+  <data name="Editor_TransferShortcutConflict" xml:space="preserve"><value>Не удалось перенести элемент: сочетание {0} уже назначено в принимающей конфигурации.</value></data>
+  <data name="Editor_CopyToPrimary" xml:space="preserve"><value>Копировать в основную конфигурацию</value></data>
+  <data name="Editor_CopyTooDeep" xml:space="preserve"><value>В этом месте вложенность группы будет слишком глубокой. Выберите позицию ближе к корню дерева.</value></data>
+  <data name="Editor_UsedInOtherPane" xml:space="preserve"><value> (открыта в другой панели)</value></data>
+  <data name="Editor_ClearSource" xml:space="preserve"><value>Снять выбор источника</value></data>
+  <data name="Editor_DuplicateProfile" xml:space="preserve"><value>Эта конфигурация уже открыта в другой панели.</value></data>
+  <data name="Editor_SavePaneBeforeClosing" xml:space="preserve"><value>Сохранить изменения перед закрытием? {0}: «{1}».</value></data>
+  <data name="Editor_SavePaneBeforeSwitching" xml:space="preserve"><value>Сохранить изменения перед переключением? {0}: «{1}».</value></data>
+  <data name="Editor_SourceChanged" xml:space="preserve"><value>Конфигурация-источник изменилась на диске. Откройте её заново, чтобы загрузить текущую версию.</value></data>
   <data name="Editor_ApplyChangesBeforeClosing_c969f8" xml:space="preserve">
     <value>Сохранить изменения перед закрытием?</value>
   </data>
@@ -503,4 +525,8 @@
   <data name="Icon_Confirm" xml:space="preserve"><value>Выбрать</value></data>
   <data name="Icon_Preview" xml:space="preserve"><value>Выбранная иконка</value></data>
   <data name="Icon_ColorBundledOnly" xml:space="preserve"><value>Цвет доступен для встроенных иконок.</value></data>
+  <data name="Workflow_ActivateWindow" xml:space="preserve"><value>Активировать окно (прототип)</value></data>
+  <data name="Workflow_WindowProcess" xml:space="preserve"><value>Имя процесса (например, Taskmgr.exe)</value></data>
+  <data name="Workflow_WindowTitle" xml:space="preserve"><value>Заголовок содержит (необязательно)</value></data>
+  <data name="Workflow_WindowTimeout" xml:space="preserve"><value>Ожидание окна, мс</value></data>
 </root>

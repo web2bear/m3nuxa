@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
+using Windows.ApplicationModel.DataTransfer;
 using WinRT.Interop;
 
 namespace m3nuxa.Editor;
@@ -25,13 +26,15 @@ public sealed class EditorOleDropTarget : IEditorDropTarget, IDisposable
     private readonly bool oleInitialized;
     private readonly Func<bool> internalDrag;
     private readonly Func<double, double, bool> onInternalDrop;
+    private readonly Func<double, double, DataPackageOperation> internalDropOperation;
     private readonly Func<double, double, bool> onExternalDragOver;
     private readonly Action onExternalDragLeave;
     private bool externalDataSupported;
-    public EditorOleDropTarget(Window window, Action<IReadOnlyList<string>, double, double> onPaths, Action<string, bool, double, double> onText, string log, Func<bool> internalDrag, Func<double, double, bool> onInternalDrop, Func<double, double, bool> onExternalDragOver, Action onExternalDragLeave)
+    public EditorOleDropTarget(Window window, Action<IReadOnlyList<string>, double, double> onPaths, Action<string, bool, double, double> onText, string log, Func<bool> internalDrag, Func<double, double, bool> onInternalDrop, Func<double, double, bool> onExternalDragOver, Action onExternalDragLeave, Func<double, double, DataPackageOperation> internalDropOperation)
     {
         root = WindowNative.GetWindowHandle(window); this.onPaths = onPaths; this.onText = onText; this.log = log; this.internalDrag = internalDrag; this.onInternalDrop = onInternalDrop;
         this.onExternalDragOver = onExternalDragOver; this.onExternalDragLeave = onExternalDragLeave;
+        this.internalDropOperation = internalDropOperation;
         var init = OleInitialize(0);
         oleInitialized = init >= 0;
         Log($"OleInitialize={init:X8}");
@@ -48,7 +51,7 @@ public sealed class EditorOleDropTarget : IEditorDropTarget, IDisposable
     private void Log(string message) { if (log.Length != 0) File.AppendAllText(log, message + Environment.NewLine); else m3nuxa.App.DevLog.Write("editor", "OLE " + message); }
     public int DragEnter(IDataObject data, uint keys, EditorDropPoint point, ref uint effect)
     {
-        if (internalDrag()) { effect &= 2u; return 0; }
+        if (internalDrag()) return DragOver(keys, point, ref effect);
         var f = new FORMATETC { cfFormat = 15, dwAspect = DVASPECT.DVASPECT_CONTENT, lindex = -1, tymed = TYMED.TYMED_HGLOBAL };
         var hr = data.QueryGetData(ref f); var text = Supports(data, 13); var url = Supports(data, (short)RegisterClipboardFormat("UniformResourceLocatorW"));
         Log($"enter file={hr:X8} text={text} url={url} effect={effect} at={point.X},{point.Y}");
@@ -57,8 +60,8 @@ public sealed class EditorOleDropTarget : IEditorDropTarget, IDisposable
     }
     public int DragOver(uint keys, EditorDropPoint point, ref uint effect)
     {
-        if (internalDrag()) { effect &= 2u; return 0; }
         var (x, y) = ClientPoint(point);
+        if (internalDrag()) { effect &= (uint)internalDropOperation(x, y); return 0; }
         if (externalDataSupported && (effect & 1u) != 0 && onExternalDragOver(x, y)) effect &= 1u;
         else { effect = 0; onExternalDragLeave(); }
         return 0;
@@ -76,7 +79,12 @@ public sealed class EditorOleDropTarget : IEditorDropTarget, IDisposable
         try
         {
             var (x, y) = ClientPoint(point);
-            if (internalDrag()) { effect = onInternalDrop(x, y) ? 2u : 0u; return 0; }
+            if (internalDrag())
+            {
+                var operation = effect & (uint)internalDropOperation(x, y);
+                effect = operation != 0 && onInternalDrop(x, y) ? operation : 0u;
+                return 0;
+            }
             if (!externalDataSupported || (effect & 1u) == 0 || !onExternalDragOver(x, y)) { effect = 0; return 0; }
             effect &= 1u;
             var url = ReadText(data, (short)RegisterClipboardFormat("UniformResourceLocatorW"));
@@ -116,8 +124,15 @@ public sealed class EditorOleDropTarget : IEditorDropTarget, IDisposable
     internal static bool TryGetCursorPosition(Window window, out double x, out double y)
     {
         x = y = 0;
+        return GetCursorPos(out var point) && TryGetClientPosition(window, point, out x, out y);
+    }
+
+    internal static bool TryGetClientPosition(Window window, EditorDropPoint point, out double x, out double y, bool requireOverWindow = false)
+    {
+        x = y = 0;
         var hwnd = WindowNative.GetWindowHandle(window);
-        if (!GetCursorPos(out var point) || !ScreenToClient(hwnd, ref point)) return false;
+        if ((requireOverWindow && GetAncestor(WindowFromPoint(point), 2) != hwnd) ||
+            !ScreenToClient(hwnd, ref point)) return false;
         var scale = GetDpiForWindow(hwnd) / 96.0;
         x = point.X / scale;
         y = point.Y / scale;
@@ -126,6 +141,8 @@ public sealed class EditorOleDropTarget : IEditorDropTarget, IDisposable
     internal static bool IsDragButtonDown() => (GetAsyncKeyState(1) & 0x8000) != 0;
     [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int virtualKey);
     [DllImport("user32.dll")] private static extern bool GetCursorPos(out EditorDropPoint point);
+    [DllImport("user32.dll")] private static extern nint WindowFromPoint(EditorDropPoint point);
+    [DllImport("user32.dll")] private static extern nint GetAncestor(nint hwnd, uint flags);
     [DllImport("user32.dll")] private static extern bool EnumChildWindows(nint hwnd, EnumProc callback, nint lParam);
     [DllImport("user32.dll")] private static extern bool ScreenToClient(nint hwnd, ref EditorDropPoint point);
     [DllImport("user32.dll")] private static extern uint GetDpiForWindow(nint hwnd);

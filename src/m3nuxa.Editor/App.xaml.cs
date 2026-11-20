@@ -34,7 +34,6 @@ public partial class App : Application
         MainWindow.AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "EditorIcon.ico"));
         MainWindow.AppWindow.Resize(new SizeInt32(1160, 780));
         var position = new EditorWindowPosition(MainWindow.AppWindow);
-        MainWindow.AppWindow.TitleBar.PreferredTheme = TitleBarTheme.Dark;
         DevLog.Write("editor", "Creating MainPage");
         var page = new MainPage();
         var arguments = Environment.GetCommandLineArgs();
@@ -42,6 +41,7 @@ public partial class App : Application
         else if (arguments.Length >= 2 && arguments[1] == "--settings") page.ShowSettings();
         _ = ListenForSelectionAsync(page);
         MainWindow.Content = page;
+        page.AttachTitleBar(MainWindow);
         page.Loaded += (_, _) =>
         {
             if (page.XamlRoot is not { } root) return;
@@ -71,7 +71,7 @@ public partial class App : Application
         void AttachDropHook()
         {
             dropHook?.Dispose();
-            dropHook = new EditorOleDropTarget(MainWindow, page.AddDroppedPaths, page.AddExternalText, "", page.InternalDragActive, page.CompleteInternalDrop, page.UpdateExternalDropIndicator, page.ClearExternalDropIndicator);
+            dropHook = new EditorOleDropTarget(MainWindow, page.AddDroppedPaths, page.AddExternalText, "", page.InternalDragActive, page.CompleteInternalDrop, page.UpdateExternalDropIndicator, page.ClearExternalDropIndicator, page.InternalDropOperation);
             DevLog.Write("editor", "OLE drop target attached");
         }
         DevLog.Write("editor", "Activating window");

@@ -7,6 +7,8 @@ namespace m3nuxa.App;
 internal sealed record InvocationContext(IntPtr SourceWindow, IReadOnlyList<string> SelectedPaths, string? CurrentFolder)
 {
     public string? ClipboardText { get; init; }
+    public InputTarget InputTarget { get; init; } = new();
+    public nint InputWindow => InputTarget.GetWindow(SourceWindow);
     public static InvocationContext Capture(IntPtr? sourceWindow = null)
     {
         var window = sourceWindow ?? NativeMethods.GetForegroundWindow();
@@ -57,7 +59,7 @@ internal static class ActionExecutor
     {
         IActionHandler[] handlers = [new OpenFolderHandler(), new OpenItemHandler(), new RunProgramHandler(),
             new RunScriptHandler(), new SendShortcutHandler(), new CopySelectionHandler(), new MoveSelectionHandler(),
-            new InsertTextHandler(), new DelayHandler(), new SetClipboardTextHandler(), new PasteTextHandler()];
+            new InsertTextHandler(), new DelayHandler(), new SetClipboardTextHandler(), new PasteTextHandler(), new ActivateWindowHandler()];
         var byKind = handlers.ToDictionary(handler => handler.Kind);
         if (Enum.GetValues<ActionKind>().Any(kind => !byKind.ContainsKey(kind)))
             throw new InvalidOperationException("An action handler is missing.");
@@ -90,7 +92,7 @@ internal static class ActionExecutor
         if (action.Kind == ActionKind.Delay)
             return action.DelayMilliseconds < 0 ? L.Format("ConfigDelayInvalid", label).TrimStart(':', ' ') : null;
         if (action.Kind == ActionKind.SetClipboardText) return null;
-        if (action.Kind is ActionKind.RunProgram or ActionKind.RunScript && action.TimeoutMilliseconds is <= 0)
+        if (action.Kind is ActionKind.RunProgram or ActionKind.RunScript or ActionKind.ActivateWindow && action.TimeoutMilliseconds is <= 0)
             return L.Format("ConfigTimeoutInvalid", label).TrimStart(':', ' ');
         if (action.Kind == ActionKind.SendShortcut)
         {

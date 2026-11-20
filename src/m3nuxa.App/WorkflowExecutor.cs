@@ -14,11 +14,12 @@ internal sealed record WorkflowResult(bool Cancelled, int StepIndex, string? Err
 internal static class WorkflowExecutor
 {
     // All clipboard and input operations share this gate, even between independent launches.
-    private static readonly SemaphoreSlim InputGate = new(1, 1);
+    internal static readonly SemaphoreSlim InputGate = new(1, 1);
 
     public static async Task<WorkflowResult> RunAsync(IReadOnlyList<MenuAction> steps,
         InvocationContext context, CancellationToken cancellationToken, Action<int, MenuAction>? progress = null)
     {
+        context = context with { InputTarget = new InputTarget() };
         var index = -1;
         var fileSteps = new List<FileStepSummary>();
         WorkflowResult Finish(bool cancelled, int stepIndex, string? error) =>

@@ -53,7 +53,8 @@ public sealed class EditorPipeClient
         SendAsync("replaceDraft", new JsonObject { ["config"] = JsonSerializer.SerializeToNode(config, JsonOptions) });
     public Task<EditorResponse> ValidateAsync() => SendAsync("validate");
     public Task<EditorResponse> ApplyAsync() => SendAsync("apply");
-    public Task<EditorResponse> SaveAsAsync(string path) => SendAsync("saveAs", new JsonObject { ["path"] = path });
+    internal Task<EditorResponse> SaveProfileAsync(EditorPipeClient primary) =>
+        SendAsync("saveProfile", new JsonObject { ["primarySession"] = primary._session });
     public Task<EditorResponse> ReloadAsync() => SendAsync("reload");
 
     public static ConfigDraft? ReadDraft(EditorResponse response)

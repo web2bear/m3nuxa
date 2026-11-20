@@ -1,4 +1,4 @@
-﻿param([switch]$NoBuild)
+﻿param([switch]$NoBuild, [switch]$Source)
 $ErrorActionPreference = 'Stop'
 $out = Join-Path $PSScriptRoot 'bin/ui-checks'
 $diagnosticDirectory = Join-Path $env:TEMP ('m3nuxa-internal-drag-diag-' + [guid]::NewGuid().ToString('N'))
@@ -16,6 +16,7 @@ $state = Join-Path $env:TEMP ('m3nuxa-internal-' + [guid]::NewGuid().ToString('N
 $editor = $null
 $previousState = $env:m3nuxa_DROP_CHECK
 $previousLanguage = $env:m3nuxa_CHECK_LANGUAGE
+$previousSource = $env:m3nuxa_SOURCE_DROP_CHECK
 $settings = Join-Path $out 'app-language.json'
 $originalSettings = if (Test-Path -LiteralPath $settings) { [IO.File]::ReadAllBytes($settings) } else { $null }
 Add-Type -AssemblyName System.Windows.Forms
@@ -47,12 +48,58 @@ try {
     $env:m3nuxa_CHECK_LANGUAGE = 'ru-RU'
     [IO.File]::WriteAllText($settings, '{"Language":"ru-RU"}')
     $env:m3nuxa_DROP_CHECK = $state
+    $env:m3nuxa_SOURCE_DROP_CHECK = if ($Source) { '1' } else { $null }
     $editor = Start-Process -FilePath (Join-Path $out 'm3nuxa.Editor.Checks.exe') -ArgumentList @('--language', 'ru-RU') -WorkingDirectory $out -WindowStyle Hidden -PassThru
     Add-Content -LiteralPath $diagnosticLog -Value "Editor PID=$($editor.Id); state=$state"
     for ($i=0; $i -lt 60 -and (!(Test-Path $state) -or $editor.MainWindowHandle -eq 0); $i++) { Start-Sleep -Milliseconds 200; $editor.Refresh() }
     if (!(Test-Path $state) -or $editor.MainWindowHandle -eq 0) { throw 'Test editor did not start.' }
     [System.Windows.Forms.SendKeys]::SendWait('%')
     [void][InternalDropFocus]::SetForegroundWindow($editor.MainWindowHandle)
+    if ($Source) {
+        $null = Invoke-Winapp @('ui','screenshot','-a',"$($editor.Id)",'--output',(Join-Path $diagnosticDirectory 'source-before.png'),'--json')
+        $tree = Invoke-Winapp @('ui','inspect','-a',"$($editor.Id)",'--depth','18','--json')
+        $rows = @(Flatten $tree.windows.elements | Where-Object { $_.type -eq 'TreeItem' })
+        $primaryGroup = $rows | Where-Object { $_.name -match 'Destination$' } | Select-Object -First 1
+        $secondaryGroup = $rows | Where-Object { $_.name -match 'Source group$' } | Select-Object -First 1
+        if (!$primaryGroup -or !$secondaryGroup) { throw 'Could not find both drop targets.' }
+        $from = '{0},{1}' -f [int]($secondaryGroup.x + 100),[int]($secondaryGroup.y + $secondaryGroup.height / 2)
+        $to = '{0},{1}' -f [int]($primaryGroup.x + 100),[int]($primaryGroup.y + $primaryGroup.height / 2)
+        Save-DragEvidence 'secondary-to-primary' $tree $from $to
+        $null = Invoke-Winapp @('ui','drag',$from,$to,'-a',"$($editor.Id)",'--hold-ms','300','--dwell-ms','500','--json')
+        $found = $false
+        for ($attempt=0; $attempt -lt 25; $attempt++) {
+            Start-Sleep -Milliseconds 200
+            try { $model = Get-Content -Raw -LiteralPath $state | ConvertFrom-Json } catch { continue }
+            $moved = $model.Items[0].Children[0]
+            if ($moved.Name -eq 'Source group' -and $moved.Children.Count -eq 2 -and $moved.Children[0].Steps[0].Text -eq 'payload') { $found = $true; break }
+        }
+        if (!$found) { throw "No subtree in Configuration 1 after move. Diagnostics: $diagnosticDirectory" }
+        $tree = Invoke-Winapp @('ui','inspect','-a',"$($editor.Id)",'--depth','18','--json')
+        $rows = @(Flatten $tree.windows.elements | Where-Object { $_.type -eq 'TreeItem' })
+        $secondaryRoot = $rows | Where-Object { $_.name -eq 'Source fixture' } | Select-Object -First 1
+        $movedRows = @($rows | Where-Object { $_.name -match 'Source group$' })
+        if (!$secondaryRoot -or $movedRows.Count -ne 1 -or $movedRows[0].x -ge $secondaryRoot.x) {
+            throw 'The moved group must be visible in Configuration 1 only.'
+        }
+        $from = '{0},{1}' -f [int]($movedRows[0].x + 100),[int]($movedRows[0].y + $movedRows[0].height / 2)
+        $to = '{0},{1}' -f [int]($secondaryRoot.x + 100),[int]($secondaryRoot.y + $secondaryRoot.height + 60)
+        Save-DragEvidence 'primary-to-secondary' $tree $from $to
+        $null = Invoke-Winapp @('ui','drag',$from,$to,'-a',"$($editor.Id)",'--hold-ms','300','--dwell-ms','500','--json')
+        $found = $false
+        for ($attempt=0; $attempt -lt 25; $attempt++) {
+            Start-Sleep -Milliseconds 200
+            try { $model = Get-Content -Raw -LiteralPath $state | ConvertFrom-Json } catch { continue }
+            if ($model.Items.Count -eq 1 -and $model.Items[0].Children.Count -eq 0) { $found = $true; break }
+        }
+        $tree = Invoke-Winapp @('ui','inspect','-a',"$($editor.Id)",'--depth','18','--json')
+        $movedRows = @(Flatten $tree.windows.elements | Where-Object { $_.type -eq 'TreeItem' -and $_.name -match 'Source group$' })
+        if (!$found -or $movedRows.Count -ne 1 -or $movedRows[0].x -lt $secondaryRoot.x) {
+            throw "Real drag did not move Configuration 1 to Configuration 2. Diagnostics: $diagnosticDirectory"
+        }
+        $null = Invoke-Winapp @('ui','screenshot','-a',"$($editor.Id)",'--output',(Join-Path $diagnosticDirectory 'source-after.png'),'--json')
+        Write-Host 'PASS: real drag moved a group with children in both directions'
+        return
+    }
     $null = Invoke-Winapp @('ui','click','Default','--right','-a',"$($editor.Id)",'--json')
     $null = Invoke-Winapp @('ui','invoke','Добавить','-a',"$($editor.Id)",'--json')
     $null = Invoke-Winapp @('ui','invoke','Сниппет','-a',"$($editor.Id)",'--json')
@@ -104,6 +151,7 @@ try {
 } finally {
     $env:m3nuxa_DROP_CHECK = $previousState
     $env:m3nuxa_CHECK_LANGUAGE = $previousLanguage
+    $env:m3nuxa_SOURCE_DROP_CHECK = $previousSource
     if ($null -eq $originalSettings) { Remove-Item -LiteralPath $settings -Force -ErrorAction SilentlyContinue }
     else { [IO.File]::WriteAllBytes($settings, $originalSettings) }
     if ($editor -and !$editor.HasExited) { Stop-Process -Id $editor.Id }

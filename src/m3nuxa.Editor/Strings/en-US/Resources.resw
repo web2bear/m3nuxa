@@ -43,6 +43,28 @@ or select an existing item.</value>
   <data name="Editor_AnItemCannotContainItself_756ab5" xml:space="preserve">
     <value>An item cannot contain itself or one of its descendant groups.</value>
   </data>
+  <data name="Editor_PrimaryConfiguration" xml:space="preserve"><value>Primary configuration</value></data>
+  <data name="Editor_SecondConfiguration" xml:space="preserve"><value>Configuration 2</value></data>
+  <data name="Editor_PropertiesTab" xml:space="preserve"><value>Properties</value></data>
+  <data name="Editor_Import" xml:space="preserve"><value>Import</value></data>
+  <data name="Editor_SelectSource" xml:space="preserve"><value>Select a configuration</value></data>
+  <data name="Editor_SourceExplanation" xml:space="preserve"><value>Drag items and groups between the trees to move them. Save both configurations to keep the changes.</value></data>
+  <data name="Editor_TransferDrafts" xml:space="preserve"><value>Item moved. Save both configurations to keep the change.</value></data>
+  <data name="Editor_TransferHistoryOrder" xml:space="preserve"><value>Undo or redo the pending changes in the other configuration first.</value></data>
+  <data name="Editor_SaveTransferOrigin" xml:space="preserve"><value>The moved items are not saved in the other configuration yet. To avoid losing them, save that configuration first. Save this one anyway?</value></data>
+  <data name="Editor_RestoreDiscardedTransfer" xml:space="preserve"><value>The other configuration no longer contains the moved items. Undo the move here before saving.</value></data>
+  <data name="Editor_KeepTransferredItems" xml:space="preserve"><value>This configuration contains the only copy of the moved items. Keep and save the items before leaving.</value></data>
+  <data name="Editor_SaveBeforeMovingAgain" xml:space="preserve"><value>Save this configuration before moving the item again. The item is no longer saved in its original configuration.</value></data>
+  <data name="Editor_TransferShortcutConflict" xml:space="preserve"><value>Cannot move the item: {0} is already assigned in the destination configuration.</value></data>
+  <data name="Editor_NewSourceConfiguration" xml:space="preserve"><value>New configuration 2</value></data>
+  <data name="Editor_CopyToPrimary" xml:space="preserve"><value>Copy to primary configuration</value></data>
+  <data name="Editor_CopyTooDeep" xml:space="preserve"><value>The group would be nested too deeply here. Choose a position closer to the root.</value></data>
+  <data name="Editor_UsedInOtherPane" xml:space="preserve"><value> (open in the other pane)</value></data>
+  <data name="Editor_ClearSource" xml:space="preserve"><value>Clear source selection</value></data>
+  <data name="Editor_DuplicateProfile" xml:space="preserve"><value>This configuration is already open in the other pane.</value></data>
+  <data name="Editor_SavePaneBeforeClosing" xml:space="preserve"><value>Save changes to {0} “{1}” before closing?</value></data>
+  <data name="Editor_SavePaneBeforeSwitching" xml:space="preserve"><value>Save changes to {0} “{1}” before switching?</value></data>
+  <data name="Editor_SourceChanged" xml:space="preserve"><value>The source configuration changed on disk. Switch to it again to load the current version.</value></data>
   <data name="Editor_ApplyChangesBeforeClosing_c969f8" xml:space="preserve">
     <value>Save changes before closing?</value>
   </data>
@@ -503,4 +525,8 @@ or select an existing item.</value>
   <data name="Icon_Confirm" xml:space="preserve"><value>Select</value></data>
   <data name="Icon_Preview" xml:space="preserve"><value>Selected icon</value></data>
   <data name="Icon_ColorBundledOnly" xml:space="preserve"><value>Color is available for built-in icons.</value></data>
+  <data name="Workflow_ActivateWindow" xml:space="preserve"><value>Activate window (prototype)</value></data>
+  <data name="Workflow_WindowProcess" xml:space="preserve"><value>Process name (e.g. Taskmgr.exe)</value></data>
+  <data name="Workflow_WindowTitle" xml:space="preserve"><value>Window title contains (optional)</value></data>
+  <data name="Workflow_WindowTimeout" xml:space="preserve"><value>Wait for window, ms</value></data>
 </root>
